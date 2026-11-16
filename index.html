@@ -233,7 +233,7 @@ function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad')}
 function makeShip(key,q,r,f,team,ai,name){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
   const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,reinf:[],gen:{lvl:1,from:0,until:IMP+1},genLvl:1,
-    lastAdj:null,dead:false,msMode:'off',queue:[],fireSel:new Set(),flash:0,hist:[],target:null,
+    lastAdj:null,dead:false,msMode:'off',subMode:false,queue:[],fireSel:new Set(),flash:0,hist:[],target:null,
     auto:{gen:true},
     weapons:d.weapons.map(([t,arc])=>({t,T:WT[t],arc,alive:true,state:'idle',readyT:0,ammo:WT[t].mag||0,stages:0,charging:false,nextT:0,holding:false})),
     pd:d.pd.map(arc=>({arc,alive:true,shots:0,pending:[]}))};sh0.reactor0=sh0.reactor;sh0.boxes=buildBoxes(sh0);sh0.damaged=[];sh0.dc=[];return sh0}
@@ -377,7 +377,7 @@ function commit(){
   pending=shots;phase='resolving';resolveT=shots.length?endT+.3:0;buildHUD();net();
 }
 function finishResolve(){
-  const sum={};for(const sh of pending){const k=sh.s.name+'→'+sh.t.name;sum[k]=sum[k]||{n:0,h:0,d:0,team:sh.s.team};sum[k].n++;if(sh.hit){sum[k].h++;sum[k].d+=sh.dmg;applyDamage(sh.t,sh.dmg,sh.s)}else missText(sh.t)}
+  const sum={};for(const sh of pending){const k=sh.s.name+'→'+sh.t.name;sum[k]=sum[k]||{n:0,h:0,d:0,team:sh.s.team};sum[k].n++;if(sh.hit){sum[k].h++;sum[k].d+=sh.dmg;applyDamage(sh.t,sh.dmg,sh.s,null,sh.s.subMode&&(sh.kind==='beam'||sh.kind==='pd'))}else missText(sh.t)}
   for(const k in sum)log(`${when(T)} ${k}: ${sum[k].h}/${sum[k].n} hits, ${sum[k].d} dmg`,sum[k].team===0?'good':'bad');
   pending=[];if(checkEnd())return;nextImpulse()}
 
@@ -424,13 +424,17 @@ function canFireMount(s,key,t){if(!t||t.dead)return false;
 function hitP(s,key,t){const d=hexDist(s,t);if(key.startsWith('pd'))return accAt('laser',d);const T_=s.weapons[+key.slice(1)].T;return T_.acc?accAt(T_.acc,d):1}
 
 // ---- damage ----
-function applyDamage(t,dmg,src,fromPt){if(t.dead)return;let left=dmg;
+function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
   // reinforcement absorbs first, then base shields in proportion to generator level
   for(const x of t.reinf){const a=Math.min(x.amt,left);x.amt-=a;left-=a;if(!left)break}
   t.lastHitT=T;const sp=Math.min(t.shield,left);t.shield-=sp;left-=sp;   // shields absorb fully until they run out
   const absorbed=dmg-left;fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(26,50),text:'-'+dmg,t:1.4,max:1.4,color:left<=0?'#7fc8ff':'#ff6b6b'});
   sfx(left<=0?'hitShield':'hitHull',.8);if(absorbed>0)t.flash=.4;
   if(t.shield<=0&&sp>0&&(t.team===0||scanStatus(t)))log(`${t.name} base shields DOWN`,t.isPlayer?'bad':'good');
+  if(left>0&&sub&&src){const from=src.px,zone=hitZone(t,from);const cnt=src.subCnt||(src.subCnt={});const n=(cnt[t.name]||0)+1;
+    // subsystem targeting (lasers/PD): every third hit that gets past the shields knocks out a system instead of doing hull damage
+    if(n>=3){const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));if(valid.length){cnt[t.name]=0;const box=valid[Math.floor(Math.random()*valid.length)];t.boxes.splice(t.boxes.indexOf(box),1);
+      burst(t.px,8,'#ffe066');fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(52,70),text:'SYSTEM',t:1.6,max:1.6,color:'#ffe066'});sysHit(t,box);return}cnt[t.name]=2}else cnt[t.name]=n}
   if(left>0){burst(t.px,6,'#ffb36b');const from=fromPt||(src&&src.px)||t.px;const zone=hitZone(t,from);
     for(let n=0;n<left&&t.hull>0;n++){const struct=Math.max(0,t.hull-t.boxes.length);const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));
       const r=Math.random()*(struct+valid.length);let box=null;if(r>=struct&&valid.length)box=valid[Math.floor(r-struct)];else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
@@ -626,7 +630,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      ${dmgLine(s)}${dcPanel(s,sd)}
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${'N NE SE S SW NW'.split(' ')[s.f]}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
-    h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge all</button>`:''}<button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Offense',def:'Defense',hold:'Hold'}[s.msMode]}</button></span></h2>`;
+    h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
     const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff'};
     for(const G of GROUPS){const ws=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.grp===G.id);if(!ws.length)continue;
       if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
@@ -665,6 +669,7 @@ function doAct(a){const [k,v]=a.split(':');
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
   if(k==='undo')s.queue.pop();
+  else if(k==='submode')s.subMode=!s.subMode;
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
   else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:genCost(s)*+v});
   else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*REINF_COST});
@@ -915,11 +920,11 @@ function mpApplyState(m){const first=$('start').style.display!=='none'||!ships.l
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
 function mpApplyOrders(orders){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
-    s.ai=o.ai;s.msMode=o.msMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.ai=o.ai;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[])}}
   MP.guestReady=true;mpTryCommit()}
 
