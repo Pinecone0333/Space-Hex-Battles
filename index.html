@@ -479,6 +479,8 @@ function autoFireSel(s,t){return [] }
 // ---- AI ----
 // AI keeps enough energy back to renew the shield generator when renewal is near (shields collapse if it lapses)
 function genReserve(s){return (s.gen.until-T<=4&&!qHas(s,'gen'))?genCost(s):0}
+// pivot direction for the AI: the short way if those thrusters work, otherwise the long way round (thrusters on that side destroyed)
+function aiPivotDir(s,fd){if(!fd)return 0;const d=Math.sign(fd);return isFinite(pivotCost(s,d))?d:isFinite(pivotCost(s,-d))?-d:0}
 function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);if(s.ai&&impOf(T)===1)s.target=nearestEnemy(s);const t=tgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
@@ -527,8 +529,8 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   if(em>=(urgent?.75:1.5)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent?0:Math.min(8,s.reactor/4))){let best=null,bv=em;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const b=burnResult(s,k);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?.15:0)+(b.f!==s.f?.05:0)+(tb>120*D2R?.8:0);if(ne<bv-.2){bv=ne;best=k}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
     if(best)queue(s,{type:'burn',a:best,cost:burnCost(s,best)});
-    else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/3));if(fd)queue(s,{type:'pivot',dir:Math.sign(fd),cost:pivotCost(s,Math.sign(fd))})}}
-  else{const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/3));if(fd&&s.E-qCost(s)>reserve+pivotCost(s,Math.sign(fd)))queue(s,{type:'pivot',dir:Math.sign(fd),cost:pivotCost(s,Math.sign(fd))})}
+    else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/3));const pd=aiPivotDir(s,fd);if(pd)queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}}
+  else{const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/3));const pd=aiPivotDir(s,fd);if(pd&&s.E-qCost(s)>reserve+pivotCost(s,pd))queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}
   // weapons by priority, keeping a little energy back for manoeuvres
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
