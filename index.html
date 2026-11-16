@@ -71,7 +71,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
  <div id="forms" class="row" style="justify-content:center;gap:14px;margin-bottom:8px"></div>
  <div class="row" style="justify-content:center"><button class="btn big go" id="go">Launch battle ▶</button></div>
  <div class="dim" style="font-size:11px;margin-top:10px">8 impulses per turn; spend energy and fire at any impulse. Velocity carries over until you burn to change it. Burn 2 (reverse 4) for cruisers, half that for frigates/destroyers, one per impulse; cruisers must burn straight after a turn or slip; frigates/destroyers can't repeat a turn or a slip back to back; pivot 2 per facing (frigates/destroyers 0.5).<br>
- Shield generator 25–100% (heavy cruiser 10 energy, cruiser 7.5, frigate/destroyer 5), online next impulse for one turn (8 impulses); repair base shields or reinforce at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
+ Shield generator 25–100% (heavy cruiser 10 energy, cruiser 7.5, frigate/destroyer 5), online next impulse for one turn (8 impulses); reinforce at 1 energy per point, repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
  Heavy cruisers: reactor 42, 50 shields / 150 hull · Albatross: reactor 30, 40 / 110 · Dogahr Light Cruiser: reactor 28, 35 / 90 · Dogahr Destroyers: reactor 18, 28 / 64 · Peregrine: reactor 16, 25 / 60 · Dogahr Frigate: reactor 16, 20 / 48.</div>
 </div></div>
 <div id="end" class="overlay" style="display:none"><div class="box" style="text-align:center"><h1 id="endTitle"></h1><div id="endSub" class="dim" style="margin:8px 0 16px"></div><button class="btn big" id="again">Choose ship again</button></div></div>
@@ -192,8 +192,9 @@ function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
 function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));   // <0 port half, >0 starboard half
-  if(x.k==='w'){const w=t.weapons[x.i];return w.alive&&inArc(t,w.arc,pixToHex(from.x,from.y))}
-  if(x.k==='pd'){const p=t.pd[x.i];return p.alive&&inArc(t,p.arc,pixToHex(from.x,from.y))}
+  const inA=arc=>{const [c,hw]=ARCS[arc];return hw>=180||Math.abs(norm(side-c*D2R))<=hw*D2R+1e-6};   // exact bearing, not hex-rounded
+  if(x.k==='w'){const w=t.weapons[x.i];return w.alive&&inA(w.arc)}
+  if(x.k==='pd'){const p=t.pd[x.i];return p.alive&&inA(p.arc)}
   if(x.k==='eng')return zone==='rear';if(x.k==='thrP')return side<0;if(x.k==='thrS')return side>0;return true}
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
 const thrMul=(s,dir)=>[1,1.5,2,Infinity][(dir>0?s.dmgThrP:s.dmgThrS)||0];   // port thrusters turn you to starboard (dir +1), starboard thrusters to port
@@ -235,7 +236,7 @@ function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return f
 const qCost=s=>s.queue.reduce((a,x)=>a+x.cost,0);
 const qHas=(s,type)=>s.queue.some(x=>x.type===type);
 const qShieldPts=s=>s.queue.filter(x=>x.type==='reinf'||x.type==='repair').reduce((a,x)=>a+x.n,0);   // max 2 shield points per impulse
-const SHIELD_PT_COST=2;
+const REINF_COST=1,REPAIR_COST=2;   // reinforcement 1:1, base-shield regeneration 2:1
 function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
   if(act.type==='burn'){if(qHas(s,'burn'))return false;const pv=s.queue.filter(x=>x.type==='pivot');return burnAllowed(s,act.a)}
@@ -477,7 +478,7 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   s.pd.forEach((pp,i)=>{if(s.E-qCost(s)>reserve)while(queue(s,{type:'pd',i,cost:1})){}});
   const gunsWaiting=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
-  if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*SHIELD_PT_COST});   // repair only once every gun is loaded or loading
+  if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
   // fire
   const fire=[];
   if(s.d.doctrine==='alpha'){
@@ -529,7 +530,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='';
      <div class="row dim"><label><input type="checkbox" data-auto="gen" ${s.auto.gen?'checked':''}> auto-renew generator</label></div>
      <div class="row dim">Generator ${Math.round(g*100)}%${s.gen.from>T?` (online ${when(s.gen.from)})`:''} · until ${when(s.gen.until)} · regen +${(genRegen(s)*g).toFixed(1)}/turn</div>`;
     if(sd){h+=`<div class="row">Gen: ${[.25,.5,.75,1].map(l=>btn('gen:'+l,Math.round(l*100)+'%',canQueue(s,{type:'gen',lvl:l,cost:gc*l}),(gc*l)+' energy')).join('')}</div>
-      <div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
+      <div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:1}),'1 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:2}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`}
     h+=dmgLine(s);h+=`<div class="row dim">Velocity <b class="txt">${vlen(s.vq,s.vr)}</b> hexes/turn · facing ${'N NE SE S SW NW'.split(' ')[s.f]}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.queue.length&&!s.ai)h+=`<div class="panel"><h2>Queued for ${s.name} <button class="btn" data-act="undo" style="float:right">Undo ⌫</button></h2><div class="dim">${s.queue.map(x=>qLabel(s,x)).join(' · ')}</div></div>`;
@@ -581,8 +582,8 @@ function doAct(a){const [k,v]=a.split(':');
   if(k==='undo')s.queue.pop();
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
   else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:genCost(s)*+v});
-  else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*SHIELD_PT_COST});
-  else if(k==='repair')queue(s,{type:'repair',n:+v,cost:+v*SHIELD_PT_COST});
+  else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*REINF_COST});
+  else if(k==='repair')queue(s,{type:'repair',n:+v,cost:+v*REPAIR_COST});
   else if(k==='start'){const w=s.weapons[+v];queue(s,{type:'start',i:+v,cost:w.T.kind==='torp'?w.T.perTurn:w.T.cost})}
   else if(k==='hold')queue(s,{type:'hold',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
