@@ -191,10 +191,10 @@ function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.
   for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<5;i++)b.push({k:'rea'});return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
-function boxValid(t,x,from,zone){
+function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));   // <0 port half, >0 starboard half
   if(x.k==='w'){const w=t.weapons[x.i];return w.alive&&inArc(t,w.arc,pixToHex(from.x,from.y))}
   if(x.k==='pd'){const p=t.pd[x.i];return p.alive&&inArc(t,p.arc,pixToHex(from.x,from.y))}
-  if(x.k==='eng')return zone==='rear';if(x.k==='thrP')return zone==='port';if(x.k==='thrS')return zone==='stbd';return true}
+  if(x.k==='eng')return zone==='rear';if(x.k==='thrP')return side<0;if(x.k==='thrS')return side>0;return true}
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
 const thrMul=(s,dir)=>[1,1.5,2,Infinity][(dir>0?s.dmgThrP:s.dmgThrS)||0];   // port thrusters turn you to starboard (dir +1), starboard thrusters to port
 function sysHit(t,x){let msg;
