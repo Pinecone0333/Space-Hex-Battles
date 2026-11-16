@@ -1,4 +1,4 @@
-# Space Hex Battles
+# Space Hex Tactics
 
 Impulse-based, Newtonian hex space combat between the Dogahr and the Martians.
 
