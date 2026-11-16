@@ -444,7 +444,7 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
     // Martian: stay out of the fight while charging; once every gun is loaded and torpedoes are full, close and fire everything at once
     s.mode=s.alphaDone&&torps.length?'brawl':(torps.length?torps.every(ready):guns.every(ready))?'attack':'charge';
     if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
-    else if(s.mode==='attack'){want={range:1,radial:1.2};face=a;prio=['torps','coils','lasers'];reserve=4}
+    else if(s.mode==='attack'){want={range:1,radial:1.2};face=d>4?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
     else{want={range:15,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
   }else if(s.d.doctrine==='hunt'||s.d.doctrine==='brawl'){
     // Dogahr: hunt at mid range; if an enemy within 12 hexes has full torpedoes, stand off at 10 (torpedoes only 45% there)
@@ -477,6 +477,10 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
     if(s.E-qCost(s)-c<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   s.pd.forEach((pp,i)=>{if(s.E-qCost(s)>reserve)while(queue(s,{type:'pd',i,cost:1})){}});
+  // Martian shield reinforcement (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
+  if(s.d.doctrine==='alpha'){const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
+    if(inbound||d<=10){const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*.4-reinfAmt(s)));const n=Math.floor(room);
+      if(n>=1&&s.E-qCost(s)-n*REINF_COST>=(s.mode==='charge'?6:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
   const gunsWaiting=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
   if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
   // fire
