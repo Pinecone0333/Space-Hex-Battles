@@ -71,7 +71,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
  <div id="forms" class="row" style="justify-content:center;gap:14px;margin-bottom:8px"></div>
  <div class="row" style="justify-content:center"><button class="btn big go" id="go">Launch battle ▶</button></div>
  <div class="dim" style="font-size:11px;margin-top:10px">8 impulses per turn; spend energy and fire at any impulse. Velocity carries over until you burn to change it. Burn 2 (reverse 4) for cruisers, half that for frigates/destroyers, one per impulse; cruisers must burn straight after a turn or slip; frigates/destroyers can't repeat a turn or a slip back to back; pivot 2 per facing (frigates/destroyers 0.5).<br>
- Shield generator 25–100% (heavy cruiser 10 energy, cruiser 7.5, frigate/destroyer 5), online next impulse for one turn (8 impulses); reinforce or repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
+ Shield generator on/off (heavy cruiser 10 energy per turn, cruiser 7.5, frigate/destroyer 5); if it goes off, shields collapse to 0 and must be rebuilt. Regeneration: none if hit in the last 4 impulses, base rate if hit in the last 12, double otherwise; reinforce or repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
  Heavy cruisers: reactor 42, 50 shields / 150 hull · Albatross: reactor 30, 40 / 110 · Dogahr Light Cruiser: reactor 28, 35 / 90 · Dogahr Destroyers: reactor 18, 28 / 64 · Peregrine: reactor 16, 25 / 60 · Dogahr Frigate: reactor 16, 20 / 48.</div>
 </div></div>
 <div id="end" class="overlay" style="display:none"><div class="box" style="text-align:center"><h1 id="endTitle"></h1><div id="endSub" class="dim" style="margin:8px 0 16px"></div><button class="btn big" id="again">Choose ship again</button></div></div>
@@ -217,7 +217,10 @@ const enemiesOf=s=>ships.filter(x=>!x.dead&&x.team!==s.team);
 const mine=()=>ships.filter(s=>s.team===0&&!s.dead&&!s.ai);
 function nearestEnemy(s){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d<bd){bd=d;b=e}}return b}
 function tgt(s){if(!s.target||s.target.dead)s.target=nearestEnemy(s);return s.target}
-const genLvl=s=>(T>=s.gen.from&&T<s.gen.until)?s.gen.lvl:0;
+const genLvl=s=>(T>=s.gen.from&&T<s.gen.until)?1:0;   // generator is on or off (no partial power)
+// regeneration depends on how recently the ship was hit: within 4 impulses 0, within 12 impulses the base rate, otherwise double
+const regenTier=s=>{const dt=T-(s.lastHitT??-999);return dt<=4?2:dt<=12?1:0};
+const regenRate=s=>genLvl(s)?[2,1,0][regenTier(s)]*genRegen(s):0;
 const reinfAmt=s=>s.reinf.reduce((a,x)=>a+x.amt,0);
 const torpStored=w=>w.stages*w.T.perTurn;
 const torpDmg=w=>torpStored(w)*2;
@@ -241,7 +244,7 @@ function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
   if(act.type==='burn'){if(qHas(s,'burn'))return false;const pv=s.queue.filter(x=>x.type==='pivot');return burnAllowed(s,act.a)}
   if(act.type==='gen')return !qHas(s,'gen');
-  if(act.type==='reinf'){if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;return s.shield+reinfAmt(s)+act.n<=s.d.shield*2}
+  if(act.type==='reinf'){if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;if(!(genLvl(s)>0||qHas(s,'gen')))return false;return s.shield+reinfAmt(s)+act.n<=s.d.shield*2}
   if(act.type==='repair'){if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;if(!(genLvl(s)>0||qHas(s,'gen')))return false;return s.shield+act.n<=s.d.shield}
   if(act.type==='start'){const w=s.weapons[act.i];if(!w.alive||s.queue.some(x=>x.type==='start'&&x.i===act.i))return false;return w.T.kind==='torp'?w.state==='idle'||(w.holding&&w.stages<3):w.state==='idle'}
   if(act.type==='hold'){const w=s.weapons[act.i];return w.alive&&w.charging&&w.stages>=1&&!s.queue.some(x=>x.type==='hold'&&x.i===act.i)}
@@ -252,7 +255,7 @@ function applyQueue(s){
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;s.E-=a.cost;
     if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';s.burnFx=1}
     else if(a.type==='pivot'){s.f=(s.f+a.dir+6)%6}
-    else if(a.type==='gen'){s.gen={lvl:a.lvl,from:T+1,until:T+1+IMP};s.genLvl=a.lvl}
+    else if(a.type==='gen'){const on=genLvl(s)>0;s.gen={lvl:1,from:on?s.gen.from:T+1,until:Math.max(s.gen.until,T)+IMP};s.genLvl=1}   // renewing while running extends seamlessly
     else if(a.type==='reinf'){s.reinf.push({amt:a.n,exp:T+IMP});if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='repair'){s.shield=Math.min(s.d.shield,s.shield+a.n);if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='start'){const w=s.weapons[a.i];
@@ -267,7 +270,8 @@ function applyQueue(s){
 function upkeep(s){
   s.E=Math.min(s.reactor,s.E+income(s));
   s.reinf=s.reinf.filter(x=>x.exp>T&&x.amt>0);
-  const g=genLvl(s);if(g>0)s.shield=Math.min(s.d.shield,s.shield+genRegen(s)*g/IMP);
+  if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
+  else s.shield=Math.min(s.d.shield,s.shield+regenRate(s)/IMP);
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
     if(K==='torp'){
       if(w.charging&&T>=w.nextT){w.stages++;
@@ -391,7 +395,7 @@ function hitP(s,key,t){const d=hexDist(s,t);if(key.startsWith('pd'))return accAt
 function applyDamage(t,dmg,src,fromPt){if(t.dead)return;let left=dmg;
   // reinforcement absorbs first, then base shields in proportion to generator level
   for(const x of t.reinf){const a=Math.min(x.amt,left);x.amt-=a;left-=a;if(!left)break}
-  const g=genLvl(t);const sp=Math.min(t.shield,left*g);t.shield-=sp;left-=sp;
+  t.lastHitT=T;const sp=Math.min(t.shield,left);t.shield-=sp;left-=sp;   // shields absorb fully until they run out
   const absorbed=dmg-left;fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(26,50),text:'-'+dmg,t:1.4,max:1.4,color:left<=0?'#7fc8ff':'#ff6b6b'});
   sfx(left<=0?'hitShield':'hitHull',.8);if(absorbed>0)t.flash=.4;
   if(t.shield<=0&&sp>0)log(`${t.name} base shields DOWN`,t.isPlayer?'bad':'good');
@@ -415,7 +419,7 @@ function showEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>
 
 // ---- automation (player standing orders + AI helpers) ----
 function autoQueue(s){   // standing order: generator renewal only (weapons are never queued automatically)
-  if(s.auto.gen&&s.genLvl>0&&s.gen.until<=T+1&&!qHas(s,'gen'))queue(s,{type:'gen',lvl:s.genLvl,cost:genCost(s)*s.genLvl});
+  if(s.auto.gen&&s.gen.until<=T+1&&!qHas(s,'gen'))queue(s,{type:'gen',lvl:1,cost:genCost(s)});
 }
 function chargeAll(s){let n=0;
   s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
@@ -429,6 +433,8 @@ function decelBurn(s){ // the legal burn that leaves the lowest speed (prefers c
 function autoFireSel(s,t){return [] }
 
 // ---- AI ----
+// AI keeps enough energy back to renew the shield generator when renewal is near (shields collapse if it lapses)
+function genReserve(s){return (s.gen.until-T<=4&&!qHas(s,'gen'))?genCost(s):0}
 function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);if(s.ai&&impOf(T)===1)s.target=nearestEnemy(s);const t=tgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
@@ -467,20 +473,20 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;const Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
   const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<9||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.evadeUntil>T;
-  if(em>=(urgent?.75:1.5)&&s.E-qCost(s)>burnCost(s,'F')+(urgent?0:Math.min(8,s.reactor/4))){let best=null,bv=em;
+  if(em>=(urgent?.75:1.5)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent?0:Math.min(8,s.reactor/4))){let best=null,bv=em;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const b=burnResult(s,k);const bp=hp(b.dq,b.dr);const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?.15:0)+(b.f!==s.f?.05:0);if(ne<bv-.2){bv=ne;best=k}}
     if(best)queue(s,{type:'burn',a:best,cost:burnCost(s,best)});
     else{const fd=Math.round(norm(Math.atan2(e.y,e.x)-fAng(s.f))/(Math.PI/3));if(fd)queue(s,{type:'pivot',dir:Math.sign(fd),cost:pivotCost(s,Math.sign(fd))})}}
   else{const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/3));if(fd&&s.E-qCost(s)>reserve+pivotCost(s,Math.sign(fd)))queue(s,{type:'pivot',dir:Math.sign(fd),cost:pivotCost(s,Math.sign(fd))})}
   // weapons by priority, keeping a little energy back for manoeuvres
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
-    if(s.E-qCost(s)-c<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
+    if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
-  s.pd.forEach((pp,i)=>{if(s.E-qCost(s)>reserve)while(queue(s,{type:'pd',i,cost:1})){}});
+  s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-1>=reserve&&queue(s,{type:'pd',i,cost:1})){}});
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
   {const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
     if(inbound||d<=10){const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*.4-reinfAmt(s)));const n=Math.floor(room);
-      if(n>=1&&s.E-qCost(s)-n*REINF_COST>=(s.mode==='charge'?6:s.d.faction==='Dogahr'?4:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
+      if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=(s.mode==='charge'?6:s.d.faction==='Dogahr'?4:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
   const gunsWaiting=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
   if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
   // fire
@@ -532,8 +538,8 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='';
      <div class="row"><span class="lab">Shields</span>${bar(s.shield,s.d.shield,'sh')}<span class="val">${s.shield.toFixed(1)}/${s.d.shield}</span></div>
      <div class="row"><span class="lab">Reinforce</span>${bar(reinfAmt(s),s.d.shield,'rf')}<span class="val">+${reinfAmt(s).toFixed(0)}</span></div>
      <div class="row dim"><label><input type="checkbox" data-auto="gen" ${s.auto.gen?'checked':''}> auto-renew generator</label></div>
-     <div class="row dim">Generator ${Math.round(g*100)}%${s.gen.from>T?` (online ${when(s.gen.from)})`:''} · until ${when(s.gen.until)} · regen +${(genRegen(s)*g).toFixed(1)}/turn</div>`;
-    if(sd){h+=`<div class="row">Gen: ${[.25,.5,.75,1].map(l=>btn('gen:'+l,Math.round(l*100)+'%',canQueue(s,{type:'gen',lvl:l,cost:gc*l}),(gc*l)+' energy')).join('')}</div>
+     <div class="row dim">Generator <b class="${g?'good':'bad'}">${g?'ON':'OFF'}</b>${s.gen.from>T?` (online ${when(s.gen.from)})`:''}${g?` · paid until ${when(s.gen.until)}`:''} · regen <b>+${regenRate(s).toFixed(0)}/turn</b> <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>`;
+    if(sd){h+=`<div class="row">${btn('gen:1',g?'Renew generator':'Start generator',canQueue(s,{type:'gen',lvl:1,cost:gc}),gc+' energy per turn. Shields collapse to 0 whenever the generator is off and must be rebuilt.')}</div>
       <div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`}
     h+=dmgLine(s);h+=`<div class="row dim">Velocity <b class="txt">${vlen(s.vq,s.vr)}</b> hexes/turn · facing ${'N NE SE S SW NW'.split(' ')[s.f]}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
@@ -560,7 +566,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='';
   // enemies list
   const foes=ships.filter(x=>x.team===1);const ct=P&&!P.dead?tgt(P):null;
   h+=`<div class="panel"><h2>Enemy ships <span class="dim" style="text-transform:none">(click to target)</span></h2><div class="tabs scroll">${foes.map(x=>`<div class="tab ${x===ct?'sel':''} ${x.dead?'dead':''}" data-tgt="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':` <span class="dim">${P&&!P.dead?hexDist(P,x)+' hexes':''}</span>`}
-    <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">v ${vlen(x.vq,x.vr)} · gen ${Math.round(genLvl(x)*100)}%${reinfAmt(x)?' · +'+reinfAmt(x).toFixed(0)+' reinf':''}</span></div>`).join('')}</div></div>`;
+    <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">v ${vlen(x.vq,x.vr)} · gen ${genLvl(x)?'on':'OFF'}${reinfAmt(x)?' · +'+reinfAmt(x).toFixed(0)+' reinf':''}</span></div>`).join('')}</div></div>`;
   h+=`<div class="panel" id="log"></div>`;
   $('side').innerHTML=h;$('log').innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('');
   let b='';if(dec&&s&&!s.dead&&!s.ai){const B=(k,lab,a)=>{const act={type:'burn',a,cost:burnCost(s,a)};return `<button class="btn big" data-act="burn:${a}" ${canQueue(s,act)?'':'disabled'} title="${act.cost} energy"><span class="k">${k}</span> ${lab}</button>`};
@@ -585,7 +591,7 @@ function doAct(a){const [k,v]=a.split(':');
   const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
   if(k==='undo')s.queue.pop();
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
-  else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:genCost(s)*+v});
+  else if(k==='gen')queue(s,{type:'gen',lvl:1,cost:genCost(s)});
   else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*REINF_COST});
   else if(k==='repair')queue(s,{type:'repair',n:+v,cost:+v*REPAIR_COST});
   else if(k==='start'){const w=s.weapons[+v];queue(s,{type:'start',i:+v,cost:w.T.kind==='torp'?w.T.perTurn:w.T.cost})}
