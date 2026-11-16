@@ -441,7 +441,13 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=enemyMs>ownMs?'def':'off';
-  if(s.gen.until<=T+1)queue(s,{type:'gen',lvl:1,cost:genCost(s)});
+  if(s.gen.until<=T+1){
+    // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
+    // pick the lowest level whose cap still holds the current shields, so nothing is lost
+    const need=s.weapons.reduce((a,w)=>a+(!w.alive?0:w.T.kind==='torp'?((w.charging||w.state==='idle')?w.T.perTurn:0):(w.T.kind!=='missile'&&w.state==='idle'?w.T.cost:0)),0)+4;
+    const frac=s.shield/s.d.shield,full=genCost(s);let lvl=1;
+    if(frac<.75&&s.E+income(s)*IMP-full<need&&regenTier(s)>0)lvl=Math.max(.25,Math.ceil(frac*4-1e-9)/4);
+    if(!queue(s,{type:'gen',lvl,cost:full*lvl})&&lvl>.25){const l2=Math.max(.25,Math.ceil(frac*4-1e-9)/4);queue(s,{type:'gen',lvl:l2,cost:full*l2})}}
   const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp');
   const A=hp(s.q,s.r),B=hp(t.q,t.r);const a=Math.atan2(B.y-A.y,B.x-A.x);const side=norm(relBearing(s,t))>=0?1:-1;
   let want,face,prio,reserve=6;
