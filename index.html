@@ -414,7 +414,7 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   if(s.d.doctrine==='alpha'){
     // Martian: stay out of the fight while charging; once every gun is loaded and torpedoes are full, close and fire everything at once
     s.mode=s.alphaDone&&torps.length?'brawl':(torps.length?torps.every(ready):guns.every(ready))?'attack':'charge';
-    if(s.mode==='brawl'){want={range:2,radial:1.2,chase:true};face=a;prio=['torps','coils','lasers'];reserve=3}   // after the alpha strike: stay in close, torpedoes every turn
+    if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
     else if(s.mode==='attack'){want={range:1,radial:1.2};face=a;prio=['torps','coils','lasers'];reserve=4}
     else{want={range:15,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
   }else if(s.d.doctrine==='hunt'||s.d.doctrine==='brawl'){
@@ -437,7 +437,7 @@ function aiDecide(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(s);
   const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;const Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='standoff'&&d<9||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.evadeUntil>T;
+  const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||s.mode==='standoff'&&d<9||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.evadeUntil>T;
   if(em>=(urgent?.75:1.5)&&s.E-qCost(s)>R.burn+(urgent?0:Math.min(8,s.reactor/4))){let best=null,bv=em;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const b=burnResult(s,k);const bp=hp(b.dq,b.dr);const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?.15:0)+(b.f!==s.f?.05:0);if(ne<bv-.2){bv=ne;best=k}}
     if(best)queue(s,{type:'burn',a:best,cost:best==='R'?R.reverse:R.burn});
