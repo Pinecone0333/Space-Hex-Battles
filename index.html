@@ -371,12 +371,12 @@ function commit(){
   for(const s of alive())applyQueue(s);
   const shots=[];
   const collect=(s,t,sel)=>{for(const key of sel){if(!canFireMount(s,key,t))continue;
-    if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
+    if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
     if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
-      missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',s.team===0?1:.65);continue}
+      fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',s.team===0?1:.65);continue}
     let dmg=w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3))(o.torpMem||(o.torpMem={}))[s.name]=false}else w.state='idle';
-    shots.push({s,t,kind:K,dmg,hit:Math.random()<hitP(s,key,t)})}};
+    fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,dmg,hit:Math.random()<hitP(s,key,t)})}};
   for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
   for(const s of alive()){if(s.msMode!=='def')continue;
     const thr=missiles.filter(m=>!m.dead&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead)&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=R.defRange);
@@ -390,6 +390,14 @@ function commit(){
     f.d=d;fx.push(f);endT=Math.max(endT,d+f.max)});
   pending=shots;phase='resolving';resolveT=shots.length?endT+.3:0;buildHUD();net();
 }
+// fire history (what each ship fired, and when) — weapon fire is visible at any range
+function fireRec(s,ab,kind,dmg,t,n=1){const L=s.fireLog||(s.fireLog=[]);let e=L.find(x=>x.T===T&&x.ab===ab);if(!e){e={T,ab,kind,n:0,dmg:0,at:t.name};L.push(e);if(L.length>24)L.shift()}e.n+=n;e.dmg+=dmg}
+function fireHist(t){const L=t.fireLog||[];const seen=new Set(),out=[];for(let i=L.length-1;i>=0&&out.length<6;i--){const e=L[i];if(seen.has(e.ab))continue;seen.add(e.ab);out.push(e)}
+  if(!out.length)return `<div class="row dim sm">Recent fire: none seen</div>`;
+  return `<div class="sm" style="margin-top:2px"><span class="dim">Recent fire</span>${out.map(e=>{const ago=T-e.T;const cls=ago<=2?'bad':ago<IMP?'warn':'dim';
+    const what=e.kind==='missile'?`${e.n} launched`:e.kind==='pd'?`${e.n} shot${e.n>1?'s':''}`:e.kind==='torp'?`×${e.n} · ${e.dmg} dmg`:`×${e.n}`;
+    const nxt=e.kind==='torp'?' · recharging':e.kind==='pd'?'':` · ${e.kind==='missile'?'next launch':'reload'} ≥ ${when(e.T+IMP+(e.kind==='missile'?0:1))}`;
+    return `<div class="${cls}"><b>${e.ab}</b> ${what} · ${when(e.T)} <span class="dim">(${ago?ago+' imp ago':'just now'}${e.at!==t.name?'':''}${nxt})</span></div>`}).join('')}</div>`}
 function finishResolve(){
   const sum={};for(const sh of pending){const k=sh.s.name+'→'+sh.t.name;sum[k]=sum[k]||{n:0,h:0,d:0,team:sh.s.team};sum[k].n++;if(sh.hit){sum[k].h++;sum[k].d+=sh.dmg;applyDamage(sh.t,sh.dmg,sh.s,null,sh.s.subMode&&(sh.kind==='beam'||sh.kind==='pd'))}else missText(sh.t)}
   for(const k in sum)log(`${when(T)} ${k}: ${sum[k].h}/${sum[k].n} hits, ${sum[k].d} dmg`,sum[k].team===0?'good':'bad');
@@ -626,6 +634,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
     const dl=Object.entries(dead).map(([n,c])=>n+(c>1?' ×'+c:'')).join(', ');
     h+=`<div class="row dim sm">Damage: eng <b class="${t.dmgEng?'bad':''}">${pip(t.dmgEng)}</b> P <b class="${t.dmgThrP?'bad':''}">${pip(t.dmgThrP)}</b> S <b class="${t.dmgThrS?'bad':''}">${pip(t.dmgThrS)}</b> · rea <b class="${t.dmgRea?'bad':''}">${100-10*(t.dmgRea||0)}%</b> · sens <b class="${t.dmgSen?'bad':''}">${sensRange(t)}</b>${dl?` · <span class="bad">✖ ${dl}</span>`:''}${(t.dc||[]).length?` · 🔧 ${t.dc.length} repair${t.dc.length>1?'s':''} under way`:''}</div>`}
   else h+=`<div class="row dim sm">Weapons and system damage: ${best?`not scanned — need ≤ ${best} hexes`:'no sensors'}</div>`;
+  h+=fireHist(t);
   return h+`</div>`}
 function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',rh='';
   const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
