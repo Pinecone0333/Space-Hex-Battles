@@ -735,14 +735,14 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   if(AIV.wfirst&&d<=12&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
-  const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&(w.T.kind==='slug'&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
-  const wantNose=AIV.align&&spReady&&d<=9&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run');
+  const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
+  const wantNose=AIV.align&&spReady&&d<=(s.d.faction==='Dogahr'?10:9)&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run');
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
   const noseFoes=s.d.faction==='Martian'||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=10&&(s.torpMem||{})[e.name]!==false&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
   const look=2/IMP;
   const posPen=(Vn,fn)=>{const sp={x:s.px.x+Vn.x*look,y:s.px.y+Vn.y*look};let pen=0;
     if(wantNose){const Vt1=hp(t.vq,t.vr),tp={x:t.px.x+Vt1.x*look,y:t.px.y+Vt1.y*look};const an=Math.atan2(tp.y-sp.y,tp.x-sp.x);
-      const off=Math.min(Math.abs(norm(an-fAng(fn))),Math.min(Math.abs(norm(an-fAng((fn+1)%NF))),Math.abs(norm(an-fAng((fn+NF-1)%NF))))+12*D2R);pen+=Math.max(0,off-13*D2R)/(60*D2R)*1.4}
+      let off=9;for(let k=-2;k<=2;k++)off=Math.min(off,Math.abs(norm(an-fAng((fn+k+NF)%NF)))+Math.abs(k)*4*D2R);pen+=Math.max(0,off-13*D2R)/(60*D2R)*1.4}
     for(const e of noseFoes){const Ve=hp(e.vq,e.vr),ep={x:e.px.x+Ve.x*look,y:e.px.y+Ve.y*look};const dd=Math.hypot(sp.x-ep.x,sp.y-ep.y)/HS;if(dd>9)continue;
       const off=Math.abs(norm(Math.atan2(sp.y-ep.y,sp.x-ep.x)-fAng(e.f)));if(off<40*D2R)pen+=(40*D2R-off)/(40*D2R)*1.6*(1.3-dd/9)}
     return pen};
@@ -757,8 +757,13 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(best)queue(s,{type:'burn',a:best,cost:burnCost(s,best)});
     else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd){queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)});if(Math.abs(fd)>=2)queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}}}
   else{const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd&&s.E-qCost(s)>reserve+pivotCost(s,pd)){queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)});if(Math.abs(fd)>=2&&s.E-qCost(s)>reserve+pivotCost(s,pd))queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}}
-  if(wantNose&&!s.queue.some(x=>x.type==='pivot'||x.type==='burn'&&BURNS[x.a].turn)){const fb=s.queue.find(x=>x.type==='burn');const f0=fb?burnResult(s,fb.a).f:s.f;
-    const an=Math.atan2(B.y-A.y,B.x-A.x),cur=Math.abs(norm(an-fAng(f0)));if(cur>14*D2R)for(const dir of [1,-1]){const f1=(f0+dir+NF)%NF;if(Math.abs(norm(an-fAng(f1)))<=14*D2R&&s.E-qCost(s)-genReserve(s)>=pivotCost(s,dir)){queue(s,{type:'pivot',dir,cost:pivotCost(s,dir)});break}}}
+  if(wantNose){const fb=s.queue.find(x=>x.type==='burn');const f0=fb?burnResult(s,fb.a).f:s.f;
+    const nv=x=>{const b=x===s&&fb?burnResult(s,fb.a):{dq:0,dr:0};return hexRound(x.pq+(x.vq+b.dq)/IMP,x.pr+(x.vr+b.dr)/IMP)};   // where both ships will be after the next move
+    const S1=hp(nv(s).q,nv(s).r),T1=hp(nv(t).q,nv(t).r);const an=(S1.x===T1.x&&S1.y===T1.y)?Math.atan2(B.y-A.y,B.x-A.x):Math.atan2(T1.y-S1.y,T1.x-S1.x);
+    const k=Math.round(norm(an-fAng(f0))/(Math.PI/6));
+    if(k&&Math.abs(norm(an-fAng(f0)))>14*D2R){const dir=Math.sign(k),n=Math.min(2,Math.abs(k));const pv=s.queue.filter(x=>x.type==='pivot');s.queue=s.queue.filter(x=>x.type!=='pivot');
+      let done=0;for(let i=0;i<n;i++)if(isFinite(pivotCost(s,dir))&&s.E-qCost(s)-genReserve(s)>=pivotCost(s,dir)&&queue(s,{type:'pivot',dir,cost:pivotCost(s,dir)}))done++;
+      if(!done)for(const x of pv)s.queue.push(x)}}   // couldn't afford it: keep the navigation pivots
   // weapons by priority, keeping a little energy back for manoeuvres
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
