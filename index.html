@@ -811,7 +811,7 @@ function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(p
 // ---- flow: fleet builder ----
 const fleet=[[],[]];const MAXSHIPS=20;
 const FORMS={line:'Line abreast',wedge:'Wedge',column:'Column',block:'Block',echelon:'Echelon',screen:'Screen (escorts forward)'};
-const fleetForm=['line','line'];let startMode='stations',startSpeed=0;   // 'stations' = every weapon loaded, torpedoes full, PD loaded; 'cold' = everything empty
+const fleetForm=['line','line'];let startMode='stations',startSpeed=[0,0];   // starting speed (hexes/turn, toward the enemy) chosen per side   // 'stations' = every weapon loaded, torpedoes full, PD loaded; 'cold' = everything empty
 // formation slot offsets in hexes: x = lateral, y = depth behind the front rank (heaviest ships get the first slots)
 function formSlots(form,list){const n=list.length,sp=4;const out=[];
   const centerOut=k=>{const r=[];for(let i=0;i<k;i++)r.push(i===0?0:(i%2?1:-1)*Math.ceil(i/2));return r};
@@ -836,10 +836,10 @@ function renderBuilder(){const box=$('builder');
      <div class="addlist">${avail.length?'':'<span class="dim">No ships at this tech level for this faction yet.</span>'}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
   const both=fleet[0].length>1&&fleet[1].length>1;
   box.innerHTML=side(0)+(MP.on?mpOppSide():side(1));
-  const smSel=`<label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label>${startMode==='stations'?` <label><span class="dim">Starting speed</span> <select id="sspeed" ${MP.role==='guest'?'disabled':''}>${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed===v?'selected':''}>${v} hex/turn</option>`).join('')}</select></label>`:''}`;
+  const smSel=`<label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label>${(MP.on?[0]:[0,1]).map(t=>` <label style="color:${TEAMCOL[t]}"><span class="dim">${MP.on?'Your':t?'Enemy':'Your'} starting speed</span> <select data-sspeed="${t}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[t]===v?'selected':''}>${v} hex/turn</option>`).join('')}</select></label>`).join('')}`;
   $('forms').innerHTML=smSel+((MP.on?fleet[0].length>1:both)?` <span class="dim">Starting formation</span> ${(MP.on?[0]:[0,1]).map(t=>`<label style="color:${TEAMCOL[t]}">${t?'Enemy':'Yours'} <select data-form="${t}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" ${fleetForm[t]===k?'selected':''}>${l}</option>`).join('')}</select></label>`).join(' ')}`:'');
   $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();if(MP.role==='host')mpSendFleet()};
-  if($('sspeed'))$('sspeed').onchange=e=>{startSpeed=+e.target.value;if(MP.role==='host')mpSendFleet()};
+  document.querySelectorAll('[data-sspeed]').forEach(el=>el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;if(MP.on)mpSendFleet()});
   $('forms').querySelectorAll('[data-form]').forEach(b=>b.onchange=()=>{fleetForm[+b.dataset.form]=b.value;if(MP.on)mpSendFleet()});
   box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder()});
   box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder()});
@@ -847,7 +847,7 @@ function renderBuilder(){const box=$('builder');
   box.querySelectorAll('[data-fac]').forEach(b=>b.onchange=()=>{fleetFaction[+b.dataset.fac]=b.value;renderBuilder()});
   box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{fleetTL[+b.dataset.tl]=+b.value;renderBuilder()});
   $('go').disabled=!(fleet[0].length&&(MP.on?MP.opp.fleet.length:fleet[1].length))||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':'Launch battle ▶';if(MP.on)mpSendFleet()}
-function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.opp.fleet.map(x=>({...x}));fleetForm[1]=MP.opp.form}const half=R.startDist/2;ships=[];const count={};for(const t of [0,1])fleet[t].sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
+function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.opp.fleet.map(x=>({...x}));fleetForm[1]=MP.opp.form;startSpeed[1]=MP.opp.speed||0}const half=R.startDist/2;ships=[];const count={};for(const t of [0,1])fleet[t].sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
   const used=new Set();
   for(const t of [0,1]){const form=(fleet[0].length>1&&fleet[1].length>1)?fleetForm[t]:'line';const slots=formSlots(form,fleet[t]);
    fleet[t].forEach((x,i)=>{const sl=slots[i];const dir=t?-1:1;
@@ -857,10 +857,11 @@ function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.op
     const both=t===1&&fleet[0].some(y=>y.key===x.key);const name=d.short+(t===0?(same?' '+count[t+x.key]:''):(same||both?' '+'ABCDEFGHIJKLMNOPQRST'[count[t+x.key]-1]:''));
     const sh=makeShip(x.key,q,r,t?3:0,t,t===0||MP.on?!!x.ai:true,name);sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}
   for(const sh of ships)sh.target=nearestEnemy(sh);
-  if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2;if(startSpeed){const d=DIRS[sh.f];sh.vq=d[0]*startSpeed;sh.vr=d[1]*startSpeed}}
+  if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
+  for(const sh of ships){const v=startSpeed[sh.team]||0;if(v){const d=DIRS[sh.f];sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
   P=mine()[0]||null;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
   const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;
-  $('start').style.display='none';$('end').style.display='none';log(`${fleet[0].length} vs ${fleet[1].length} at ${R.startDist} hexes. ${startMode==='stations'?(startSpeed?`Battle stations, closing at ${startSpeed} hex/turn`:'Battle stations, all ships at rest')+' — all weapons loaded':'Weapons cold, all ships at rest'}.`,'warn');
+  $('start').style.display='none';$('end').style.display='none';log(`${fleet[0].length} vs ${fleet[1].length} at ${R.startDist} hexes. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}; starting speed ${MP.on?`host ${startSpeed[0]} / guest ${startSpeed[1]}`:`yours ${startSpeed[0]} / enemy ${startSpeed[1]}`} hex/turn.`,'warn');
   for(const sh of alive()){if(isAI(sh)){const a=aiDecide(sh);sh.queue=a.queue;sh.fireChoice=a.fire}else autoQueue(sh)}
   phase='decide';MP.hostReady=!P;MP.guestReady=!(MP.on&&ships.some(x=>x.team===1&&!x.ai));if(!P&&!MP.on)commit();else if(MP.on&&MP.hostReady&&MP.guestReady)commit();buildHUD();net()}
 function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio,my=e.clientY*devicePixelRatio;let best=null,bd=40*devicePixelRatio;
@@ -935,7 +936,7 @@ function mpWire(c){
   c.on('close',()=>{mpBanner('Your opponent disconnected.');mpStatus('Opponent disconnected.','bad');MP.on=false;MP.role=null;MP.conn=null;if($('start').style.display!=='none')renderBuilder()});
   c.on('error',e=>mpStatus('Connection problem: '+(e.type||e),'bad'))}
 function mpSend(m){if(MP.conn&&MP.conn.open)MP.conn.send(m)}
-function mpSendFleet(){const m={t:'fleet',fleet:fleet[0].map(x=>({key:x.key,ai:!!x.ai})),form:fleetForm[0],faction:fleetFaction[0],startMode,startSpeed};const j=JSON.stringify(m);if(j===mpLastFleet)return;mpLastFleet=j;mpSend(m)}
+function mpSendFleet(){const m={t:'fleet',fleet:fleet[0].map(x=>({key:x.key,ai:!!x.ai})),form:fleetForm[0],faction:fleetFaction[0],startMode,speed:startSpeed[0]};const j=JSON.stringify(m);if(j===mpLastFleet)return;mpLastFleet=j;mpSend(m)}
 function mpOppSide(){const o=MP.opp.fleet.slice().sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
   return `<div class="fleetcol"><h3 style="color:${TEAMCOL[1]}">Opponent's fleet <span class="dim" style="font-weight:normal;font-size:11px">${o.length}/${MAXSHIPS}</span></h3>
    <div class="fl-list">${o.map(x=>{const d=SHIPS[x.key];return `<div class="fl" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}${x.ai?' · AI':''}</span></div>`}).join('')||'<div class="dim">(opponent has no ships yet)</div>'}</div>
@@ -984,7 +985,7 @@ function mpApplyOrders(orders){if(phase!=='decide')return;
 
 function mpOnMsg(m){if(!m||!m.t)return;
   if(m.t==='full'){mpStatus('That game already has two players.','bad');return}
-  if(m.t==='fleet'){MP.opp={fleet:m.fleet||[],form:m.form||'line',faction:m.faction};if(MP.role==='guest'&&m.startMode){startMode=m.startMode;startSpeed=m.startSpeed||0}if($('start').style.display!=='none')renderBuilder();return}
+  if(m.t==='fleet'){MP.opp={fleet:m.fleet||[],form:m.form||'line',faction:m.faction,speed:m.speed||0};if(MP.role==='guest'&&m.startMode){startMode=m.startMode}if($('start').style.display!=='none')renderBuilder();return}
   if(MP.role==='guest'){
     if(m.t==='state')mpApplyState(m);
     else if(m.t==='wait'){if(phase==='decide')mpBanner(m.g&&!m.h?'Orders sent — waiting for the host…':(!m.g&&m.h?'The host is ready — give your orders and press Continue (Enter)':''))}}
