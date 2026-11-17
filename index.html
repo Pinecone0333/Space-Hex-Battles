@@ -259,10 +259,10 @@ function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   else{s.dmgRea=Math.max(0,(s.dmgRea||0)-1);s.reactor=s.reactor0*(1-.1*s.dmgRea)}
   s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(s.team===0&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
 function makeShip(key,q,r,f,team,ai,name){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
-  const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,reinf:[],gen:d.noShield?{lvl:0,from:0,until:0}:{lvl:1,from:0,until:IMP+1},genLvl:d.noShield?0:1,
+  const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
     lastAdj:null,dead:false,msMode:'off',subMode:false,queue:[],fireSel:new Set(),flash:0,hist:[],target:null,
-    auto:{gen:true},
-    weapons:d.weapons.map(([t,arc])=>({t,T:WT[t],arc,alive:true,state:'idle',readyT:0,ammo:WT[t].mag||0,stages:0,charging:false,nextT:0,holding:false})),
+    auto:{},
+    weapons:d.weapons.map(([t,arc])=>({t,T:WT[t],arc,alive:true,state:'idle',readyT:0,ammo:WT[t].mag||0,stages:0,charging:false,paid:0,holding:false})),
     pd:d.pd.map(arc=>({arc,alive:true,shots:0,pending:[]}))};sh0.reactor0=sh0.reactor;sh0.boxes=buildBoxes(sh0);sh0.damaged=[];sh0.dc=[];return sh0}
 const alive=()=>ships.filter(s=>!s.dead);
 const enemiesOf=s=>ships.filter(x=>!x.dead&&x.team!==s.team);
@@ -272,13 +272,19 @@ function tgt(s){if(!s.target||s.target.dead)s.target=isAI(s)&&AIV.focus?pickTarg
 // AI target choice: close, weakened, and already under fire from allies (focus fire beats spreading damage)
 function pickTarget(s){let b=null,bv=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d>30&&b)continue;const hpF=(e.hull+e.shield)/(e.d.hull+e.d.shield);
     const allies=ships.filter(x=>x!==s&&!x.dead&&x.team===s.team&&x.target===e).length;const v=d+10*hpF-3*Math.min(allies,2);if(v<bv){bv=v;b=e}}return b||nearestEnemy(s)}
-const genLvl=s=>(T>=s.gen.from&&T<s.gen.until)?s.gen.lvl:0;   // 0 = off; 25/50/75% = reduced (capped shields, slower regen, no reinforce/repair); 100% = full
+const genLvl=s=>T>=s.gen.from?s.gen.lvl:0;   // 0 = off; 25/50/75% = reduced (capped shields, slower regen, no reinforce/repair); 100% = full
 // regeneration depends on how recently the ship was hit: within 4 impulses 0, within 12 impulses the base rate, otherwise double
 const regenTier=s=>{const dt=T-(s.lastHitT??-999);return dt<=4?2:dt<=12?1:0};
 const regenRate=s=>[2,1,0][regenTier(s)]*genRegen(s)*genLvl(s);
 const shieldCap=s=>s.d.shield*genLvl(s);
 const reinfAmt=s=>s.reinf.reduce((a,x)=>a+x.amt,0);
 const torpStored=w=>w.stages*w.T.perTurn;
+// ---- ongoing energy drains, paid every impulse: generator 1/8 of its per-turn cost, charging torpedoes 1/8 of a stage, held torpedoes 1/6 of the stored charge per turn ----
+function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0);if(!s.d.noShield&&g>0)out.push({lab:'Gen',c:genCost(s)*g/IMP});
+  for(const w of s.weapons){if(!w.alive||w.T.kind!=='torp')continue;if(w.charging)out.push({lab:w.T.ab+'▷',c:w.T.perTurn/IMP});else if(w.holding&&w.stages>0)out.push({lab:w.T.ab+' hold',c:torpStored(w)/6/IMP})}
+  return out}
+const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
+function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
 const torpDmg=w=>Math.round(torpStored(w)*2*(w.T.dmgMul||1));
 const pivotCost=(s,dir)=>(s.d.big?R.pivot:R.pivot/2)*(dir?thrMul(s,dir):1);   // small ships (frigates/destroyers) pay half
 const burnCost=(s,a)=>{const m=(a==='TL'||a==='TR')?thrMul(s,a==='TL'?-1:1):1;return (a==='R'?R.reverse:R.burn)*(s.d.big?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
@@ -304,7 +310,7 @@ const REINF_COST=2,REPAIR_COST=2;   // reinforcement and base-shield repair both
 function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
   if(act.type==='burn'){if(qHas(s,'burn'))return false;const pv=s.queue.filter(x=>x.type==='pivot');return burnAllowed(s,act.a)}
-  if(act.type==='gen')return !s.d.noShield&&!qHas(s,'gen');
+  if(act.type==='gen')return !s.d.noShield&&!qHas(s,'gen')&&act.lvl!==s.gen.lvl;
   if(act.type==='reinf'){if(s.d.noShield)return false;if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;if(genLvl(s)<1)return false;   // reinforcement only at full generator strength
    return s.shield+reinfAmt(s)+act.n<=s.d.shield*2}
   if(act.type==='dc'){const x=s.damaged.find(b=>b.id===act.id);return !!x&&!s.dc.some(j=>j.box===x)&&s.dc.length+s.queue.filter(q=>q.type==='dc').length<dcTeams(s)&&!s.queue.some(q=>q.type==='dc'&&q.id===act.id)}
@@ -314,20 +320,20 @@ function canQueue(s,act){
   if(act.type==='hold'){const w=s.weapons[act.i];return w.alive&&w.charging&&w.stages>=1&&!s.queue.some(x=>x.type==='hold'&&x.i===act.i)}
   if(act.type==='pd'){const p=s.pd[act.i];const q=s.queue.filter(x=>x.type==='pd'&&x.i===act.i).length;return p.alive&&p.shots+p.pending.length+q<2}
   return true}
-function queue(s,act){if(!canQueue(s,act))return false;s.queue.push(act);return true}
+function queue(s,act){if(act.type==='start'&&s.weapons[act.i]&&s.weapons[act.i].T.kind==='torp')act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;s.E-=a.cost;
     if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';s.burnFx=1}
     else if(a.type==='pivot'){s.f=(s.f+a.dir+6)%6}
-    else if(a.type==='gen'){const on=genLvl(s)>0;s.gen={lvl:a.lvl,from:on?s.gen.from:T+1,until:Math.max(s.gen.until,T)+IMP};s.genLvl=a.lvl;if(a.lvl<1){s.shield=Math.min(s.shield,s.d.shield*a.lvl);s.reinf=[]}}   // renewing while running extends seamlessly
+    else if(a.type==='gen'){const on=genLvl(s)>0;s.gen={lvl:a.lvl,from:on&&a.lvl>0?s.gen.from:T+1};s.genLvl=a.lvl;if(a.lvl<1){s.shield=Math.min(s.shield,s.d.shield*a.lvl);s.reinf=[]}}   // renewing while running extends seamlessly
     else if(a.type==='reinf'){s.reinf.push({amt:a.n,exp:T+IMP});if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='dc'){const x=s.damaged.find(b=>b.id===a.id);if(x&&!s.dc.some(j=>j.box===x)&&s.dc.length<dcTeams(s))s.dc.push({box:x,done:T+IMP})}
     else if(a.type==='dccancel'){s.dc=s.dc.filter(j=>j.box.id!==a.id)}
     else if(a.type==='repair'){s.shield=Math.min(s.d.shield,s.shield+a.n);if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='start'){const w=s.weapons[a.i];
-      if(w.T.kind==='torp'){w.charging=true;w.holding=false;w.state='charging';w.nextT=T+IMP;w.paidThis=true}
+      if(w.T.kind==='torp'){w.charging=true;w.holding=false;w.state='charging';w.paid=0}
       else{w.state='cycling';w.readyT=T+IMP}}
-    else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding'}
+    else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding';w.paid=0}
     else if(a.type==='pd'){s.pd[a.i].pending.push(T+R.pdReload)}}
   s.queue=[];
 }
@@ -337,14 +343,17 @@ function upkeep(s){
   for(const j of (s.dc||[]).slice())if(T>=j.done){s.dc.splice(s.dc.indexOf(j),1);dcFinish(s,j)}
   s.E=Math.min(s.reactor,s.E+income(s));
   s.reinf=s.reinf.filter(x=>x.exp>T&&x.amt>0);
+  if(!s.d.noShield&&genLvl(s)>0){const c=genCost(s)*genLvl(s)/IMP;if(s.E>=c-1e-9)s.E-=c;else{s.gen={lvl:0,from:0};s.genLvl=0;if(s.team===0||s.isPlayer)log(`${s.name}: not enough energy to run the shield generator — it shut down`,'bad')}}
   if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
     if(K==='torp'){
-      if(w.charging&&T>=w.nextT){w.stages++;
-        if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(s.isPlayer)log(`${s.name}: ${w.T.ab} fully charged (${torpDmg(w)} dmg)`,'good')}
-        else if(s.E>=w.T.perTurn){s.E-=w.T.perTurn;w.nextT+=IMP;if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`)}
-        else{w.charging=false;w.holding=true;w.state='holding';if(s.isPlayer)log(`Not enough energy to keep charging ${w.T.ab} — holding at ${torpDmg(w)} dmg`,'warn')}}
+      if(w.charging){const c=w.T.perTurn/IMP;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);
+        if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;
+          if(w.paid>=IMP){w.paid=0;w.stages++;
+            if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(me)torpNote(s,`${w.T.ab} fully charged (${torpDmg(w)} dmg) — now holding`,'good')}
+            else{if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`);if(me)torpNote(s,`${w.T.ab} reached stage ${w.stages} (${torpDmg(w)} dmg) — keep charging or Hold`,'warn')}}}
+        else{w.charging=false;w.paid=0;if(w.stages>0){w.holding=true;w.state='holding'}else w.state='idle';if(me)torpNote(s,`not enough energy to keep charging ${w.T.ab} — ${w.stages?`holding at ${torpDmg(w)} dmg`:'charge lost'}`,'bad')}}
       if(w.holding&&w.stages>0){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
     else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(s.team===0&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
   for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(2,p.shots+1);return false}return true})}
@@ -379,8 +388,6 @@ function shouldStop(){
   if(STOP.turn&&impOf(T)===IMP)why.push('End of turn — plan your next turn');
   if(STOP.first&&impOf(T)===1)why.push('Impulse 1 done — adjust your orders');
   if(STOP.ready&&ev.length)why.push('Weapon ready: '+ev.join(', '));
-  {const msgs=[];for(const s of ships){if(s.dead||s.team!==0||isAI(s))continue;const pl=energyPlan(s);const keys=pl.map(planKey).join('|');if(keys&&keys!==s.planSeen)msgs.push(`${s.name}: ${planMsg(s,pl[0])}`);s.planSeen=keys}
-   if(msgs.length)why.push('⚠ Energy short — '+msgs.join(' · '))}
   if(STOP.full&&full.length)why.push('Energy full (income wasted): '+full.join(', '));
   {const dc=[...new Set(dcEvt)].filter(n=>{const x=ships.find(y=>y.name===n);return x&&dcAvail(x)});dcEvt=[];if(dc.length)why.push('🔧 Damage control team available: '+dc.join(', '))}
   if(why.length){lastFireOpp=fireOppCount();return why.join(' · ')}
@@ -559,21 +566,8 @@ function showEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>
   setTimeout(()=>{const win=a0&&!a1,draw=!a0&&!a1;const t=$('endTitle');t.textContent=draw?'MUTUAL DESTRUCTION':win?'VICTORY':'DEFEAT';t.style.color=draw?'var(--warn)':win?'var(--good)':'var(--bad)';
     const lost=ships.filter(s=>s.dead);$('endSub').textContent=`${when(T)}. Lost: ${lost.filter(s=>s.team===0).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>s.team===1).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
 
-// ---- energy planner: will this ship be able to pay its generator renewal and its torpedo charge stages over the next turn? ----
-function energyPlan(s){const out=[];let av=s.E-qCost(s);const qs=new Set(s.queue.filter(x=>x.type==='start').map(x=>s.weapons[x.i]));const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp'&&(w.charging||qs.has(w)));const nxt=w=>w.charging?w.nextT:T+IMP;
-  const genRun=!s.d.noShield&&genLvl(s)>0&&!qHas(s,'gen');const gc=genCost(s)*(s.genLvl||1);
-  if(genRun&&s.gen.until<=T+1)out.push({k:'gen',T:T,need:gc,have:Math.max(0,av),now:true});   // lapses after this impulse unless renewed now
-  for(let k=1;k<=IMP;k++){const t1=T+k;av=Math.min(s.reactor,av+income(s));
-    for(const w of torps)if(nxt(w)===t1&&w.stages<=1&&!out.some(x=>x.w===w)){if(av<w.T.perTurn-1e-9)out.push({k:'torp',w,T:t1,need:w.T.perTurn,have:Math.max(0,av),stage:w.stages+2});else av-=w.T.perTurn}
-    if(genRun&&s.gen.until-1===t1&&!out.some(x=>x.k==='gen')){if(av<gc-1e-9)out.push({k:'gen',T:t1,need:gc,have:Math.max(0,av)});else av-=gc}}
-  return out}
-const planKey=x=>x.k+(x.w?'#'+x.w.T.ab+x.w.arc+x.stage:'')+'@'+x.T;
-function planMsg(s,x){return x.k==='gen'?(x.now?`Generator runs out after this impulse — renew it now (needs ${+x.need.toFixed(1)}, you have ${x.have.toFixed(1)}) or shields collapse`:`Generator renewal at ${when(x.T)} needs ${+x.need.toFixed(1)} energy — you'll have about ${x.have.toFixed(1)}; shields will collapse`)
-  :`${x.w.T.ab} stage ${x.stage} at ${when(x.T)} needs ${x.need} — you'll have about ${x.have.toFixed(1)}; it will stop at stage ${x.stage-1} (${(x.stage-1)*x.w.T.perTurn*2*(x.w.T.dmgMul||1)|0} dmg)`}
-
 // ---- automation (player standing orders + AI helpers) ----
 function autoQueue(s){   // standing order: generator renewal only (weapons are never queued automatically)
-  if(s.auto.gen&&s.genLvl>0&&s.gen.until<=T+1&&!qHas(s,'gen'))queue(s,{type:'gen',lvl:s.genLvl,cost:genCost(s)*s.genLvl});
 }
 function chargeAll(s){let n=0;
   s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
@@ -588,7 +582,7 @@ function autoFireSel(s,t){return [] }
 
 // ---- AI ----
 // AI keeps enough energy back to renew the shield generator when renewal is near (shields collapse if it lapses)
-function genReserve(s){return s.d.noShield?0:(s.gen.until-T<=4&&!qHas(s,'gen'))?genCost(s):0}
+function genReserve(s){const u=upkeepCost(s)-income(s);return u>0?u+.25:0}   // keep enough to pay next impulse's drains
 // pivot direction for the AI: the short way if those thrusters work, otherwise the long way round (thrusters on that side destroyed)
 function aiPivotDir(s,fd){if(!fd)return 0;const d=Math.sign(fd);return isFinite(pivotCost(s,d))?d:isFinite(pivotCost(s,-d))?-d:0}
 // AINEW[team]=false runs the previous AI for that side (testing only)
@@ -597,13 +591,13 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=enemyMs>ownMs?'def':'off';
-  if(s.gen.until<=T+1&&!s.d.noShield){
+  if(!s.d.noShield&&(T===0||impOf(T)===IMP||s.gen.lvl===0)){
     // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
     const need=s.weapons.reduce((a,w)=>a+(!w.alive?0:w.T.kind==='torp'?((w.charging||w.state==='idle')?w.T.perTurn:0):(w.T.kind!=='missile'&&w.state==='idle'?w.T.cost:0)),0)+4;
     const frac=s.shield/s.d.shield,full=genCost(s);let lvl=1;
     if(frac<.75&&s.E+income(s)*IMP-full<need&&regenTier(s)>0)lvl=Math.max(.25,Math.ceil(frac*4-1e-9)/4);
-    if(!queue(s,{type:'gen',lvl,cost:full*lvl})&&lvl>.25){const l2=Math.max(.25,Math.ceil(frac*4-1e-9)/4);queue(s,{type:'gen',lvl:l2,cost:full*l2})}}
+    if(lvl!==s.gen.lvl)queue(s,{type:'gen',lvl,cost:0})}
   const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp');
   const A=hp(s.q,s.r),B=hp(t.q,t.r);const a=Math.atan2(B.y-A.y,B.x-A.x);const side=norm(relBearing(s,t))>=0?1:-1;
   let want,face,prio,reserve=Math.min(6,s.reactor0/4);   // small-reactor ships keep a smaller float
@@ -687,13 +681,13 @@ function aiDecide(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=s.d.faction!=='Dogahr'&&enemyMs>ownMs?'def':'off';
-  if(s.gen.until<=T+1&&!s.d.noShield){
+  if(!s.d.noShield&&(T===0||impOf(T)===IMP||s.gen.lvl===0)){
     // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
     const need=s.weapons.reduce((a,w)=>a+(!w.alive?0:w.T.kind==='torp'?((w.charging||w.state==='idle')?w.T.perTurn:0):(w.T.kind!=='missile'&&w.state==='idle'?w.T.cost:0)),0)+4;
     const frac=s.shield/s.d.shield,full=genCost(s);let lvl=1;
     if(frac<.75&&s.E+income(s)*IMP-full<need&&regenTier(s)>0)lvl=Math.max(.25,Math.ceil(frac*4-1e-9)/4);
-    if(!queue(s,{type:'gen',lvl,cost:full*lvl})&&lvl>.25){const l2=Math.max(.25,Math.ceil(frac*4-1e-9)/4);queue(s,{type:'gen',lvl:l2,cost:full*l2})}}
+    if(lvl!==s.gen.lvl)queue(s,{type:'gen',lvl,cost:0})}
   const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp');
   const A=hp(s.q,s.r),B=hp(t.q,t.r);const a=Math.atan2(B.y-A.y,B.x-A.x);const side=norm(relBearing(s,t))>=0?1:-1;
   let want,face,prio,reserve=Math.min(6,s.reactor0/4);   // small-reactor ships keep a smaller float
@@ -864,11 +858,11 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
-     ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[.25,.5,.75,1].map(l=>btn('gen:'+l,Math.round(l*100)+'%',canQueue(s,{type:'gen',lvl:l,cost:gc*l}),(gc*l)+' energy per turn. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}<label class="dim" title="auto-renew generator" style="margin-left:auto"><input type="checkbox" data-auto="gen" ${s.auto.gen?'checked':''}>auto</label></div>
-     <div class="row dim sm">${s.gen.from>T?`online ${when(s.gen.from)} · `:''}${g?`paid to ${when(s.gen.until)} · cap ${Math.round(shieldCap(s))} · `:''}regen <b class="txt">+${regenRate(s).toFixed(1)}</b>/turn <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>
+     ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>${upkeepRow(s)}`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[0,.25,.5,.75,1].map(l=>btn('gen:'+l,l?Math.round(l*100)+'%':'Off',canQueue(s,{type:'gen',lvl:l,cost:0}),!l?'Turn the generator off: no drain, but shields collapse to 0.':(gc*l)+' energy per turn, drained '+(+(gc*l/IMP).toFixed(3))+' each impulse. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}</div>
+     ${upkeepRow(s)}
+     <div class="row dim sm">${s.gen.from>T?`online ${when(s.gen.from)} · `:''}${g?`cap ${Math.round(shieldCap(s))} · `:''}regen <b class="txt">+${regenRate(s).toFixed(1)}</b>/turn <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>
      ${sd?`<div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`:''}`}
-     ${(()=>{const pl=energyPlan(s);return pl.map(x=>`<div class="row warnbox sm">⚠ ${planMsg(s,x)}</div>`).join('')})()}
      ${dmgLine(s)}${dcPanel(s,sd)}
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${'N NE SE S SW NW'.split(' ')[s.f]}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
@@ -878,8 +872,8 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
       if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
       for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
         if(!w.alive)st='<span class="bad">destroyed</span>';
-        else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim">next ${when(w.nextT)}</span>${energyPlan(s).some(x=>x.w===w)?' <b class="bad" title="not enough energy projected for the next stage">⚠ short</b>':''}`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
-          if(sd){if(canQueue(s,{type:'start',i,cost:w.T.perTurn}))ctl+=btn('start:'+i,`Charge ${w.T.perTurn}`,true);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
+        else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
+          if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.holding?'Resume':'Charge',true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
         else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
         if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)))}
@@ -906,19 +900,21 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   else if(!MP.on&&(phase==='moving'||phase==='resolving'||phase==='post'))b=`<button class="btn big" data-act="pause"><span class="k">Space</span> Stop at next impulse</button>`;
   const io=T?impOf(T):0;b=`<div class="clock" title="8 impulses per turn"><div class="ct">TURN ${turnOf(T)}</div><div class="ci">IMPULSE ${io}/${IMP}</div><div class="pips">${Array.from({length:IMP},(_,i)=>`<i class="${i<io?'on':''}"></i>`).join('')}</div><div class="cs">${st}</div></div>`+b;
   $('bar').innerHTML=b;$('bar').style.display=phase==='select'?'none':'flex';wireHUD()}
+function upkeepRow(s){const L=upkeepList(s);const tot=L.reduce((a,x)=>a+x.c,0),net=income(s)-tot;
+  return `<div class="row sm upk" title="Ongoing energy expenses, paid every impulse. Income is +${income(s).toFixed(2)} per impulse."><span class="lab">Upkeep</span><b class="${tot?'warn':'dim'}">−${tot.toFixed(2)}</b><span class="dim">/imp</span>${L.length?' <span class="dim">'+L.map(x=>`${x.lab} ${x.c.toFixed(2)}`).join(' · ')+'</span>':''}<span style="margin-left:auto" class="${net<0?'bad':'good'}">net ${net>=0?'+':''}${net.toFixed(2)}</span></div>`}
 const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+label:label}</button>`;
 function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pd'?'PD load':'')+(x.cost?` (${x.cost})`:'')}
 function selectShip(x){if(x&&x.team===0&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
-function doAct(a){doAct0(a);const s=P;if(s&&!s.dead&&!s.ai&&phase==='decide'&&doAct.p0){const nw=energyPlan(s).filter(x=>!doAct.p0.has(planKey(x)));if(nw.length)toast('⚠ '+planMsg(s,nw[0]),'warnt')}doAct.p0=null}
+function doAct(a){doAct0(a)}
 function doAct0(a){const [k,v]=a.split(':');
   if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.hostReady=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
-  const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;doAct.p0=new Set(energyPlan(s).map(planKey));
+  const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
   if(k==='undo')s.queue.pop();
   else if(k==='submode')s.subMode=!s.subMode;
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
-  else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:genCost(s)*+v});
+  else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:0});
   else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*REINF_COST});
   else if(k==='repair')queue(s,{type:'repair',n:+v,cost:+v*REPAIR_COST});
   else if(k==='start'){const w=s.weapons[+v];queue(s,{type:'start',i:+v,cost:w.T.kind==='torp'?w.T.perTurn:w.T.cost})}
@@ -1090,7 +1086,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
   function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
     if(phase==='moving'){animT+=dt*1000;if(animT>=ANIM&&msHold>0)msHold-=dt;else if(animT>=ANIM&&MP.role!=='guest'){for(const s of ships)s.ppx=null;for(const m of missiles)m.ppx=null;phase='post';afterMove()}}
     if(phase==='resolving'&&MP.role!=='guest'){resolveT-=dt;if(resolveT<=0)finishResolve()}
-    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
+    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&x.team===0&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
     for(const s of ships){if(s.flash)s.flash=Math.max(0,s.flash-dt);if(s.burnFx)s.burnFx=Math.max(0,s.burnFx-dt*1.2)}
     updateCam(dt);render();requestAnimationFrame(loop)}
   requestAnimationFrame(loop)}
