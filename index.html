@@ -151,10 +151,10 @@ const WT={
   ST:{name:'Small Energy Torpedo',ab:'ST',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'MT',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
   HT:{name:'Heavy Energy Torpedo',ab:'HT',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
-  // Plasma Lance (Nov 17, David): loads instantly, holds free, torpedo accuracy; damage falls off with range (index = hexes, 13+ uses the last entry)
-  SPL:{name:'Small Plasma Lance',ab:'SPL',grp:'lances',kind:'lance',acc:'torp',cost:9,dmgR:[27,27,23,23,18,18,13,13,9,9,5,5,5,2]},
-  MPL:{name:'Medium Plasma Lance',ab:'MPL',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[36,36,30,30,24,24,18,18,12,12,6,6,6,2]},
-  HPL:{name:'Heavy Plasma Lance',ab:'HPL',grp:'lances',kind:'lance',acc:'torp',cost:15,dmgR:[45,45,38,38,30,30,22,22,15,15,8,8,8,3]}
+  // Plasma Lance (Nov 17, David): loads like lasers (ready one turn after paying), holds free, torpedo accuracy; damage falls off with range (index = hexes, 13+ uses the last entry)
+  SPL:{name:'Small Plasma Lance',ab:'SPL',grp:'lances',kind:'lance',acc:'torp',cost:9,dmgR:[36,36,31,31,24,24,17,17,12,12,7,7,7,3]},
+  MPL:{name:'Medium Plasma Lance',ab:'MPL',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[48,48,40,40,32,32,24,24,16,16,8,8,8,3]},
+  HPL:{name:'Heavy Plasma Lance',ab:'HPL',grp:'lances',kind:'lance',acc:'torp',cost:15,dmgR:[60,60,51,51,40,40,29,29,20,20,11,11,11,4]}
 };
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: same energy for 2/3 of the damage, and the shorter-ranged targeting computer
@@ -337,7 +337,6 @@ function applyQueue(s){
     else if(a.type==='repair'){s.shield=Math.min(s.d.shield,s.shield+a.n);if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='start'){const w=s.weapons[a.i];
       if(w.T.kind==='torp'){w.charging=true;w.holding=false;w.state='charging';w.paid=0}
-      else if(w.T.kind==='lance'){w.state='ready'}   // plasma lance: ready at once
       else{w.state='cycling';w.readyT=T+IMP}}
     else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding';w.paid=0}
     else if(a.type==='pd'){s.pd[a.i].pending.push(T+R.pdReload)}}
