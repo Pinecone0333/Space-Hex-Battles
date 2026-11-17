@@ -91,6 +91,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
  <div id="builder" class="cards"></div>
  <div id="forms" class="row" style="justify-content:center;gap:14px;margin-bottom:8px"></div>
  <div class="row" style="justify-content:center"><button class="btn big go" id="go">Launch battle ▶</button></div>
+ <div id="pastBattles" style="margin-top:10px"></div>
  <div class="dim" style="font-size:11px;margin-top:10px">8 impulses per turn; spend energy and fire at any impulse. Velocity carries over until you burn to change it. Burn 2 (reverse 4) for cruisers, half that for frigates/destroyers, one per impulse; cruisers must burn straight after a turn or slip; frigates/destroyers can't repeat a turn or a slip back to back; pivot 2 per facing (frigates/destroyers 0.5).<br>
  Shield generator at 25/50/75/100% (full cost: heavy cruiser 10 energy per turn, cruiser 7.5, frigate/destroyer 5); below 100% shields are capped at that share, regenerate proportionally slower, and can't be reinforced or repaired; if it goes off, shields collapse to 0. Regeneration: none if hit in the last 4 impulses, base rate if hit in the last 12, double otherwise; reinforce or repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
  Heavy cruisers: reactor 42, 50 shields / 150 hull · Albatross: reactor 30, 40 / 110 · Dogahr Light Cruiser: reactor 28, 35 / 90 · Dogahr Destroyers: reactor 22, 28 / 64 · Peregrine: reactor 22, 25 / 60 · Dogahr Frigate: reactor 20, 20 / 48.</div>
@@ -391,15 +392,27 @@ function recShip(s,i,orders){const t=s.target&&!s.target.dead?s.target:null;cons
   o.wpn=s.weapons.map(w=>!w.alive?'X':w.T.kind==='torp'?'T'+w.stages+(w.charging?'c':''):w.T.kind==='missile'?w.state[0]+w.ammo:w.state[0]).join(' ');o.pd=s.pd.map(p=>p.alive?p.shots:'X').join('');
   if(orders){if(s.queue.length)o.orders=s.queue.map(x=>qLabel(s,x));if(s.fireSel.size&&t)o.fire=[...s.fireSel].map(k=>wLabel(s,k)+(canFireMount(s,k,t)?' '+Math.round(hitP(s,k,t)*100)+'%':''));if(s.subMode)o.aim='systems';if(s.msMode!=='off')o.msl=s.msMode}
   if((s.dc||[]).length)o.dcw=s.dc.map(j=>boxShort(s,j.box));if(s.dead)o.dead=true;return o}
-function recImpulse(){if(!REC||MP.role==='guest')return;REC.imp.push({T:when(T),ships:ships.map((s,i)=>s.dead?{i,dead:true}:recShip(s,i,true)),msl:[missiles.filter(m=>m.owner.team===0&&!m.intercept).length,missiles.filter(m=>m.owner.team===1&&!m.intercept).length]})}
-function recStart(){REC={game:'Space Hex Tactics battle record',v:1,date:new Date().toISOString(),online:MP.on?(MP.role==='host'?'host = team 0':'guest'):false,
+function recImpulse(){if(!REC||MP.role==='guest')return;if(T>0&&impOf(T)===IMP)setTimeout(histSave,0);REC.imp.push({T:when(T),ships:ships.map((s,i)=>s.dead?{i,dead:true}:recShip(s,i,true)),msl:[missiles.filter(m=>m.owner.team===0&&!m.intercept).length,missiles.filter(m=>m.owner.team===1&&!m.intercept).length]})}
+function recStart(){REC={game:'Space Hex Tactics battle record',v:1,id:Date.now()+'-'+Math.floor(Math.random()*1e6),date:new Date().toISOString(),online:MP.on?(MP.role==='host'?'host = team 0':'guest'):false,
   start:{mode:startMode,speed:startSpeed.slice(),dist:R.startDist,form:fleetForm.slice(),impulsesPerTurn:IMP},
   key:{pos:'axial hex q,r',v:'hexes/turn (axial)',f:'facing 0=N 1=NE 2=SE 3=S 4=SW 5=NW',brg:'target bearing off the nose, degrees (+ = starboard)',dmg:'[engine, port thr, stbd thr, reactor, sensors] hits',
     wpn:'per weapon in ship order: r=ready c=cycling i=idle h=holding, T#=torpedo stages (c=charging), missiles state+ammo, X=destroyed',pd:'PD shots per mount',fire:'weapons fired this impulse with hit chance',orders:'energy spent / maneuvers this impulse'},
   ships:ships.map((s,i)=>({i,name:s.name,cls:s.d.name,key:s.key,team:s.team,side:s.team===0?(MP.on?'host':'player'):(MP.on?'guest':'enemy'),ai:!!isAI(s),reactor:s.reactor0,hull:s.d.hull,shield:s.d.shield,
     weapons:s.weapons.map(w=>w.T.ab+' '+w.arc),pd:s.pd.map(p=>p.arc)})),imp:[],log:[],result:null}}
+// ---- past battles: the last 10 records kept in this browser (saved every turn and at the end) ----
+const HKEY='spaceHexBattles';
+function histLoad(){try{return JSON.parse(localStorage.getItem(HKEY)||'[]')}catch(e){return []}}
+function histSave(){if(!REC||MP.role==='guest')return;try{const L=histLoad().filter(x=>x.id!==REC.id);const s0=REC.ships;
+    const side=t=>s0.filter(x=>x.team===t).map(x=>x.name).join(', ');const you=s0.find(x=>x.team===0&&!x.ai)?0:-1;
+    const res=REC.result?(REC.result.winner==='team 0'?'won':REC.result.winner==='team 1'?'lost':'draw')+' '+REC.result.at:'in progress '+when(T);
+    L.unshift({id:REC.id,date:REC.date,title:side(0)+' vs '+side(1),res,txt:recText()});while(L.length>10)L.pop();
+    for(;;){try{localStorage.setItem(HKEY,JSON.stringify(L));break}catch(e){if(L.length<=1)break;L.pop()}}}catch(e){}}
+function renderHistory(){const el=$('pastBattles');if(!el)return;const L=histLoad();if(!L.length){el.innerHTML='';return}
+  el.innerHTML=`<details><summary class="dim" style="cursor:pointer">💾 Past battles (${L.length}) — saved in this browser</summary><div style="margin-top:6px">${L.map((x,i)=>{const d=new Date(x.date);
+    return `<div class="row sm" style="gap:10px;border-bottom:1px solid var(--line);padding:2px 0"><span class="dim" style="width:120px">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span><span style="flex:1">${x.title}</span><span class="${x.res.startsWith('won')?'good':x.res.startsWith('lost')?'bad':'dim'}">${x.res}</span><button class="btn" data-hist="${i}">Save record</button></div>`}).join('')}</div></details>`;
+  el.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{const x=histLoad()[+b.dataset.hist];if(x)recDownload(x.txt)})}
 function recEnd(){if(!REC||REC.result)return;const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);
-  REC.result={at:when(T),winner:a0&&!a1?'team 0':a1&&!a0?'team 1':'none',final:ships.map((s,i)=>recShip(s,i,false))}}
+  REC.result={at:when(T),winner:a0&&!a1?'team 0':a1&&!a0?'team 1':'none',final:ships.map((s,i)=>recShip(s,i,false))};histSave()}
 function recText(){const R0=REC;if(!R0)return '';const head={...R0,imp:undefined,log:undefined};
   return '{\n"header":'+JSON.stringify(head)+',\n"impulses":[\n'+R0.imp.map(x=>JSON.stringify(x)).join(',\n')+'\n],\n"log":[\n'+R0.log.map(x=>JSON.stringify(x)).join(',\n')+'\n]}\n'}
 function saveRecord(){if(MP.role==='guest'){mpSend({t:'getrec'});mpBanner('Asking the host for the battle record…');return}
@@ -873,7 +886,7 @@ function formSlots(form,list){const n=list.length,sp=4;const out=[];
 const fleetFaction=['Martian','Dogahr'],fleetTL=[4,4];
 const TLNOTE={4:'shielded refits',3:'no shields, weaker reactors',2:'no shields, 8-hex targeting, 2/3-damage weapons'};
 function shipLabel(k){const d=SHIPS[k];return `<span class="fbadge" style="background:${FACTIONS[d.faction].color}22;border-color:${FACTIONS[d.faction].color};color:${FACTIONS[d.faction].color}">${d.faction}</span> <b>${d.cls}</b>`}
-function renderBuilder(){const box=$('builder');
+function renderBuilder(){renderHistory();const box=$('builder');
   const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
     const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);
     return `<div class="fleetcol"><h3 style="color:${TEAMCOL[t]}">${t?'Enemy fleet':'Your fleet'} <span class="dim" style="font-weight:normal;font-size:11px">${fleet[t].length}/${MAXSHIPS}</span></h3>
