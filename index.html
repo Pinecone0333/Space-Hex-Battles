@@ -398,6 +398,9 @@ function recText(){const R0=REC;if(!R0)return '';const head={...R0,imp:undefined
 function saveRecord(){if(MP.role==='guest'){mpSend({t:'getrec'});mpBanner('Asking the host for the battle record…');return}
   if(!REC){alertBox('No battle recorded yet.');return}recDownload(recText())}
 function recDownload(txt){const d=new Date(),pad=n=>String(n).padStart(2,'0');const name=`space-hex-battle-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.json`;
+  // inside a Claude artifact, files go through the viewer's downloads capability; elsewhere (GitHub page) a normal download link
+  if(window.claude&&window.claude.use){window.claude.use('downloads').then(dl=>{if(!dl){recShow(txt,name,false);return}
+      dl.save({filename:name,data:txt}).then(()=>recShow(txt,name,true)).catch(e=>recShow(txt,name,false))}).catch(()=>recShow(txt,name,false));return}
   let ok=false;try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();ok=true}catch(e){}
   recShow(txt,name,ok)}
 function recShow(txt,name,ok){let el=$('recBox');if(!el){el=document.createElement('div');el.id='recBox';el.className='overlay';document.body.appendChild(el)}
