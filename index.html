@@ -217,6 +217,12 @@ SHIPS.hunifer={faction:'Hunifer',cls:'Heavy Cruiser',weight:100,name:'Hunifer He
     shape:[[38,-10],[38,10],[30,10],[25,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5],[25,-5],[30,-10]],
     lines:[[-30,0,36,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[33,-6],[33,6],[-18,-10],[-18,10]],
     weapons:[['HPL','S'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};
+SHIPS.hunolddd={faction:'Hunibler',cls:'Destroyer',weight:60,name:'Hunibler Destroyer',short:'Hunibler DD',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
+    shape:[[27,-3.8],[27,3.8],[-6,3.8],[-19.5,18],[-24,18],[-24,-18],[-19.5,-18],[-6,-3.8]],lines:[[-22.5,0,25.5,0],[-21,-9,-9,-3.8],[-21,9,-9,3.8]],dots:[[15,0],[-13.5,-7.5],[-13.5,7.5]],
+    weapons:[['MC','S'],['MC','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])],pd:['ALL','ALL']};   // Nov 18: downsized like the Blokai DD (heavy→medium spinal, lasers→light, one fewer FX PD), half the missiles, hull 80% of a destroyer's
+SHIPS.huniferdd={faction:'Hunifer',cls:'Destroyer',weight:60,name:'Hunifer Destroyer',short:'Hunifer DD',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
+    shape:[[28.5,-7.5],[28.5,7.5],[22.5,7.5],[18.8,3.8],[-6,3.8],[-19.5,18],[-24,18],[-24,-18],[-19.5,-18],[-6,-3.8],[18.8,-3.8],[22.5,-7.5]],lines:[[-22.5,0,27,0],[-21,-9,-9,-3.8],[-21,9,-9,3.8]],dots:[[24.8,-4.5],[24.8,4.5],[-13.5,-7.5],[-13.5,7.5]],
+    weapons:[['MPL','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])],pd:['ALL','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
