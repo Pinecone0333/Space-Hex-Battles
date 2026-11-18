@@ -206,6 +206,16 @@ SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthl
 SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Destroyer',short:'Earthling DD',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:64,shield:28,big:false,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',
     shape:[[27,0],[-13.5,10.5],[-21,19.5],[-26.2,19.5],[-21.8,7.5],[-21.8,-7.5],[-26.2,-19.5],[-21,-19.5],[-13.5,-10.5]],lines:[[-21.8,0,22.5,0],[-15,-4.5,7.5,-2.2],[-15,4.5,7.5,2.2]],dots:[[10.5,-3.8],[10.5,3.8],[-10.5,-6.8],[-10.5,6.8]],
     weapons:[['MT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};   // Nov 18: heavy cruiser loadout downsized to medium, one fewer FX PD, 4 missiles
+// ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
+FACTIONS.Hunibler={color:'#ff9f1a',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
+SHIPS.hunold={faction:'Hunibler',cls:'Old Heavy Cruiser',weight:99,name:'Hunibler Old Heavy Cruiser',short:'Hunibler Old',color:'#ff9f1a',laser:'#ffd27a',torp:'#ffb347',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
+    shape:[[36,-5],[36,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5]],
+    lines:[[-30,0,34,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[20,0],[-18,-10],[-18,10]],
+    weapons:[['HC','S'],['HC','S'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};
+SHIPS.hunifer={faction:'Hunibler',cls:'Heavy Cruiser',weight:100,name:'Hunibler Heavy Cruiser',short:'Hunibler',color:'#ff9f1a',laser:'#ffd27a',torp:'#ffb347',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
+    shape:[[38,-10],[38,10],[30,10],[25,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5],[25,-5],[30,-10]],
+    lines:[[-30,0,36,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[33,-6],[33,6],[-18,-10],[-18,10]],
+    weapons:[['HPL','S'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -315,8 +325,9 @@ function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0
 const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
 function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
 const torpDmg=w=>Math.round(torpStored(w)*2*(w.T.dmgMul||1));
-const pivotCost=(s,dir)=>(s.d.big?R.pivot:R.pivot/2)/2*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
-const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (a==='R'?R.reverse:R.burn)*(s.d.big?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
+const bigMove=s=>s.d.big&&!s.d.agile;   // maneuvering class: agile cruisers (Hunibler) handle like destroyers
+const pivotCost=(s,dir)=>(bigMove(s)?R.pivot:R.pivot/2)/2*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
+const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (a==='R'?R.reverse:R.burn)*(bigMove(s)?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
 // turning with damaged thrusters: extra cost (for the warning on the buttons)
 const turnPen=(s,dir)=>{const m=thrMul(s,dir);return m>1&&isFinite(m)?m:0};
 const thrName=dir=>dir>0?'Port thrusters':'Starboard thrusters';
@@ -329,7 +340,7 @@ function burnResult(s,a,f0){const A=BURNS[a];let f=f0??s.f;if(A.turn)f=(f+A.turn
 // small ships: a turn can't follow a turn, a slip can't follow a slip. Cruisers: turns and slips share one limit — after either, the next burn must be straight.
 function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return false;   // main engine out: only reverse (retro) thrust
   if(A.turn<0&&(s.dmgThrS||0)>=3||A.turn>0&&(s.dmgThrP||0)>=3)return false;
-  if(!A.kind)return true;if(s.d.big)return !(s.lastAdj==='turn'||s.lastAdj==='slip');return s.lastAdj!==A.kind}
+  if(!A.kind)return true;if(bigMove(s))return !(s.lastAdj==='turn'||s.lastAdj==='slip');return s.lastAdj!==A.kind}
 
 // ---- queue of spending actions for the current decision point ----
 const qCost=s=>s.queue.reduce((a,x)=>a+x.cost,0);
@@ -551,7 +562,7 @@ function canFireMount(s,key,t){if(!t||t.dead)return false;
   if(K==='missile')return s.msMode==='off'&&w.state==='ready'&&w.ammo>0;
   if(K==='torp')return w.stages>=1&&inArc(s,w.arc,t);
   return w.state==='ready'&&inArc(s,w.arc,t)}
-function hitP(s,key,t){const d=Math.max(0,hexDist(s,t)-(s.d.accShift||0));if(key.startsWith('pd'))return accAt('laser',d);const T_=s.weapons[+key.slice(1)].T;return T_.acc?accAt(T_.acc,d):1}
+function hitP(s,key,t){const d=Math.max(0,hexDist(s,t)-(s.d.accShift||0)),ev=t.d.evade||0;if(key.startsWith('pd'))return Math.max(0,accAt('laser',d)-ev);const T_=s.weapons[+key.slice(1)].T;return T_.acc?Math.max(0,accAt(T_.acc,d)-ev):1}   // evade: sleek hulls (Hunibler) are 5% harder to hit
 
 // ---- damage ----
 function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
@@ -711,7 +722,7 @@ function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r
 function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===1&&!s.isPlayer||s.ai&&impOf(T)===1)s.target=AIV.focus?pickTarget(s):nearestEnemy(s);const t=tgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
-  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=s.d.faction!=='Dogahr'&&enemyMs>ownMs&&!(AIV.msClose&&d<=8)?'def':'off';
+  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=s.d.faction==='Martian'&&enemyMs>ownMs&&!(AIV.msClose&&d<=8)?'def':'off';
   if(!s.d.noShield&&(T===0||impOf(T)===IMP||s.gen.lvl===0)){
     // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
@@ -755,6 +766,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     else if(hot&&!AIV.dStand){want={range:10,radial:1,orbit:2};face=a;prio=['lasers','coils']}
     else if(hot){want={range:6,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
     else{want={range:s.d.prefRange||6,radial:1.2,orbit:1,chase:true,maxClose:12};face=a;prio=['lasers','coils']}   // mid-range: chase from afar, back away if the enemy closes inside 4
+    if(s.d.broadside)face=a-side*Math.PI/2;   // side-mounted guns (Hunibler): keep the target abeam; the spinal-aim pivot takes over when spinal weapons are ready
   }else if(s.d.doctrine==='torpRun'&&torps.length){
     const full=torps.every(w=>w.stages>=3);if(full)s.mode='run';else if(s.mode==='run'&&torps.every(w=>w.stages===0))s.mode='stand';if(!s.mode)s.mode='stand';
     if(s.mode==='run'){want={range:1,radial:1.2};face=a;prio=['torps','coils','lasers'];reserve=4}
@@ -846,7 +858,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const q=s.queue;s.queue=[];return{queue:q,fire}}
   const msReady=[];
   s.weapons.forEach((w,i)=>{const key='w'+i;if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
-    if(K==='missile'){const tDef=AIV.msHold&&t.msMode==='def'&&t.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);if(d<=(tDef?6:s.d.faction==='Dogahr'?24:16))msReady.push(key);return}
+    if(K==='missile'){const tDef=AIV.msHold&&t.msMode==='def'&&t.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);if(d<=(tDef?6:s.d.faction==='Martian'?16:24))msReady.push(key);return}
     if(K==='torp'){if(w.stages>=3&&pp>=.4)fire.push(key);return}
     if(pp>=.35)fire.push(key)});
   if(msReady.length){let n=msReady.length;
