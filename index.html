@@ -228,6 +228,21 @@ SHIPS.hunolddd={faction:'Hunibler',cls:'Destroyer',weight:60,name:'Hunibler Dest
 SHIPS.huniferdd={faction:'Hunifer',cls:'Destroyer',weight:60,name:'Hunifer Destroyer',short:'Hunifer DD',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
     shape:[[28.5,-7.5],[28.5,7.5],[22.5,7.5],[18.8,3.8],[-6,3.8],[-19.5,18],[-24,18],[-24,-18],[-19.5,-18],[-6,-3.8],[18.8,-3.8],[22.5,-7.5]],lines:[[-22.5,0,27,0],[-21,-9,-9,-3.8],[-21,9,-9,3.8]],dots:[[24.8,-4.5],[24.8,4.5],[-13.5,-7.5],[-13.5,7.5]],
     weapons:[['MPL','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])],pd:['ALL','ALL']};
+// ---- Chemantar (Nov 18, David): purple, fire light green. Placeholder outlines until David's sprites ----
+FACTIONS.Chemantar={color:'#a35cff',blurb:'Artillery cruisers: antiproton lances, laser batteries, light torpedoes'};
+const CHEM={faction:'Chemantar',color:'#a35cff',laser:'#9dff8a',torp:'#b8ff9e'};
+SHIPS.chemdbl={...CHEM,cls:'Double Artillery Cruiser',weight:110,name:'Chemantar Double Artillery Cruiser',short:'Chem Double',hull:220,shield:80,big:true,dcTeams:4,reactor:65,genCost:15,genRegen:6,doctrine:'hunt',prefRange:10,
+    shape:[[25,-31.5],[27.8,-30.7],[29.4,-28.8],[30,-26],[30,-16],[29.4,-13.2],[27.8,-11.3],[25,-10.5],[-23,-5.5],[-25.8,-5.8],[-27.4,-7.3],[-28,-10],[-28,-32],[-27.4,-34.7],[-25.8,-36.2],[-23,-36.5],null,[25,10.5],[27.8,11.3],[29.4,13.2],[30,16],[30,26],[29.4,28.8],[27.8,30.7],[25,31.5],[-23,36.5],[-25.8,36.2],[-27.4,34.7],[-28,32],[-28,10],[-27.4,7.3],[-25.8,5.8],[-23,5.5],null,[14,-10],[14,10],[8,10],[8,-10],null,[-12,-7.5],[-12,7.5],[-18,7.5],[-18,-7.5]],lines:[[-24,-21,26,-21],[-24,21,26,21]],dots:[[20,-21],[20,21],[-10,-34],[-10,34]],
+    weapons:[['HAP','S'],['HAP','S'],['ML','FX'],['ML','FX'],['ML','FX'],['ML','FX'],['ML','LS'],['ML','RS'],...rep(8,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};   // two artillery cruisers joined by two pylons; the inner side lasers are gone
+SHIPS.chemart={...CHEM,cls:'Artillery Cruiser',weight:90,name:'Chemantar Artillery Cruiser',short:'Chem Artillery',hull:110,shield:40,big:true,reactor:35,genCost:7.5,genRegen:3,doctrine:'hunt',prefRange:10,
+    shape:[[25,-10.5],[27.8,-9.7],[29.4,-7.8],[30,-5],[30,5],[29.4,7.8],[27.8,9.7],[25,10.5],[-23,15.5],[-25.8,15.2],[-27.4,13.7],[-28,11],[-28,-11],[-27.4,-13.7],[-25.8,-15.2],[-23,-15.5]],lines:[[-24,0,26,0]],dots:[[20,0],[0,-8],[0,8]],
+    weapons:[['HAP','S'],['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};
+SHIPS.chemcru={...CHEM,cls:'Cruiser',weight:88,name:'Chemantar Cruiser',short:'Chem Cruiser',hull:110,shield:40,big:true,reactor:34,genCost:7.5,genRegen:3,doctrine:'alpha',
+    shape:[[-28,-12],[18,-12],[21.1,-11.6],[24,-10.4],[26.5,-8.5],[28.4,-6],[29.6,-3.1],[30,0],[29.6,3.1],[28.4,6],[26.5,8.5],[24,10.4],[21.1,11.6],[18,12],[-28,12]],lines:[[-26,-5,24,-5],[-26,5,24,5]],dots:[[22,-6],[22,6],[0,-9],[0,9]],
+    weapons:[...rep(4,['ST','S']),['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS'],...rep(4,['MS','ALL'])],pd:['FX','ALL','ALL']};
+SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frigate',short:'Chem Frigate',hull:55,shield:25,big:false,reactor:19,genCost:5,genRegen:2,doctrine:'alpha',
+    shape:[[-17.4,-7.4],[11.2,-7.4],[13.1,-7.2],[14.9,-6.4],[16.4,-5.3],[17.6,-3.7],[18.4,-1.9],[18.6,0],[18.4,1.9],[17.6,3.7],[16.4,5.3],[14.9,6.4],[13.1,7.2],[11.2,7.4],[-17.4,7.4]],lines:[[-16,0,15,0]],dots:[[13,0],[-4,-5],[-4,5]],
+    weapons:[['ST','S'],['ST','S'],['SL','ALL'],['SL','ALL'],...rep(2,['MS','ALL'])],pd:['FX','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -293,7 +308,7 @@ function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
   else{t.dmgRea=(t.dmgRea||0)+1;t.reactor=Math.max(0,t.reactor0*(1-.1*t.dmgRea));t.E=Math.min(t.E,t.reactor);msg=t.reactor<=0?'REACTOR DEAD — ship is dead in the water':`reactor hit (output ${Math.round(100-10*t.dmgRea)}%)`}
   log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good',{s:ships.indexOf(t),g:`${t.name}: system damaged (out of scan range)`});if(t.team===0&&!t.ai&&dcTeams(t)-(t.dc||[]).length>0){dcEvt.push(t.name);dcHide=''}}
 // ---- damage control: teams repair one damaged system each; a repair takes a full turn. Cruisers have 2 teams, small ships 1 ----
-const dcTeams=s=>s.d.big?2:1;
+const dcTeams=s=>s.d.dcTeams||(s.d.big?2:1);
 const dcFree=s=>dcTeams(s)-(s.dc||[]).length-s.queue.filter(q=>q.type==='dc').length;
 const dcOpen=s=>(s.damaged||[]).filter(x=>!(s.dc||[]).some(j=>j.box===x)&&!s.queue.some(q=>q.type==='dc'&&q.id===x.id)).length;
 const dcAvail=s=>!s.dead&&!s.ai&&s.team===0&&dcFree(s)>0&&dcOpen(s)>0;
@@ -1089,7 +1104,7 @@ function drawMissile(x,y,h,col,ic){const dpr=devicePixelRatio;const ms=Math.max(
     ctx.fillStyle=ic?'#ffd27a':'#d8dde3';ctx.fillRect(-6,-1.5,9,3);ctx.fillStyle='#f2f4f6';ctx.beginPath();ctx.moveTo(3,-1.5);ctx.lineTo(7,0);ctx.lineTo(3,1.5);ctx.closePath();ctx.fill();ctx.restore()}
 function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(pos.y),sc=Math.max(cam.s*.75,.35*dpr);const PT=P&&!P.dead?tgt(P):null;
   const g=genLvl(s),sh=s.shield+reinfAmt(s);if(g>0&&sh>0){ctx.beginPath();ctx.arc(X,Y,42*sc,0,7);ctx.strokeStyle=`rgba(88,184,255,${.12+.4*Math.min(1,sh/s.d.shield)*g+(s.flash||0)})`;ctx.lineWidth=(1.5+(reinfAmt(s)>0?2:0)+(s.flash||0)*8)*dpr;ctx.stroke()}
-  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);ctx.beginPath();s.d.shape.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();
+  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);ctx.beginPath();{let mv=true;for(const p of s.d.shape){if(!p){ctx.closePath();mv=true;continue}mv?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1]);mv=false}}ctx.closePath();
   ctx.fillStyle='#0c1622';ctx.fill();ctx.strokeStyle=s.color;ctx.lineWidth=2/sc*dpr;ctx.shadowColor=s.color;ctx.shadowBlur=10*dpr;ctx.stroke();ctx.shadowBlur=0;
   if(s.d.inner){ctx.beginPath();s.d.inner.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=s.color+'26';ctx.fill();ctx.strokeStyle=s.color+'cc';ctx.lineWidth=1/sc*dpr;ctx.stroke()}   // aft hull block (Condor)
   ctx.strokeStyle=s.color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of s.d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of s.d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
