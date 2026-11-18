@@ -203,6 +203,14 @@ for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R
   SHIPS[k+'3']={...d,tl:3,name:d.name+' (TL3)',short:d.short+' III',shield:0,noShield:true,reactor:r3,weight:d.weight-.1};
   if(d.faction==='Martian')SHIPS[k+'2']={...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:.1,
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
+
+// ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
+FACTIONS.Blokai={color:'#a9b2bf',blurb:'Heavy shields, plasma lances, long-range targeting'};
+SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#7fd4ff',torp:'#ff8a2a',hull:150,shield:75,big:true,tl:5,
+    reactor:48,genCost:15,genRegen:6,doctrine:'hunt',prefRange:2,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
+    shape:[[36,-11],[30,-12.5],[24,-12],[19,-9.5],[16,-6],[8,-5],[6.1,-6.8],[3.3,-10.3],[-0.5,-13.1],[-5.2,-15],[-10.3,-15.9],[-15.5,-15.8],[-20.5,-14.5],[-24.9,-12.3],[-28.4,-9.2],[-30.8,-5.5],[-31.9,-1.4],[-30.8,5.5],[-28.4,9.2],[-24.9,12.3],[-20.5,14.5],[-15.5,15.8],[-10.3,15.9],[-5.2,15],[-0.5,13.1],[3.3,10.3],[6.1,6.8],[8,5],[16,6],[19,9.5],[24,12],[30,12.5],[36,11],[31,6],[28,0],[31,-6]],
+    lines:[[-30,0,6,0],[-24,-9,-4,-9],[-24,9,-4,9]],dots:[[22,-7],[22,7],[-12,-13],[-12,13]],
+    weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
 // ---- hex geometry (flat-top axial) ----
 const DIRS=[[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
 const hp=(q,r)=>({x:HX*1.5*q,y:HX*SQ3*(r+q/2)});
@@ -529,7 +537,7 @@ function canFireMount(s,key,t){if(!t||t.dead)return false;
   if(K==='missile')return s.msMode==='off'&&w.state==='ready'&&w.ammo>0;
   if(K==='torp')return w.stages>=1&&inArc(s,w.arc,t);
   return w.state==='ready'&&inArc(s,w.arc,t)}
-function hitP(s,key,t){const d=hexDist(s,t);if(key.startsWith('pd'))return accAt('laser',d);const T_=s.weapons[+key.slice(1)].T;return T_.acc?accAt(T_.acc,d):1}
+function hitP(s,key,t){const d=Math.max(0,hexDist(s,t)-(s.d.accShift||0));if(key.startsWith('pd'))return accAt('laser',d);const T_=s.weapons[+key.slice(1)].T;return T_.acc?accAt(T_.acc,d):1}
 
 // ---- damage ----
 function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
@@ -685,7 +693,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=9});return r}
+function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});return r}
 function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===1&&!s.isPlayer||s.ai&&impOf(T)===1)s.target=AIV.focus?pickTarget(s):nearestEnemy(s);const t=tgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
@@ -695,7 +703,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
     const need=s.weapons.reduce((a,w)=>a+(!w.alive?0:w.T.kind==='torp'?((w.charging||w.state==='idle')?w.T.perTurn:0):(w.T.kind!=='missile'&&w.state==='idle'?w.T.cost:0)),0)+4;
     const frac=s.shield/s.d.shield,full=genCost(s);let lvl=1;
-    if(AIV.genKeep&&(s.d.faction==='Dogahr'||AIV.genKeep>1)){const drain=s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind==='torp'&&w.charging?w.T.perTurn:0),0),afford=income(s)*IMP-drain-2;if(afford<full)lvl=Math.max(.25,Math.floor(Math.max(0,afford)/full*4)/4)}
+    if(AIV.genKeep&&(s.d.faction!=='Martian'||AIV.genKeep>1)){const drain=s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind==='torp'&&w.charging?w.T.perTurn:0),0),afford=income(s)*IMP-drain-2;if(afford<full)lvl=Math.max(.25,Math.floor(Math.max(0,afford)/full*4)/4)}
     else if(frac<.75&&s.E+income(s)*IMP-full<need&&regenTier(s)>0)lvl=Math.max(.25,Math.ceil(frac*4-1e-9)/4);
     if(lvl!==s.gen.lvl)queue(s,{type:'gen',lvl,cost:0})}
   const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp');
@@ -781,7 +789,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
   {const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
     const idleGuns=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
-    const brace=s.mode==='brace',dog=s.d.faction==='Dogahr';
+    const brace=s.mode==='brace',dog=s.d.faction!=='Martian';
     // Dogahr (Nov 18, David): reinforce liberally whenever an enemy is within 15 hexes, layer up to the full base shield (the 2× cap);
     // Martians: their guns eat the energy — only against inbound missiles, with plenty to spare, and a thin layer
     const want=AIV.reinf2?(dog?(inbound||brace||d<=15):inbound):(inbound||(d<=10&&!idleGuns)||brace||AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5);
@@ -1053,14 +1061,14 @@ function formSlots(form,list){const n=list.length,sp=4;const out=[];
     const res=new Array(n);centerOut(light.length).forEach((c,j)=>res[light[j]]={x:c*sp,y:0});centerOut(heavy.length).forEach((c,j)=>res[heavy[j]]={x:c*sp*1.3,y:5});return res}
   return out}
 const fleetFaction=['Martian','Dogahr'],fleetTL=[4,4];
-const TLNOTE={4:'shielded refits',3:'no shields, weaker reactors',2:'no shields, 8-hex targeting, 2/3-damage weapons'};
+const TLNOTE={5:'built for shields: 1.5× shields, targeting +2 hexes',4:'shielded refits',3:'no shields, weaker reactors',2:'no shields, 8-hex targeting, 2/3-damage weapons'};
 function shipLabel(k){const d=SHIPS[k];return `<span class="fbadge" style="background:${FACTIONS[d.faction].color}22;border-color:${FACTIONS[d.faction].color};color:${FACTIONS[d.faction].color}">${d.faction}</span> <b>${d.cls}</b>`}
 function renderBuilder(){renderHistory();const box=$('builder');
   const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
     const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);
     return `<div class="fleetcol"><h3 style="color:${TEAMCOL[t]}">${t?'Enemy fleet':'Your fleet'} <span class="dim" style="font-weight:normal;font-size:11px">${fleet[t].length}/${MAXSHIPS}</span></h3>
      <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${t===0?`<label class="dim"><input type="checkbox" data-fai="${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
-     <div class="row" style="margin-top:10px"><span class="dim">Faction</span><select data-fac="${t}">${Object.keys(FACTIONS).map(f=>`<option ${f===fac?'selected':''}>${f}</option>`).join('')}</select><span class="dim">Tech</span><select data-tl="${t}">${[4,3,2].map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
+     <div class="row" style="margin-top:10px"><span class="dim">Faction</span><select data-fac="${t}">${Object.keys(FACTIONS).map(f=>`<option ${f===fac?'selected':''}>${f}</option>`).join('')}</select><span class="dim">Tech</span><select data-tl="${t}">${[5,4,3,2].map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
      <div class="addlist">${avail.length?'':'<span class="dim">No ships at this tech level for this faction yet.</span>'}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
   const both=fleet[0].length>1&&fleet[1].length>1;
   box.innerHTML=side(0)+(MP.on?mpOppSide():side(1));
@@ -1072,7 +1080,7 @@ function renderBuilder(){renderHistory();const box=$('builder');
   box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder()});
   box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder()});
   box.querySelectorAll('[data-fai]').forEach(b=>b.onchange=()=>{fleet[0][+b.dataset.fai].ai=b.checked});
-  box.querySelectorAll('[data-fac]').forEach(b=>b.onchange=()=>{fleetFaction[+b.dataset.fac]=b.value;renderBuilder()});
+  box.querySelectorAll('[data-fac]').forEach(b=>b.onchange=()=>{const t=+b.dataset.fac;fleetFaction[t]=b.value;const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===b.value).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);renderBuilder()});
   box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{fleetTL[+b.dataset.tl]=+b.value;renderBuilder()});
   $('go').disabled=!(fleet[0].length&&(MP.on?MP.opp.fleet.length:fleet[1].length))||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':'Launch battle ▶';if(MP.on)mpSendFleet()}
 function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.opp.fleet.map(x=>({...x}));fleetForm[1]=MP.opp.form;startSpeed[1]=MP.opp.speed??4}const half=R.startDist/2;ships=[];const count={};for(const t of [0,1])fleet[t].sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
