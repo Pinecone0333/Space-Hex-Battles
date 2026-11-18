@@ -156,10 +156,15 @@ const WT={
   MPL:{name:'Medium Plasma Lance',ab:'MPL',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[48,48,40,40,32,32,24,24,16,16,8,8,8,3]},
   HPL:{name:'Heavy Plasma Lance',ab:'HPL',grp:'lances',kind:'lance',acc:'torp',cost:15,dmgR:[60,60,51,51,40,40,29,29,20,20,11,11,11,4]}
 };
+// Antiproton Lance (Nov 18, David): 2× a full torpedo's damage, flat at every range; costs 2× a full torpedo, drained over 2 turns (1/16 per impulse); holds free; torpedo accuracy
+WT.SAP={name:'Small Antiproton Lance',ab:'SAP',grp:'aplances',kind:'ap',acc:'torp',cost:18,dmg:36};
+WT.MAP={name:'Medium Antiproton Lance',ab:'MAP',grp:'aplances',kind:'ap',acc:'torp',cost:24,dmg:48};
+WT.HAP={name:'Heavy Antiproton Lance',ab:'HAP',grp:'aplances',kind:'ap',acc:'torp',cost:30,dmg:60};
+const AP_IMP=2*IMP;
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: same energy for 2/3 of the damage, and the shorter-ranged targeting computer
-for(const k of ['SL','ML','HL','SC','MC','HC','ST','MT','HT','SPL','MPL','HPL']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
-const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'missiles',label:'Missiles'}];
+for(const k of ['SL','ML','HL','SC','MC','HC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
+const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
 const FACTIONS={Dogahr:{color:'#39e75f',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
 const SHIPS={
@@ -327,7 +332,7 @@ const reinfAmt=s=>s.reinf.reduce((a,x)=>a+x.amt,0);
 const torpStored=w=>w.stages*w.T.perTurn;
 // ---- ongoing energy drains, paid every impulse: generator 1/8 of its per-turn cost, charging torpedoes 1/8 of a stage, held torpedoes 1/6 of the stored charge per turn ----
 function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0);if(!s.d.noShield&&g>0)out.push({lab:'Gen',c:genCost(s)*g/IMP});
-  for(const w of s.weapons){if(!w.alive||w.T.kind!=='torp')continue;if(w.charging)out.push({lab:w.T.ab+'▷',c:w.T.perTurn/IMP});else if(w.holding&&w.stages>0)out.push({lab:w.T.ab+' hold',c:torpStored(w)/6/IMP})}
+  for(const w of s.weapons){if(w.alive&&w.T.kind==='ap'&&w.charging)out.push({lab:w.T.ab+'▷',c:w.T.cost/AP_IMP});if(!w.alive||w.T.kind!=='torp')continue;if(w.charging)out.push({lab:w.T.ab+'▷',c:w.T.perTurn/IMP});else if(w.holding&&w.stages>0)out.push({lab:w.T.ab+' hold',c:torpStored(w)/6/IMP})}
   return out}
 const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
 function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
@@ -367,7 +372,7 @@ function canQueue(s,act){
   if(act.type==='hold'){const w=s.weapons[act.i];return w.alive&&w.charging&&w.stages>=1&&!s.queue.some(x=>x.type==='hold'&&x.i===act.i)}
   if(act.type==='pd'){const p=s.pd[act.i];const q=s.queue.filter(x=>x.type==='pd'&&x.i===act.i).length;return p.alive&&p.shots+p.pending.length+q<2}
   return true}
-function queue(s,act){if(act.type==='start'&&s.weapons[act.i]&&s.weapons[act.i].T.kind==='torp')act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
+function queue(s,act){if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;s.E-=a.cost;
     if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';s.burnFx=1}
@@ -379,6 +384,7 @@ function applyQueue(s){
     else if(a.type==='repair'){s.shield=Math.min(s.d.shield,s.shield+a.n);if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='start'){const w=s.weapons[a.i];
       if(w.T.kind==='torp'){w.charging=true;w.holding=false;w.state='charging';w.paid=0}
+      else if(w.T.kind==='ap'){w.charging=true;w.state='charging';w.paid=0}
       else{w.state='cycling';w.readyT=T+cycleImp(s,w)}}
     else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding';w.paid=0}
     else if(a.type==='pd'){s.pd[a.i].pending.push(T+R.pdReload)}}
@@ -394,6 +400,10 @@ function upkeep(s){
   if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
+    if(K==='ap'&&w.charging){const c=w.T.cost/AP_IMP;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);   // short of energy: charging pauses, progress kept
+      if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;if(w.paid>=AP_IMP){w.charging=false;w.paid=0;w.state='ready';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab}`);if(me)torpNote(s,`${w.T.ab} charged (${w.T.dmg} dmg)`,'good')}}
+      else if(!w.apShort){w.apShort=1;if(me)torpNote(s,`not enough energy — ${w.T.ab} charging paused`,'bad')}
+      if(s.E>=c)w.apShort=0;continue}
     if(K==='torp'){
       if(w.charging){const c=w.T.perTurn/IMP;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);
         if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;
@@ -511,7 +521,7 @@ function commit(){
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
     const d=Math.min(i*.14,1.6),vol=sh.s.team===0?1:.65;let f;
     if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:sh.dmg>8?3:2,snd:[sh.kind==='pd'?'pd':sh.dmg>8?'laserH':'laserM',vol]};
-    else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:'#ffe066',r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
+    else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:sh.kind==='ap'?.6:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:sh.kind==='ap'?'#f2e8ff':'#ffe066',r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'||sh.kind==='ap'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
     f.d=d;fx.push(f);endT=Math.max(endT,d+f.max)});
   pending=shots;phase='resolving';resolveT=shots.length?endT+.3:0;buildHUD();net();
 }
@@ -618,7 +628,7 @@ function showEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>
 function autoQueue(s){   // standing order: generator renewal only (weapons are never queued automatically)
 }
 function chargeAll(s){let n=0;
-  s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
+  s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
   s.pd.forEach((p,i)=>{while(queue(s,{type:'pd',i,cost:1}))n++});
   if(!n)log(`${s.name}: nothing to charge (or not enough energy)`,'dim')}
 function decelBurn(s){ // the legal burn that leaves the lowest speed (prefers cheaper burns on ties)
@@ -686,7 +696,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd){queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)});if(Math.abs(fd)>=2)queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}}}
   else{const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd&&s.E-qCost(s)>reserve+pivotCost(s,pd)){queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)});if(Math.abs(fd)>=2&&s.E-qCost(s)>reserve+pivotCost(s,pd))queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)})}}
   // weapons by priority, keeping a little energy back for manoeuvres
-  for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
+  for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-1>=reserve&&queue(s,{type:'pd',i,cost:1})){}});
@@ -696,7 +706,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(inbound||(d<=10&&!idleGuns)){const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*.4-reinfAmt(s)));const n=Math.floor(room);
       if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=(s.mode==='charge'?6:s.d.faction==='Dogahr'?4:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
   // damage control: reactor first, then engine, torpedoes/coilguns, other weapons, PD, thrusters
-  {const pr=x=>x.k==='rea'?0:x.k==='eng'?1:x.k==='w'&&(s.weapons[x.i].T.kind==='torp'||s.weapons[x.i].T.kind==='slug'||s.weapons[x.i].T.kind==='lance')?2:x.k==='w'&&s.weapons[x.i].T.kind!=='missile'?3:x.k==='pd'?4:x.k==='sen'?4.5:x.k==='w'?6:5;
+  {const pr=x=>x.k==='rea'?0:x.k==='eng'?1:x.k==='w'&&(s.weapons[x.i].T.kind==='torp'||s.weapons[x.i].T.kind==='slug'||s.weapons[x.i].T.kind==='lance'||s.weapons[x.i].T.kind==='ap')?2:x.k==='w'&&s.weapons[x.i].T.kind!=='missile'?3:x.k==='pd'?4:x.k==='sen'?4.5:x.k==='w'?6:5;
    const todo=s.damaged.filter(x=>!s.dc.some(j=>j.box===x)).sort((a,b)=>pr(a)-pr(b));for(const x of todo)if(!queue(s,{type:'dc',id:x.id,cost:0}))break}
   const gunsWaiting=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
   if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
@@ -789,11 +799,11 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   if(AIV.pdFirst&&inbN){const need=AIV.pdBudget?Math.ceil(inbN*1.25):99;const have=()=>s.pd.reduce((a,p)=>a+(p.alive?p.shots+p.pending.length:0),0)+s.queue.filter(x=>x.type==='pd').length;
     s.pd.forEach((pp,i)=>{while(have()<need&&s.E-qCost(s)-genReserve(s)-1>=0&&queue(s,{type:'pd',i,cost:1})){}})}
   // weapons before manoeuvre when the target is in range and guns sit empty (an energy-starved ship otherwise spends everything on burns)
-  if(prio&&!prio.includes('lances'))prio=[...prio,'lances'];
-  if(AIV.wfirst&&d<=12&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
+  if(prio&&!prio.includes('lances'))prio=[...prio,'lances'];if(prio&&!prio.includes('aplances'))prio=['aplances',...prio];
+  if(AIV.wfirst&&d<=12&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:w.T.cost;
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:AIV.pdBudget&&s.mode==='charge'?reserve:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
-  const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
+  const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance'||w.T.kind==='ap')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
   const wantNose=AIV.align&&spReady&&d<=(s.d.faction==='Dogahr'?10:9)&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
   const noseFoes=s.d.faction==='Martian'||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=10&&(s.torpMem||{})[e.name]!==false&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
@@ -823,7 +833,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       let done=0;for(let i=0;i<n;i++)if(isFinite(pivotCost(s,dir))&&s.E-qCost(s)-genReserve(s)>=pivotCost(s,dir)&&queue(s,{type:'pivot',dir,cost:pivotCost(s,dir)}))done++;
       if(!done)for(const x of pv)s.queue.push(x)}}   // couldn't afford it: keep the navigation pivots
   // weapons by priority, keeping a little energy back for manoeuvres
-  for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.cost;
+  for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   {const msIn=AIV.pdFirst&&missiles.some(m=>!m.dead&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20);
@@ -839,7 +849,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       const keep=AIV.reinf2?(dog?(brace?0:inbound?2:idleGuns?99:Math.max(2,s.reactor0/4)):12):(brace?0:s.mode==='charge'?6:dog?4:2);
       if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=keep)queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
   // damage control: reactor first, then engine, torpedoes/coilguns, other weapons, PD, thrusters
-  {const pr=x=>x.k==='rea'?0:x.k==='eng'?1:x.k==='w'&&(s.weapons[x.i].T.kind==='torp'||s.weapons[x.i].T.kind==='slug'||s.weapons[x.i].T.kind==='lance')?2:x.k==='w'&&s.weapons[x.i].T.kind!=='missile'?3:x.k==='pd'?4:x.k==='sen'?4.5:x.k==='w'?6:5;
+  {const pr=x=>x.k==='rea'?0:x.k==='eng'?1:x.k==='w'&&(s.weapons[x.i].T.kind==='torp'||s.weapons[x.i].T.kind==='slug'||s.weapons[x.i].T.kind==='lance'||s.weapons[x.i].T.kind==='ap')?2:x.k==='w'&&s.weapons[x.i].T.kind!=='missile'?3:x.k==='pd'?4:x.k==='sen'?4.5:x.k==='w'?6:5;
    const todo=s.damaged.filter(x=>!s.dc.some(j=>j.box===x)).sort((a,b)=>pr(a)-pr(b));for(const x of todo)if(!queue(s,{type:'dc',id:x.id,cost:0}))break}
   const gunsWaiting=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
   if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
@@ -905,7 +915,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
   if(wOK){const ws=t.weapons.filter(w=>w.alive);const grp=k=>ws.filter(w=>w.T.kind===k);const parts=[];
     for(const w of grp('torp'))parts.push(`<span class="${w.stages>=3?'bad':w.stages?'warn':'dim'}" title="${w.T.name}: ${torpDmg(w)} damage stored${w.charging?', charging':''}">${w.T.ab} ${'▮'.repeat(w.stages)}${'▯'.repeat(3-w.stages)}${w.charging?'▷':''}</span>`);
     const tally=(k,lab)=>{const g=grp(k);if(!g.length)return;const r=g.filter(w=>w.state==='ready').length;parts.push(`<span class="${r?'warn':'dim'}">${lab} ${r}/${g.length} hot</span>`)};
-    tally('beam','lasers');tally('slug','coilguns');tally('lance','lances');
+    tally('beam','lasers');tally('slug','coilguns');tally('lance','lances');tally('ap','antiproton lances');
     const m=grp('missile');if(m.length){const r=m.filter(w=>w.state==='ready').length;parts.push(`<span class="${r?'warn':'dim'}">launchers ${r}/${m.length} ready</span>`)}
     const pd=t.pd.filter(p=>p.alive);if(pd.length)parts.push(`<span class="dim">PD ${pd.reduce((a,p)=>a+p.shots,0)} shots</span>`);
     h+=`<div class="row sm" style="flex-wrap:wrap;gap:3px 9px">${parts.join('')}</div>`;
@@ -945,13 +955,15 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
-    const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff'};
+    const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff',lances:s.d.torp,aplances:'#f2e8ff'};
     for(const G of GROUPS){const ws=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.grp===G.id);if(!ws.length)continue;
       if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
       for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
         if(!w.alive)st='<span class="bad">destroyed</span>';
         else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
           if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.holding?'Resume':'Charge',true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
+        else if(K==='ap'){st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+AP_IMP-(w.paid||0))}">${w.paid||0}/${AP_IMP}→${when(T+AP_IMP-(w.paid||0))}</span>`:'<span class="dim">empty</span>';
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,'Charge',true,`${w.T.cost} energy over 2 turns (${+(w.T.cost/AP_IMP).toFixed(3)} per impulse); ${w.T.dmg} damage at any range; holds free`)}
         else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
         if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):''),K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'')}
