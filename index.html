@@ -216,14 +216,14 @@ for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',blurb:'Heavy shields, plasma lances, long-range targeting'};
 SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:150,shield:75,big:true,tl:5,
-    reactor:48,genCost:15,genRegen:6,doctrine:'hunt',prefRange:2,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
+    reactor:48,genCost:15,genRegen:6,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
     shape:[[36,-11],[30,-12.5],[24,-12],[19,-9.5],[16,-6],[8,-5],[6.1,-6.8],[3.3,-10.3],[-0.5,-13.1],[-5.2,-15],[-10.3,-15.9],[-15.5,-15.8],[-20.5,-14.5],[-24.9,-12.3],[-28.4,-9.2],[-30.8,-5.5],[-31.9,-1.4],[-30.8,5.5],[-28.4,9.2],[-24.9,12.3],[-20.5,14.5],[-15.5,15.8],[-10.3,15.9],[-5.2,15],[-0.5,13.1],[3.3,10.3],[6.1,6.8],[8,5],[16,6],[19,9.5],[24,12],[30,12.5],[36,11],[31,6],[28,0],[31,-6]],
     lines:[[-30,0,6,0],[-24,-9,-4,-9],[-24,9,-4,9]],dots:[[22,-7],[22,7],[-12,-13],[-12,13]],
-    weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
+    weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','FX','ALL','ALL','ALL']};
 SHIPS.blokaidd={faction:'Blokai',cls:'Destroyer',weight:60,name:'Blokai Destroyer',short:'Blokai DD',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:64,shield:42,big:false,tl:5,
-    reactor:25,genCost:7.5,genRegen:3,doctrine:'hunt',prefRange:2,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
+    reactor:25,genCost:7.5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
     shape:[[27,-8.2],[22.5,-9.4],[18,-9],[14.2,-7.1],[12,-4.5],[6,-3.8],[4.6,-5.1],[2.5,-7.7],[-0.4,-9.8],[-3.9,-11.2],[-7.7,-11.9],[-11.6,-11.9],[-15.4,-10.9],[-18.7,-9.2],[-21.3,-6.9],[-23.1,-4.1],[-23.9,-1],[-23.1,4.1],[-21.3,6.9],[-18.7,9.2],[-15.4,10.9],[-11.6,11.9],[-7.7,11.9],[-3.9,11.2],[-0.4,9.8],[2.5,7.7],[4.6,5.1],[6,3.8],[12,4.5],[14.2,7.1],[18,9],[22.5,9.4],[27,8.2],[23.2,4.5],[21,0],[23.2,-4.5]],lines:[[-22.5,0,4.5,0],[-18,-6.8,-3,-6.8],[-18,6.8,-3,6.8]],dots:[[16.5,-5.2],[16.5,5.2],[-9,-9.8],[-9,9.8]],
-    weapons:[['MPL','S'],['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS']],pd:['FX','ALL','ALL','ALL']};
+    weapons:[['MPL','S'],['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS']],pd:['FX','FX','ALL','ALL','ALL']};
 // ---- hex geometry (flat-top axial) ----
 const DIRS=[[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
 const hp=(q,r)=>({x:HX*1.5*q,y:HX*SQ3*(r+q/2)});
@@ -536,7 +536,7 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
         for(const m of missiles){if(m.dead||m.intercept||claimed.has(m)||m.target.dead||m.target.team!==s.team||!m.ppx)continue;
           const c=segD(m,s.px);if(c.d>R.pdRange+.01)continue;const mh=pixToHex(c.x,c.y);if(!inArc(s,p.arc,mh))continue;
           const k=(m.target===s?0:100)+c.d;if(k<bk){bk=k;best=m;bp=c}}
-        if(!best)break;claimed.add(best);p.shots--;{const q=inPt(best,rnd(1.2,1.8));bp={...bp,x:q.x,y:q.y}}const hit=Math.random()<R.pdHit;FXD=at();sfxAt('pd',s.isPlayer?.6:.4);
+        if(!best)break;claimed.add(best);p.shots--;{const q=inPt(best,rnd(1.2,1.8));bp={...bp,x:q.x,y:q.y}}const hit=Math.random()<R.pdHit+.05*((s.d.tl||4)-((best.owner&&best.owner.d.tl)||4));FXD=at();sfxAt('pd',s.isPlayer?.6:.4);
         fx.push({type:'beam',x1:s.px.x,y1:s.px.y,x2:bp.x+(hit?0:rnd(-12,12)),y2:bp.y+(hit?0:rnd(-12,12)),t:.35,max:.35,color:'#e8f6ff',w:1.5,d:FXD});
         if(hit){MST.pd++;if(best.target!==s)MST.ally++;best.dead=true;ghost(best,bp.x,bp.y,FXD);burst({x:bp.x,y:bp.y},14,'#c7a6ff');ring({x:bp.x,y:bp.y},18,'#c7a6ff');sfxAt('mslPop',.6);if(best.target!==s&&s.isPlayer)log(`${s.name} PD shot down a missile aimed at ${best.target.name}`,'good')}FXD=0}}}
   for(const m of missiles){if(m.dead||m.intercept)continue;if(m.closest<=HX){MST.h++;const hb=Math.min(24,Math.floor((m.ld||0)/4)*4);(MST.hd||(MST.hd={}))[hb]=(MST.hd[hb]||0)+1;m.dead=true;FXD=at();const g=inPt(m,1),hp_=inPt(m,.35);ghost(m,g.x,g.y,FXD);applyDamage(m.target,m.dmg,m.owner,m.ppx||m.px);burst(hp_,26,'#ffb36b',true);ring(hp_,40,'#ffb36b',true);sfxAt('boom',.5);FXD=0}}
@@ -741,7 +741,16 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const hotE=e=>(s.torpMem||{})[e.name]!==false&&e.weapons.some(w=>w.alive&&w.T.kind==='torp');
     s.hotNear=enemiesOf(s).some(e=>hexDist(e,s)<=15&&hotE(e));
     if(AIV.brace&&hot&&enemiesOf(s).some(e=>hexDist(e,s)<=12&&hotE(e))&&(sepRate<-6||d<=7))s.mode='brace';
-    if(s.mode==='brace'){want={range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   // can't outrun it: face it, reinforce, shoot
+    if(s.d.sniper){   // Blokai (Nov 18, David): out-range the enemy, wear it down, then dive in for the lance kill
+      const sh=t.shield+reinfAmt(t),guns=t.weapons.filter(w=>w.alive&&w.T.kind!=='missile').length,guns0=t.weapons.filter(w=>w.T.kind!=='missile').length;
+      const weak=sh<t.d.shield*.25||t.hull<t.d.hull*.5||guns<=guns0*.4;
+      // window: the enemy's big punch is spent (no full torpedo, most launchers reloading) — go in with the lance while it recharges
+      const tT=t.weapons.filter(w=>w.alive&&w.T.kind==='torp'),tM=t.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);
+      const spent=(!tT.length||tT.every(w=>w.stages<3))&&tM.filter(w=>w.state==='ready').length<=tM.length*.3&&(tT.length||tM.length);
+      if(weak)s.dove=true;s.mode=(s.dove||spent&&d<=14)&&!t.dead?'dive':'snipe';
+      if(s.mode==='dive'){want={range:2,radial:1.2,orbit:.3,chase:true,maxClose:14};face=a;prio=['lances','lasers']}
+      else{want={range:s.d.standRange||11,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lasers','lances']}}
+    else if(s.mode==='brace'){want={range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   // can't outrun it: face it, reinforce, shoot
     else if(hot&&!AIV.dStand){want={range:10,radial:1,orbit:2};face=a;prio=['lasers','coils']}
     else if(hot){want={range:6,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
     else{want={range:s.d.prefRange||6,radial:1.2,orbit:1,chase:true,maxClose:12};face=a;prio=['lasers','coils']}   // mid-range: chase from afar, back away if the enemy closes inside 4
@@ -765,7 +774,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'?0:AIV.pdBudget&&s.mode==='charge'?reserve:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
   const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
-  const wantNose=AIV.align&&spReady&&d<=(s.d.faction==='Dogahr'?10:9)&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run'||s.mode==='brace'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
+  const wantNose=AIV.align&&spReady&&d<=(s.d.faction==='Dogahr'?10:9)&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
   const noseFoes=s.d.faction==='Martian'||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=10&&(s.torpMem||{})[e.name]!==false&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
   const look=2/IMP;
@@ -779,7 +788,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;const Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.evadeUntil>T;
+  const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T;
   const pen0=posPen(V,s.f);
   if((em>=(urgent?.75:1.5)||pen0>.35)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent||pen0>.6?0:Math.min(8,s.reactor/4))){let best=null,bv=em+pen0;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const b=burnResult(s,k);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?.15:0)+(b.f!==s.f?.05:0)+(tb>120*D2R?.8:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
