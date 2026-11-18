@@ -750,7 +750,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       const spent=(!tT.length||tT.every(w=>w.stages<3))&&tM.filter(w=>w.state==='ready').length<=tM.length*.3&&(tT.length||tM.length);
       if(weak)s.dove=true;s.mode=(s.dove||spent&&d<=14)&&!t.dead?'dive':'snipe';
       if(s.mode==='dive'){want={range:2,radial:1.2,orbit:.3,chase:true,maxClose:14};face=a;prio=['lances','lasers']}
-      else{want={range:s.d.standRange||11,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lasers','lances']}}
+      else{want={range:s.d.standRange||11,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lances','lasers']}}   // load the lance first (holding is free), lasers with what's left
     else if(s.mode==='brace'){want={range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   // can't outrun it: face it, reinforce, shoot
     else if(hot&&!AIV.dStand){want={range:10,radial:1,orbit:2};face=a;prio=['lasers','coils']}
     else if(hot){want={range:6,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
