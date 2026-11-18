@@ -125,7 +125,7 @@ const MP={on:false,role:null,conn:null,peer:null,hostReady:false,guestReady:fals
 const isAI=s=>s.ai||(s.team===1&&!MP.on);
 function net(){if(MP.role==='host'&&typeof mpSendState==='function')mpSendState()}
 const R={reactor:42, burn:2, reverse:4, pivot:2, genCost:10, genRegen:4, shieldRepairPerImp:2, startDist:20,
-  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.8, magReloadTurns:3};
+  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.75, magReloadTurns:3};
 const income=s=>s.reactor/IMP;
 const genCost=s=>s.d.noShield?0:(s.d.genCost||R.genCost), genRegen=s=>s.d.genRegen||R.genRegen;
 
@@ -147,7 +147,7 @@ const WT={
   SC:{name:'Small Coilgun',ab:'SC',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
   MC:{name:'Medium Coilgun',ab:'MC',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
   HC:{name:'Heavy Coilgun',ab:'HC',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
-  MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:4},
+  MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:14,cost:0,mag:4},
   ST:{name:'Small Energy Torpedo',ab:'ST',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'MT',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
   HT:{name:'Heavy Energy Torpedo',ab:'HT',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
@@ -219,7 +219,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1};   // AI variants (for testing)
+let AIV={reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -695,7 +695,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
     const need=s.weapons.reduce((a,w)=>a+(!w.alive?0:w.T.kind==='torp'?((w.charging||w.state==='idle')?w.T.perTurn:0):(w.T.kind!=='missile'&&w.state==='idle'?w.T.cost:0)),0)+4;
     const frac=s.shield/s.d.shield,full=genCost(s);let lvl=1;
-    if(AIV.genKeep){const drain=s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind==='torp'&&w.charging?w.T.perTurn:0),0),afford=income(s)*IMP-drain-2;if(afford<full)lvl=Math.max(.25,Math.floor(Math.max(0,afford)/full*4)/4)}
+    if(AIV.genKeep&&(s.d.faction==='Dogahr'||AIV.genKeep>1)){const drain=s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind==='torp'&&w.charging?w.T.perTurn:0),0),afford=income(s)*IMP-drain-2;if(afford<full)lvl=Math.max(.25,Math.floor(Math.max(0,afford)/full*4)/4)}
     else if(frac<.75&&s.E+income(s)*IMP-full<need&&regenTier(s)>0)lvl=Math.max(.25,Math.ceil(frac*4-1e-9)/4);
     if(lvl!==s.gen.lvl)queue(s,{type:'gen',lvl,cost:0})}
   const torps=s.weapons.filter(w=>w.alive&&w.T.kind==='torp');
@@ -781,9 +781,13 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
   {const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
     const idleGuns=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
-    const brace=s.mode==='brace',idleE=AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5;
-    if(inbound||(d<=10&&!idleGuns)||brace||idleE){const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*.4-reinfAmt(s)));const n=Math.floor(room);
-      if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=(brace?0:s.mode==='charge'?6:s.d.faction==='Dogahr'?4:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
+    const brace=s.mode==='brace',dog=s.d.faction==='Dogahr';
+    // Dogahr (Nov 18, David): reinforce liberally whenever an enemy is within 15 hexes, layer up to the full base shield (the 2× cap);
+    // Martians: their guns eat the energy — only against inbound missiles, with plenty to spare, and a thin layer
+    const want=AIV.reinf2?(dog?(inbound||brace||d<=15):inbound):(inbound||(d<=10&&!idleGuns)||brace||AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5);
+    if(want){const layer=AIV.reinf2?(dog?1:.2):.4;const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*layer-reinfAmt(s)));const n=Math.floor(room);
+      const keep=AIV.reinf2?(dog?(brace?0:inbound?2:idleGuns?99:Math.max(2,s.reactor0/4)):12):(brace?0:s.mode==='charge'?6:dog?4:2);
+      if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=keep)queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
   // damage control: reactor first, then engine, torpedoes/coilguns, other weapons, PD, thrusters
   {const pr=x=>x.k==='rea'?0:x.k==='eng'?1:x.k==='w'&&(s.weapons[x.i].T.kind==='torp'||s.weapons[x.i].T.kind==='slug'||s.weapons[x.i].T.kind==='lance')?2:x.k==='w'&&s.weapons[x.i].T.kind!=='missile'?3:x.k==='pd'?4:x.k==='sen'?4.5:x.k==='w'?6:5;
    const todo=s.damaged.filter(x=>!s.dc.some(j=>j.box===x)).sort((a,b)=>pr(a)-pr(b));for(const x of todo)if(!queue(s,{type:'dc',id:x.id,cost:0}))break}
