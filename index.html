@@ -221,9 +221,9 @@ SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy
     lines:[[-30,0,6,0],[-24,-9,-4,-9],[-24,9,-4,9]],dots:[[22,-7],[22,7],[-12,-13],[-12,13]],
     weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','FX','ALL','ALL','ALL']};
 SHIPS.blokaidd={faction:'Blokai',cls:'Destroyer',weight:60,name:'Blokai Destroyer',short:'Blokai DD',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:64,shield:42,big:false,tl:5,
-    reactor:53.5,genCost:7.5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
+    reactor:45.5,genCost:7.5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
     shape:[[27,-8.2],[22.5,-9.4],[18,-9],[14.2,-7.1],[12,-4.5],[6,-3.8],[4.6,-5.1],[2.5,-7.7],[-0.4,-9.8],[-3.9,-11.2],[-7.7,-11.9],[-11.6,-11.9],[-15.4,-10.9],[-18.7,-9.2],[-21.3,-6.9],[-23.1,-4.1],[-23.9,-1],[-23.1,4.1],[-21.3,6.9],[-18.7,9.2],[-15.4,10.9],[-11.6,11.9],[-7.7,11.9],[-3.9,11.2],[-0.4,9.8],[2.5,7.7],[4.6,5.1],[6,3.8],[12,4.5],[14.2,7.1],[18,9],[22.5,9.4],[27,8.2],[23.2,4.5],[21,0],[23.2,-4.5]],lines:[[-22.5,0,4.5,0],[-18,-6.8,-3,-6.8],[-18,6.8,-3,6.8]],dots:[[16.5,-5.2],[16.5,5.2],[-9,-9.8],[-9,9.8]],
-    weapons:[['MPL','S'],['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS']],pd:['FX','FX','ALL','ALL','ALL']};
+    weapons:[['MPL','S'],['SL','FX'],['SL','FX'],['SL','RS'],['SL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
 // ---- hex geometry (flat-top axial) ----
 const DIRS=[[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
 const hp=(q,r)=>({x:HX*1.5*q,y:HX*SQ3*(r+q/2)});
