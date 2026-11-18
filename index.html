@@ -147,6 +147,7 @@ const WT={
   SC:{name:'Small Coilgun',ab:'SC',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
   MC:{name:'Medium Coilgun',ab:'MC',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
   HC:{name:'Heavy Coilgun',ab:'HC',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
+  XC:{name:'Superheavy Coilgun',ab:'XC',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
   MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:14,cost:0,mag:4},
   ST:{name:'Small Energy Torpedo',ab:'ST',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'MT',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
@@ -163,7 +164,7 @@ WT.HAP={name:'Heavy Antiproton Lance',ab:'HAP',grp:'aplances',kind:'ap',acc:'tor
 const AP_IMP=2*IMP;
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: same energy for 2/3 of the damage, and the shorter-ranged targeting computer
-for(const k of ['SL','ML','HL','SC','MC','HC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
+for(const k of ['SL','ML','HL','SC','MC','HC','XC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
 const FACTIONS={Dogahr:{color:'#39e75f',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
@@ -243,6 +244,9 @@ SHIPS.chemcru={...CHEM,cls:'Cruiser',weight:88,name:'Chemantar Cruiser',short:'C
 SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frigate',short:'Chem Frigate',hull:55,shield:25,big:false,reactor:19,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[-17.4,-7.4],[11.2,-7.4],[13.1,-7.2],[14.9,-6.4],[16.4,-5.3],[17.6,-3.7],[18.4,-1.9],[18.6,0],[18.4,1.9],[17.6,3.7],[16.4,5.3],[14.9,6.4],[13.1,7.2],[11.2,7.4],[-17.4,7.4]],lines:[[-16,0,15,0]],dots:[[13,0],[-4,-5],[-4,5]],
     weapons:[['ST','S'],['ST','S'],['SL','ALL'],['SL','ALL'],...rep(2,['MS','ALL'])],pd:['FX','ALL']};
+SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:225,shield:75,big:true,dcTeams:3,reactor:68.5,genCost:15,genRegen:6,doctrine:'hunt',
+    shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
+    weapons:[['XC','S'],['XC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
