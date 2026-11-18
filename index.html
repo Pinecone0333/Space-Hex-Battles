@@ -94,7 +94,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
  <div class="row" style="justify-content:center"><button class="btn big go" id="go">Launch battle ▶</button></div>
  <div id="pastBattles" style="margin-top:10px"></div>
  <div class="dim" style="font-size:11px;margin-top:10px">8 impulses per turn; spend energy and fire at any impulse. Velocity carries over until you burn to change it. Burn 2 (reverse 4) for cruisers, half that for frigates/destroyers, one per impulse; cruisers must burn straight after a turn or slip; frigates/destroyers can't repeat a turn or a slip back to back; pivot 2 per facing (frigates/destroyers 0.5).<br>
- Shield generator at 25/50/75/100% (full cost: heavy cruiser 10 energy per turn, cruiser 7.5, frigate/destroyer 5); below 100% shields are capped at that share, regenerate proportionally slower, and can't be reinforced or repaired; if it goes off, shields collapse to 0. Regeneration: none if hit in the last 4 impulses, base rate if hit in the last 12, double otherwise; reinforce or repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later. Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
+ Shield generator at 25/50/75/100% (full cost: heavy cruiser 10 energy per turn, cruiser 7.5, frigate/destroyer 5); below 100% shields are capped at that share, regenerate proportionally slower, and can't be reinforced or repaired; if it goes off, shields collapse to 0. Regeneration: none if hit in the last 4 impulses, base rate if hit in the last 12, double otherwise; reinforce or repair base shields at 2 energy per point (max 2 points/impulse; reinforcement lasts one turn, up to 2× shields). Loading a weapon readies it one turn later (TL5 laser cannons: half a turn). Battles start at battle stations (everything loaded) unless you choose weapons cold.<br>
  Heavy cruisers: reactor 42, 50 shields / 150 hull · Albatross: reactor 30, 40 / 110 · Dogahr Light Cruiser: reactor 28, 35 / 90 · Dogahr Destroyers: reactor 22, 28 / 64 · Peregrine: reactor 22, 25 / 60 · Dogahr Frigate: reactor 20, 20 / 48.</div>
 </div></div>
 <div id="end" class="overlay" style="display:none"><div class="box" style="text-align:center"><h1 id="endTitle"></h1><div id="endSub" class="dim" style="margin:8px 0 16px"></div><button class="btn big" id="endRec" title="Download a record of the whole battle to share with Claude">💾 Save battle record</button> <button class="btn big" id="again">Choose ship again</button></div></div>
@@ -361,7 +361,7 @@ function applyQueue(s){
     else if(a.type==='repair'){s.shield=Math.min(s.d.shield,s.shield+a.n);if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
     else if(a.type==='start'){const w=s.weapons[a.i];
       if(w.T.kind==='torp'){w.charging=true;w.holding=false;w.state='charging';w.paid=0}
-      else{w.state='cycling';w.readyT=T+IMP}}
+      else{w.state='cycling';w.readyT=T+cycleImp(s,w)}}
     else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding';w.paid=0}
     else if(a.type==='pd'){s.pd[a.i].pending.push(T+R.pdReload)}}
   s.queue=[];
@@ -498,12 +498,13 @@ function commit(){
   pending=shots;phase='resolving';resolveT=shots.length?endT+.3:0;buildHUD();net();
 }
 // fire history (what each ship fired, and when) — weapon fire is visible at any range
+const cycleImp=(s,w)=>w.T.kind==='beam'&&(s.d.tl||4)>=5?IMP/2:IMP;   // Nov 18 (David): TL5 laser cannons cycle in 4 impulses
 function fireRec(s,ab,kind,dmg,t,n=1){const L=s.fireLog||(s.fireLog=[]);let e=L.find(x=>x.T===T&&x.ab===ab);if(!e){e={T,ab,kind,n:0,dmg:0,at:t.name};L.push(e);if(L.length>24)L.shift()}e.n+=n;e.dmg+=dmg}
 function fireHist(t){const L=t.fireLog||[];const seen=new Set(),out=[];for(let i=L.length-1;i>=0&&out.length<6;i--){const e=L[i];if(seen.has(e.ab))continue;seen.add(e.ab);out.push(e)}
   if(!out.length)return `<div class="row dim sm">Recent fire: none seen</div>`;
   return `<div class="sm" style="margin-top:2px"><span class="dim">Recent fire</span>${out.map(e=>{const ago=T-e.T;const cls=ago<=2?'bad':ago<IMP?'warn':'dim';
     const what=e.kind==='missile'?`${e.n} launched`:e.kind==='pd'?`${e.n} shot${e.n>1?'s':''}`:e.kind==='torp'?`×${e.n} · ${e.dmg} dmg`:`×${e.n}`;
-    const nxt=e.kind==='torp'?' · recharging':e.kind==='pd'?'':` · ${e.kind==='missile'?'next launch':'reload'} ≥ ${when(e.T+IMP+(e.kind==='missile'?0:1))}`;
+    const nxt=e.kind==='torp'?' · recharging':e.kind==='pd'?'':` · ${e.kind==='missile'?'next launch':'reload'} ≥ ${when(e.T+(e.kind==='beam'&&(t.d.tl||4)>=5?IMP/2:IMP)+(e.kind==='missile'?0:1))}`;
     return `<div class="${cls}"><b>${e.ab}</b> ${what} · ${when(e.T)} <span class="dim">(${ago?ago+' imp ago':'just now'}${e.at!==t.name?'':''}${nxt})</span></div>`}).join('')}</div>`}
 function finishResolve(){
   const sum={};for(const sh of pending){const k=sh.s.name+'→'+sh.t.name;sum[k]=sum[k]||{n:0,h:0,d:0,team:sh.s.team};sum[k].n++;if(sh.hit){sum[k].h++;sum[k].d+=sh.dmg;applyDamage(sh.t,sh.dmg,sh.s,null,sh.s.subMode&&(sh.kind==='beam'||sh.kind==='pd'))}else missText(sh.t)}
