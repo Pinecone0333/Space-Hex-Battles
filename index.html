@@ -248,6 +248,11 @@ SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frig
 SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,dcTeams:3,reactor:76.5,genCost:20,genRegen:8,doctrine:'hunt',
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
+// ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
+FACTIONS.Golthan={color:'#a0703c',blurb:'Armored broadside cruisers: front armor, laser batteries, missiles; sluggish'};
+SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,armor:25,moveMul:1.5,big:true,reactor:47.5,doctrine:'hunt',broadside:true,
+    shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
+    weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -330,7 +335,7 @@ function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   else{s.dmgRea=Math.max(0,(s.dmgRea||0)-1);s.reactor=s.reactor0*(1-.1*s.dmgRea)}
   s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(s.team===0&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
 function makeShip(key,q,r,f,team,ai,name){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
-  const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
+  const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,armor:d.armor||0,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
     lastAdj:null,dead:false,msMode:'off',subMode:false,queue:[],fireSel:new Set(),flash:0,hist:[],target:null,
     auto:{},
     weapons:d.weapons.map(([t,arc])=>({t,T:WT[t],arc,alive:true,state:'idle',readyT:0,ammo:WT[t].mag||0,stages:0,charging:false,paid:0,holding:false})),
@@ -358,8 +363,8 @@ const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
 function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
 const torpDmg=w=>Math.round(torpStored(w)*2*(w.T.dmgMul||1));
 const bigMove=s=>s.d.big&&!s.d.agile;   // maneuvering class: agile cruisers (Hunibler) handle like destroyers
-const pivotCost=(s,dir)=>(bigMove(s)?R.pivot:R.pivot/2)/2*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
-const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (a==='R'?R.reverse:R.burn)*(bigMove(s)?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
+const pivotCost=(s,dir)=>(bigMove(s)?R.pivot:R.pivot/2)/2*(s.d.moveMul||1)*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
+const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (s.d.moveMul||1)*(a==='R'?R.reverse:R.burn)*(bigMove(s)?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
 // turning with damaged thrusters: extra cost (for the warning on the buttons)
 const turnPen=(s,dir)=>{const m=thrMul(s,dir);return m>1&&isFinite(m)?m:0};
 const thrName=dir=>dir>0?'Port thrusters':'Starboard thrusters';
@@ -477,7 +482,7 @@ function shouldStop(){
 // ---- battle record: every impulse's orders and ship state, for review after the battle ----
 const r1=x=>Math.round(x*10)/10;
 function wLabel(s,key){if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];return 'PD '+(p.arc==='ALL'?'360':p.arc)}const w=s.weapons[+key.slice(1)];return w.T.ab+' '+w.arc}
-function recShip(s,i,orders){const t=s.target&&!s.target.dead?s.target:null;const o={i,pos:[r1(s.pq??s.q),r1(s.pr??s.r)],v:[s.vq,s.vr],spd:vlen(s.vq,s.vr),f:s.f,E:r1(s.E),hull:Math.ceil(s.hull),sh:r1(s.shield),rf:r1(reinfAmt(s)),gen:s.d.noShield?null:genLvl(s),
+function recShip(s,i,orders){const t=s.target&&!s.target.dead?s.target:null;const o={i,pos:[r1(s.pq??s.q),r1(s.pr??s.r)],v:[s.vq,s.vr],spd:vlen(s.vq,s.vr),f:s.f,E:r1(s.E),hull:Math.ceil(s.hull),ar:s.armor,sh:r1(s.shield),rf:r1(reinfAmt(s)),gen:s.d.noShield?null:genLvl(s),
     dmg:[s.dmgEng||0,s.dmgThrP||0,s.dmgThrS||0,s.dmgRea||0,s.dmgSen||0],ai:!!isAI(s)};
   if(t){o.tgt=ships.indexOf(t);o.rng=hexDist(s,t);o.brg=Math.round(relBearing(s,t)/D2R)}
   o.wpn=s.weapons.map(w=>!w.alive?'X':w.T.kind==='torp'?'T'+w.stages+(w.charging?'c':''):w.T.kind==='missile'?w.state[0]+w.ammo:w.state[0]).join(' ');o.pd=s.pd.map(p=>p.alive?p.shots:'X').join('');
@@ -609,6 +614,9 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
   const absorbed=dmg-left;fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(26,50),text:'-'+dmg,t:1.4,max:1.4,color:left<=0?'#7fc8ff':'#ff6b6b',d:FXD});
   sfxAt(left<=0?'hitShield':'hitHull',.8);if(absorbed>0)t.flash=.4;
   if(t.shield<=0&&sp>0&&(t.team===0||scanStatus(t)))log(`${t.name} base shields DOWN`,t.isPlayer?'bad':'good');
+  if(left>0&&t.armor>0){const from=fromPt||(src&&src.px);   // front armor (Golthan): soaks hits from the front 180° after shields, before hull and systems; not repairable
+    if(from&&Math.abs(norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f)))<=Math.PI/2+1e-6){const a=Math.min(t.armor,left);t.armor-=a;left-=a;
+      if(t.armor<=0&&(t.team===0||scanStatus(t)))log(`${t.name}: front armor breached`,t.isPlayer?'bad':'good')}}
   if(left>0&&sub&&src){const from=src.px,zone=hitZone(t,from);const cnt=src.subCnt||(src.subCnt={});const n=(cnt[t.name]||0)+1;
     // subsystem targeting (lasers/PD): every third hit that gets past the shields knocks out a system instead of doing hull damage
     if(n>=3){const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));if(valid.length){cnt[t.name]=0;const box=valid[Math.floor(Math.random()*valid.length)];t.boxes.splice(t.boxes.indexOf(box),1);
@@ -928,7 +936,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
   const d=hexDist(s,t),stOK=scanStatus(t),wOK=scanWeapons(t),best=Math.max(0,...ships.filter(o=>o.team===0&&!o.dead).map(sensRange));
   let h=`<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> <span class="dim" style="text-transform:none">${t.d.name}</span></h2>
    <div class="row dim sm">${d} hexes · v ${vlen(t.vq,t.vr)} · facing ${fName(t.f)}</div>`;
-  if(stOK)h+=`<div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(t.hull,t.d.hull)}<span class="v2">${Math.ceil(t.hull)}/${t.d.hull}</span></div>
+  if(stOK)h+=`<div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(t.hull,t.d.hull)}<span class="v2">${Math.ceil(t.hull)}/${t.d.hull}${t.d.armor?` <span class="dim" title="front armor">⛨${Math.ceil(t.armor)}</span>`:''}</span></div>
      <div class="row"><span class="lab s">Shld</span>${bar(t.shield,t.d.shield,'sh')}<span class="v2">${t.shield.toFixed(0)}/${t.d.shield}${reinfAmt(t)?`<span style="color:#a5d8ff">+${reinfAmt(t).toFixed(0)}</span>`:''}</span></div></div>
      <div class="row dim sm">generator ${genLvl(t)?Math.round(genLvl(t)*100)+'%':'<span class="bad">OFF</span>'}</div>`;
   else h+=`<div class="row bad sm">Sensors destroyed — shields and hull unknown</div>`;
@@ -964,7 +972,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
      <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
-     <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}</span></div>
+     <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}${s.d.armor?` <span class="dim" title="front armor: soaks hits from the front 180° after shields">⛨${Math.ceil(s.armor)}</span>`:''}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
      ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>${upkeepRow(s)}`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[0,.25,.5,.75,1].map(l=>btn('gen:'+l,l?Math.round(l*100)+'%':'Off',canQueue(s,{type:'gen',lvl:l,cost:0}),!l?'Turn the generator off: no drain, but shields collapse to 0.':(gc*l)+' energy per turn, drained '+(+(gc*l/IMP).toFixed(3))+' each impulse. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}</div>
      ${upkeepRow(s)}
