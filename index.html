@@ -199,10 +199,13 @@ const SHIPS={
 };
 // ---- Earthling (Nov 18, David): blue, red weapons fire. Placeholder outline until David's sprite: triangular hull, wings off the stern ----
 FACTIONS.Earthling={color:'#3d8bff',blurb:'Balanced: torpedo, coilgun, lasers and missiles'};
-SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthling Heavy Cruiser',short:'Earthling',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',slug:'#ff6a5a',hull:150,shield:50,big:true,doctrine:'hunt',
+SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthling Heavy Cruiser',short:'Earthling',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,big:true,doctrine:'hunt',
     shape:[[36,0],[-18,14],[-28,26],[-35,26],[-29,10],[-29,-10],[-35,-26],[-28,-26],[-18,-14]],
     lines:[[-29,0,30,0],[-20,-6,10,-3],[-20,6,10,3]],dots:[[14,-5],[14,5],[-14,-9],[-14,9]],
     weapons:[['HT','S'],['HC','S'],['HL','RX'],['HL','RX'],['HL','LX'],['HL','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
+SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Destroyer',short:'Earthling DD',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:64,shield:28,big:false,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',
+    shape:[[27,0],[-13.5,10.5],[-21,19.5],[-26.2,19.5],[-21.8,7.5],[-21.8,-7.5],[-26.2,-19.5],[-21,-19.5],[-13.5,-10.5]],lines:[[-21.8,0,22.5,0],[-15,-4.5,7.5,-2.2],[-15,4.5,7.5,2.2]],dots:[[10.5,-3.8],[10.5,3.8],[-10.5,-6.8],[-10.5,6.8]],
+    weapons:[['MT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};   // Nov 18: heavy cruiser loadout downsized to medium, one fewer FX PD, 4 missiles
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -217,6 +220,10 @@ SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy
     shape:[[36,-11],[30,-12.5],[24,-12],[19,-9.5],[16,-6],[8,-5],[6.1,-6.8],[3.3,-10.3],[-0.5,-13.1],[-5.2,-15],[-10.3,-15.9],[-15.5,-15.8],[-20.5,-14.5],[-24.9,-12.3],[-28.4,-9.2],[-30.8,-5.5],[-31.9,-1.4],[-30.8,5.5],[-28.4,9.2],[-24.9,12.3],[-20.5,14.5],[-15.5,15.8],[-10.3,15.9],[-5.2,15],[-0.5,13.1],[3.3,10.3],[6.1,6.8],[8,5],[16,6],[19,9.5],[24,12],[30,12.5],[36,11],[31,6],[28,0],[31,-6]],
     lines:[[-30,0,6,0],[-24,-9,-4,-9],[-24,9,-4,9]],dots:[[22,-7],[22,7],[-12,-13],[-12,13]],
     weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
+SHIPS.blokaidd={faction:'Blokai',cls:'Destroyer',weight:60,name:'Blokai Destroyer',short:'Blokai DD',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:64,shield:42,big:false,tl:5,
+    reactor:25,genCost:7.5,genRegen:3,doctrine:'hunt',prefRange:2,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
+    shape:[[27,-8.2],[22.5,-9.4],[18,-9],[14.2,-7.1],[12,-4.5],[6,-3.8],[4.6,-5.1],[2.5,-7.7],[-0.4,-9.8],[-3.9,-11.2],[-7.7,-11.9],[-11.6,-11.9],[-15.4,-10.9],[-18.7,-9.2],[-21.3,-6.9],[-23.1,-4.1],[-23.9,-1],[-23.1,4.1],[-21.3,6.9],[-18.7,9.2],[-15.4,10.9],[-11.6,11.9],[-7.7,11.9],[-3.9,11.2],[-0.4,9.8],[2.5,7.7],[4.6,5.1],[6,3.8],[12,4.5],[14.2,7.1],[18,9],[22.5,9.4],[27,8.2],[23.2,4.5],[21,0],[23.2,-4.5]],lines:[[-22.5,0,4.5,0],[-18,-6.8,-3,-6.8],[-18,6.8,-3,6.8]],dots:[[16.5,-5.2],[16.5,5.2],[-9,-9.8],[-9,9.8]],
+    weapons:[['MPL','S'],['ML','FX'],['ML','FX'],['ML','RS'],['ML','LS']],pd:['FX','ALL','ALL','ALL']};
 // ---- hex geometry (flat-top axial) ----
 const DIRS=[[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
 const hp=(q,r)=>({x:HX*1.5*q,y:HX*SQ3*(r+q/2)});
@@ -486,7 +493,7 @@ function commit(){
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
     const d=Math.min(i*.14,1.6),vol=sh.s.team===0?1:.65;let f;
     if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:sh.dmg>8?3:2,snd:[sh.kind==='pd'?'pd':sh.dmg>8?'laserH':'laserM',vol]};
-    else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:(sh.s.d.slug||'#ffe066'),r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
+    else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:'#ffe066',r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
     f.d=d;fx.push(f);endT=Math.max(endT,d+f.max)});
   pending=shots;phase='resolving';resolveT=shots.length?endT+.3:0;buildHUD();net();
 }
