@@ -174,6 +174,7 @@ for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MP
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.SC.dmg*2/3),tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'SRG',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
 WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
+WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',dmg:Math.round(WT.SL.dmg*2/3),tl1:true};
 WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.MC.dmg*2/3),tl1:true};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
@@ -276,6 +277,7 @@ SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Ear
 SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:.2,reactor:27,genCost:0,doctrine:'alpha',pdKind:'chain',
     shape:[[-30,-24],[-22,-24],[-16,-12],[30,-12],[30,12],[-16,12],[-22,24],[-30,24]],lines:[[-28,-4,30,-4],[-28,4,30,4]],dots:[[14,-12],[14,12],[-6,0]],   // placeholder outline until David's sprite
     weapons:[['MRG','FX'],['MRG','LS'],['MRG','RS'],...rep(3,['MC1','S']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};
+SHIPS.earlyffl={...SHIPS.earlyff,cls:'Early Laser Frigate',weight:41,name:'Martian Early Laser Frigate',short:'Early Laser FF',weapons:[['SC1','S'],['SL1','FX'],['SL1','RS'],['SL1','LS'],['MS','ALL'],['MS','ALL']]};   // Nov 19 (David): Early Frigate with small lasers in place of the railgun turrets
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
 SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:.2,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
