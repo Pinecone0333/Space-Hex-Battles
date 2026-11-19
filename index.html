@@ -172,8 +172,8 @@ const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]
 for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
 // TL1 weapons (Nov 19, David): the TL2 rule (2/3 damage for the same energy) with the TL1 targeting computer; the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.SC.dmg*2/3),tl1:true};
-WT.RG={name:'Small Railgun Turret',ab:'SRG',grp:'rails',kind:'slug',acc:'rail1',dmg:2,cost:2,fx:'rail',tl1:true};
-WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:4,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): railguns are flat 1 dmg per energy (weaker than TL1 lasers' 1.5)
+WT.RG={name:'Small Railgun Turret',ab:'SRG',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
+WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
 WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',dmg:Math.round(WT.SL.dmg*2/3),tl1:true};
 WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.MC.dmg*2/3),tl1:true};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
