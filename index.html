@@ -276,6 +276,11 @@ SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Ear
 SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:.2,reactor:27,genCost:0,doctrine:'alpha',pdKind:'chain',
     shape:[[-30,-24],[-22,-24],[-16,-12],[30,-12],[30,12],[-16,12],[-22,24],[-30,24]],lines:[[-28,-4,30,-4],[-28,4,30,4]],dots:[[14,-12],[14,12],[-6,0]],   // placeholder outline until David's sprite
     weapons:[['MRG','FX'],['MRG','LS'],['MRG','RS'],...rep(3,['MC1','S']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};
+// Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
+SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:.2,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+    shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
+    weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
+SHIPS.corvette2i={...SHIPS.corvette,cls:'Improved Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8};
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',blurb:'Heavy shields, plasma lances, long-range targeting'};
 SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:150,shield:75,big:true,tl:5,
