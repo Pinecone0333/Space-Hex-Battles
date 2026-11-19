@@ -173,7 +173,7 @@ for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MP
 // TL1 weapons (Nov 19, David): the TL2 rule (2/3 damage for the same energy) with the TL1 targeting computer; the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.SC.dmg*2/3),tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'SRG',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
-WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:5,cost:3,fx:'rail',tl1:true};   // Nov 19: small 3/2 → medium 5/3 (+2 dmg, +1 energy, like the laser steps)
+WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
 WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.MC.dmg*2/3),tl1:true};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
@@ -273,7 +273,7 @@ for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R
 SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Early Frigate',short:'Early FF',color:'#ff5a46',laser:'#46ff6e',torp:'#5dff7a',hull:40,shield:0,noShield:true,big:false,tl:1,accPen:.2,reactor:10,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-20,-18],[-14,-18],[-10,-9],[22,-9],[22,9],[-10,9],[-14,18],[-20,18]],lines:[[-18,0,22,0]],dots:[[4,-9],[4,9],[-2,0]],
     weapons:[['SC1','S'],['RG','FX'],['RG','RS'],['RG','LS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL','ALL']};
-SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:.2,reactor:24,genCost:0,doctrine:'alpha',pdKind:'chain',
+SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:.2,reactor:27,genCost:0,doctrine:'alpha',pdKind:'chain',
     shape:[[-30,-24],[-22,-24],[-16,-12],[30,-12],[30,12],[-16,12],[-22,24],[-30,24]],lines:[[-28,-4,30,-4],[-28,4,30,4]],dots:[[14,-12],[14,12],[-6,0]],   // placeholder outline until David's sprite
     weapons:[['MRG','FX'],['MRG','LS'],['MRG','RS'],...rep(3,['MC1','S']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
