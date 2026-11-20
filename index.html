@@ -135,7 +135,9 @@ const mkTable=fn=>Array.from({length:61},(_,r)=>Math.max(.005,Math.round(fn(r)*1
 const LASER_ACC=r=>r<=1?1:r<=3?.9:r<=5?.8:r<=7?.7:r<=9?.6:r<=11?.5:r<=12?.4:.1;
 const COIL_TBL=[.95,.95,.85,.85,.75,.75,.65,.6,.5,.45,.35,.25,.15];const COIL_ACC=r=>r<=12?COIL_TBL[r]:.05;   // David's coilgun table
 const ACC={laser:Array.from({length:61},(_,r)=>LASER_ACC(r)),coil:Array.from({length:61},(_,r)=>COIL_ACC(r)),torp:Array.from({length:61},(_,r)=>LASER_ACC(r)-.05)};
-ACC.laser2=ACC.laser.map((p,r)=>r<=8?p-.1:.05);ACC.coil2=ACC.coil.map((p,r)=>r<=8?p-.1:.05);ACC.torp2=ACC.torp.map((p,r)=>r<=8?p-.1:.05);
+// Nov 20 (David): TL2 likewise has no flat penalty — the TL4 curve is shrunk onto the 8-hex computer (TL2 hex r reads TL4 hex 1.5r, interpolated, rounded to 5%); 5% beyond 8.
+const shrinkTo=(A,max,add=0)=>A.map((p,r)=>{if(r>max)return .05;const x=r*12/max,i=Math.floor(x),f=x-i,v=A[Math.min(A.length-1,i)]*(1-f)+A[Math.min(A.length-1,i+1)]*f;return Math.min(1,Math.round((v+add)*20)/20)});
+ACC.laser2=shrinkTo(ACC.laser,8);ACC.coil2=shrinkTo(ACC.coil,8);ACC.torp2=shrinkTo(ACC.torp,8);
 // TL1 (Nov 19, David): targeting computer ends at 6 hexes, beyond it a flat 5%.
 // Railgun turret: coilgun falloff, 5 points better (a turret, not a spinal mount), then the TL1 penalty.
 // Nov 20 (David): no flat penalty — each TL4 curve is shrunk onto the 6-hex computer (TL1 hex r reads TL4 hex 2r), 5% beyond 6.
@@ -269,7 +271,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
   SHIPS[k+'3']={...d,tl:3,name:d.name+' (TL3)',short:d.short+' III',shield:0,noShield:true,reactor:r3,weight:d.weight-.1};
-  if(d.faction==='Martian')SHIPS[k+'2']={...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:.1,
+  if(d.faction==='Martian')SHIPS[k+'2']={...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
 
 // ---- Martian TL1 (Nov 19, David). Early Frigate: no shields, chain-gun PD, railgun turrets. Placeholder outline (smaller, plainer Peregrine) until David's sprite ----
