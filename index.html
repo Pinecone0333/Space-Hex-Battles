@@ -282,7 +282,7 @@ SHIPS.chemcru={...CHEM,cls:'Cruiser',weight:88,name:'Chemantar Cruiser',short:'C
 SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frigate',short:'Chem Frigate',hull:55,shield:25,big:false,reactor:19,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[-17.4,-7.4],[11.2,-7.4],[13.1,-7.2],[14.9,-6.4],[16.4,-5.3],[17.6,-3.7],[18.4,-1.9],[18.6,0],[18.4,1.9],[17.6,3.7],[16.4,5.3],[14.9,6.4],[13.1,7.2],[11.2,7.4],[-17.4,7.4]],lines:[[-16,0,15,0]],dots:[[13,0],[-4,-5],[-4,5]],
     weapons:[['ST','S'],['ST','S'],['SL','ALL'],['SL','ALL'],...rep(2,['MS','ALL'])],pd:['FX','ALL']};
-SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,dcTeams:3,reactor:76.5,genCost:20,genRegen:8,doctrine:'hunt',
+SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,pivotMax:1,dcTeams:3,reactor:76.5,genCost:20,genRegen:8,doctrine:'hunt',
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
@@ -357,6 +357,8 @@ function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x
   if(x.k==='pd'){const p=t.pd[x.i];return p.alive&&inA(p.arc)}
   if(x.k==='eng')return zone==='rear';if(x.k==='thrF')return zone==='front';if(x.k==='thrP')return side<0;if(x.k==='thrS')return side>0;return true}
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
+// Nov 20 (David): max pivot per impulse, in 30° steps — cruisers 60°, small ships 90°; Hunibler/Hunifer cruisers 90°, their small ships 120°; Dreadnought 30°
+const maxPiv=s=>s.d.pivotMax??(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'?(s.d.big?3:4):(s.d.big?2:3));
 const foreMul=s=>[1,1.5,2,Infinity][s.dmgThrF||0];   // Nov 20 (David): fore thrusters fire the reverse burn
 const thrMul=(s,dir)=>[1,1.5,2,Infinity][(dir>0?s.dmgThrP:s.dmgThrS)||0];   // port thrusters turn you to starboard (dir +1), starboard thrusters to port
 function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
@@ -440,7 +442,7 @@ const qShieldPts=s=>s.queue.filter(x=>x.type==='reinf'||x.type==='repair').reduc
 const REINF_COST=2,REPAIR_COST=2;   // reinforcement and base-shield repair both 2 energy per point
 function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
-  if(act.type==='pivot'){const net=s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+act.dir;if(Math.abs(net)>(s.d.big?2:3))return false}   // Nov 20 (David): max pivot per impulse — cruisers 60°, small ships 90°
+  if(act.type==='pivot'){const net=s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+act.dir;if(Math.abs(net)>maxPiv(s))return false}   // Nov 20 (David): max pivot per impulse — cruisers 60°, small ships 90°
   if(act.type==='burn'){if(qHas(s,'burn'))return false;const pv=s.queue.filter(x=>x.type==='pivot');return burnAllowed(s,act.a)}
   if(act.type==='gen')return !s.d.noShield&&!qHas(s,'gen')&&act.lvl!==s.gen.lvl;
   if(act.type==='reinf'){if(s.d.noShield)return false;if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;if(genLvl(s)<1)return false;   // reinforcement only at full generator strength
@@ -1135,7 +1137,7 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?(s.d.big?'Cruisers: after a turn or slip, the next burn must be straight':'A turn can\'t follow a turn, and a slip can\'t follow a slip'):'Not enough energy'),'dim')}
   else if(k==='dc'){queue(s,{type:'dc',id:+v,cost:0})}
   else if(k==='dccancel'){queue(s,{type:'dccancel',id:+v,cost:0})}
-  else if(k==='pivot'){if(!isFinite(pivotCost(s,+v)))log('Those thrusters are destroyed','bad');else if(queue(s,{type:'pivot',dir:+v,cost:pivotCost(s,+v)}))turnWarn(s,+v,pivotCost(s,+v));else if(Math.abs(s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+(+v))>(s.d.big?2:3))log(`Max pivot per impulse: ${s.d.big?'60° for cruisers':'90° for small ships'}`,'dim')}
+  else if(k==='pivot'){if(!isFinite(pivotCost(s,+v)))log('Those thrusters are destroyed','bad');else if(queue(s,{type:'pivot',dir:+v,cost:pivotCost(s,+v)}))turnWarn(s,+v,pivotCost(s,+v));else if(Math.abs(s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+(+v))>maxPiv(s))log(`Max pivot per impulse for ${s.name}: ${maxPiv(s)*30}°`,'dim')}
   else if(k==='chargeall')chargeAll(s);
   else if(k.startsWith('msl')){const t=tgt(s);const L=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.kind==='missile');
     if(k==='mslcyc'){for(const {i} of L)if(canQueue(s,{type:'start',i,cost:0}))queue(s,{type:'start',i,cost:0})}
