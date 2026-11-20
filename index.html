@@ -136,9 +136,9 @@ const LASER_ACC=r=>r<=1?1:r<=3?.9:r<=5?.8:r<=7?.7:r<=9?.6:r<=11?.5:r<=12?.4:.1;
 const COIL_TBL=[.95,.95,.85,.85,.75,.75,.65,.6,.5,.45,.35,.25,.15];const COIL_ACC=r=>r<=12?COIL_TBL[r]:.05;   // David's coilgun table
 const ACC={laser:Array.from({length:61},(_,r)=>LASER_ACC(r)),coil:Array.from({length:61},(_,r)=>COIL_ACC(r)),torp:Array.from({length:61},(_,r)=>LASER_ACC(r)-.05)};
 // Nov 20 (David): TL2 likewise has no flat penalty — the TL4 curve is shrunk onto the 8-hex computer (TL2 hex r reads TL4 hex 1.5r, interpolated, rounded to 5%); 5% beyond 8.
-const shrinkTo=(A,max,add=0,floor=.05)=>A.map((p,r)=>{if(r>max)return floor;const x=r*12/max,i=Math.floor(x),f=x-i,v=A[Math.min(A.length-1,i)]*(1-f)+A[Math.min(A.length-1,i+1)]*f;return Math.min(1,Math.round((v+add)*20)/20)});
+const shrinkTo=(A,max,add=0,floor=.05,whole=false)=>A.map((p,r)=>{if(r>max)return floor;const x=r*12/max,i=Math.floor(x),f=x-i,v=A[Math.min(A.length-1,i)]*(1-f)+A[Math.min(A.length-1,i+1)]*f;return Math.min(1,whole?Math.ceil((v+add)*100-1e-6)/100:Math.round((v+add)*20)/20)});   // whole: round UP to whole percents (TL5, David Nov 20)
 // Nov 20 (David): TL5 likewise — the TL4 curve stretched onto the 14-hex computer (TL5 hex r reads TL4 hex r×12/14); beyond 14 the TL4 floor (lasers 10%, others 5%)
-{const ext=(A,f)=>{const B=A.slice();while(B.length<61)B.push(f);return B};ACC.laser5=shrinkTo(ext(ACC.laser,.1),14,0,.1);ACC.coil5=shrinkTo(ext(ACC.coil,.05),14);ACC.torp5=shrinkTo(ext(ACC.torp,.05),14)}
+{const ext=(A,f)=>{const B=A.slice();while(B.length<61)B.push(f);return B};ACC.laser5=shrinkTo(ext(ACC.laser,.1),14,0,.1,true);ACC.coil5=shrinkTo(ext(ACC.coil,.05),14,0,.05,true);ACC.torp5=shrinkTo(ext(ACC.torp,.05),14,0,.05,true)}
 ACC.laser2=shrinkTo(ACC.laser,8,0,.1);ACC.coil2=shrinkTo(ACC.coil,8);ACC.torp2=shrinkTo(ACC.torp,8);
 // TL1 (Nov 19, David): targeting computer ends at 6 hexes, beyond it a flat 5%.
 // Railgun turret: coilgun falloff, 5 points better (a turret, not a spinal mount), then the TL1 penalty.
