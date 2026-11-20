@@ -77,6 +77,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 #toast{position:fixed;left:calc(350px + (100% - 630px)/2);transform:translateX(-50%);bottom:150px;z-index:6;padding:8px 14px;border-radius:6px;font-size:13px;opacity:0;transition:opacity .4s;pointer-events:none;background:#2a1a05;border:2px solid #ffb02e;color:#ffe2a8;box-shadow:0 0 16px rgba(255,176,46,.5)}
 .btn.thrwarn{border-color:#ffb02e!important;background:#2a1a05!important;color:#ffe2a8!important}.btn .pen{color:#ffb02e;font-size:9px;margin-left:3px}.btn.big.thrwarn{padding:4px 5px}
 .warnbox{display:block!important;background:#2a1a05;border:1px solid #ffb02e;border-radius:4px;color:#ffe2a8;padding:2px 6px;margin:3px 0}
+#side .btn.aion,#rside .btn.aion,.btn.aion{background:#143a22;border-color:#3fbf6a;color:#c8ffd6}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -357,7 +358,7 @@ function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
 const dcTeams=s=>s.d.dcTeams||(s.d.big?2:1);
 const dcFree=s=>dcTeams(s)-(s.dc||[]).length-s.queue.filter(q=>q.type==='dc').length;
 const dcOpen=s=>(s.damaged||[]).filter(x=>!(s.dc||[]).some(j=>j.box===x)&&!s.queue.some(q=>q.type==='dc'&&q.id===x.id)).length;
-const dcAvail=s=>!s.dead&&!s.ai&&s.team===0&&dcFree(s)>0&&dcOpen(s)>0;
+const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&s.team===0&&dcFree(s)>0&&dcOpen(s)>0;
 function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
@@ -694,8 +695,16 @@ function showEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>
     const lost=ships.filter(s=>s.dead);$('endSub').textContent=`${when(T)}. Lost: ${lost.filter(s=>s.team===0).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>s.team===1).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
 
 // ---- automation (player standing orders + AI helpers) ----
-function autoQueue(s){   // standing order: generator renewal only (weapons are never queued automatically)
-}
+function autoQueue(s){aiAssist(s)}
+// Simplified command (Nov 20, David): a human ship can hand its energy allocation and/or its damage control to the AI.
+// Each decision point the AI plans the ship's whole impulse as usual; only its energy orders (generator, loading/charging/holding weapons, PD, shield reinforcement/repair)
+// and/or damage-control orders are kept. Maneuvering, targets, missile modes and firing stay with the player.
+const AI_E=['gen','start','hold','pd','reinf','repair'],AI_DC=['dc','dccancel'];
+function aiAssist(s){if(!s||s.dead||s.ai||!(s.aiE||s.aiDC))return;
+  const keep=s.queue.slice(),sv={target:s.target,msMode:s.msMode,subMode:s.subMode,fireSel:s.fireSel};
+  let r;try{r=aiDecide(s)}catch(e){r={queue:[]}}
+  s.target=sv.target;s.msMode=sv.msMode;s.subMode=sv.subMode;s.fireSel=sv.fireSel;s.queue=keep;
+  for(const x of r.queue||[])if(s.aiE&&AI_E.includes(x.type)||s.aiDC&&AI_DC.includes(x.type))queue(s,x)}
 function chargeAll(s){let n=0;
   s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
   s.pd.forEach((p,i)=>{while(queue(s,{type:'pd',i,cost:1}))n++});
@@ -1012,7 +1021,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
   rh+=`<div class="panel"><h2>Fleet command</h2>
-   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
+   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
    ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
      <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
@@ -1026,6 +1035,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   // ---- left panel: your ship ----
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
+     ${s.team===0&&!s.ai?`<div class="row" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button></div>`:''}
      <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}${s.d.armor?` <span class="dim" title="front armor: soaks hits from the front 180° after shields">⛨${Math.ceil(s.armor)}</span>`:''}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
@@ -1083,6 +1093,14 @@ function doAct(a){doAct0(a)}
 function doAct0(a){const [k,v]=a.split(':');
   if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.hostReady=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
+  if((k==='aie'||k==='aidc')&&P&&!P.dead&&!P.ai){const s=P;if(k==='aie')s.aiE=!s.aiE;else s.aiDC=!s.aiDC;
+    log(`${s.name}: ${k==='aie'?'energy':'damage control'} ${(k==='aie'?s.aiE:s.aiDC)?'handed to the AI':'back under your control'}`,'dim');
+    if(phase==='decide'&&(k==='aie'?s.aiE:s.aiDC)&&MP.role!=='guest')aiAssist(s);   // online, the host runs the guest's assist when his orders arrive
+    if(phase==='decide'&&!(k==='aie'?s.aiE:s.aiDC))s.queue=s.queue.filter(x=>!(k==='aie'?AI_E:AI_DC).includes(x.type));   // drop what the AI had queued this impulse
+    buildHUD();return}
+  if(k==='aieall'||k==='aidcall'){const L=ships.filter(x=>x.team===0&&!x.dead&&!x.ai),f=k==='aieall'?'aiE':'aiDC',on=!L.every(x=>x[f]);
+    for(const x of L){x[f]=on;if(phase==='decide'){if(on){if(MP.role!=='guest')aiAssist(x)}else x.queue=x.queue.filter(q=>!(f==='aiE'?AI_E:AI_DC).includes(q.type))}}
+    log(`All ships: ${f==='aiE'?'energy':'damage control'} ${on?'handed to the AI':'back under your control'}`,'dim');buildHUD();return}
   const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
   if(k==='undo')s.queue.pop();
   else if(k==='submode')s.subMode=!s.subMode;
@@ -1364,12 +1382,12 @@ function mpApplyState(m){const first=$('start').style.display!=='none'||!ships.l
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
 function mpApplyOrders(orders){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
-    s.ai=o.ai;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
-    if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[])}}
+    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
   MP.guestReady=true;mpTryCommit()}
 
 function mpOnMsg(m){if(!m||!m.t)return;
