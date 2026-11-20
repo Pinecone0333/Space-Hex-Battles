@@ -245,16 +245,28 @@ SHIPS.hunheavy={...SHIPS.hunold,cls:'Heavy Cruiser',weight:102,name:'Hunibler He
     shape:[[38,-13],[38,-6],[-4,-6],[-4,6],[38,6],[38,13],[-8,13],[-26,28],[-32,28],[-32,-28],[-26,-28],[-8,-13],null,[24,-6],[28,-6],[28,6],[24,6]],
     lines:[[-30,0,-6,0],[-2,-9.5,36,-9.5],[-2,9.5,36,9.5],[-28,-14,-12,-11],[-28,14,-12,11]],dots:[[31,-9.5],[31,9.5],[-18,-12],[-18,12]],
     weapons:[['HC','S'],['HC','S'],['HC','S'],['HC','S'],['ML','RS'],['ML','RS'],['ML','LS'],['ML','LS'],...rep(8,['MS','ALL'])]};
-SHIPS.hunifer={faction:'Hunifer',cls:'Heavy Cruiser',weight:100,name:'Hunifer Heavy Cruiser',short:'Hunifer',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
+SHIPS.hunifer={faction:'Hunifer',cls:'Cruiser',weight:99,name:'Hunifer Cruiser',short:'Hunifer CL',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
     shape:[[38,-10],[38,10],[30,10],[25,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5],[25,-5],[30,-10]],
     lines:[[-30,0,36,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[33,-6],[33,6],[-18,-10],[-18,10]],
-    weapons:[['HPL','S'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};
-SHIPS.hunolddd={faction:'Hunibler',cls:'Destroyer',weight:60,name:'Hunibler Destroyer',short:'Hunibler DD',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
+    weapons:[['HPL','S'],['ML','RS'],['ML','RS'],['ML','LS'],['ML','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};   // Nov 20 (David): heavy lasers → medium, like the Hunibler Cruiser
+SHIPS.hunolddd={faction:'Hunibler',cls:'Frigate',weight:55,name:'Hunibler Frigate',short:'Hunibler FF',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
     shape:[[27,-3.8],[27,3.8],[-6,3.8],[-19.5,18],[-24,18],[-24,-18],[-19.5,-18],[-6,-3.8]],lines:[[-22.5,0,25.5,0],[-21,-9,-9,-3.8],[-21,9,-9,3.8]],dots:[[15,0],[-13.5,-7.5],[-13.5,7.5]],
     weapons:[['MC','S'],['MC','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])],pd:['ALL','ALL']};   // Nov 18: downsized like the Blokai DD (heavy→medium spinal, lasers→light, one fewer FX PD), half the missiles, hull 80% of a destroyer's
-SHIPS.huniferdd={faction:'Hunifer',cls:'Destroyer',weight:60,name:'Hunifer Destroyer',short:'Hunifer DD',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
+SHIPS.huniferdd={faction:'Hunifer',cls:'Frigate',weight:55,name:'Hunifer Frigate',short:'Hunifer FF',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:51,shield:28,big:false,evade:.05,reactor:22,genCost:5,genRegen:2,doctrine:'hunt',broadside:true,
     shape:[[28.5,-7.5],[28.5,7.5],[22.5,7.5],[18.8,3.8],[-6,3.8],[-19.5,18],[-24,18],[-24,-18],[-19.5,-18],[-6,-3.8],[18.8,-3.8],[22.5,-7.5]],lines:[[-22.5,0,27,0],[-21,-9,-9,-3.8],[-21,9,-9,3.8]],dots:[[24.8,-4.5],[24.8,4.5],[-13.5,-7.5],[-13.5,7.5]],
     weapons:[['MPL','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])],pd:['ALL','ALL']};
+// ---- Nov 20 (David): twin-prong Hunibler/Hunifer ships. Hunifer versions trade coilguns for plasma lances, one lance per two guns ----
+{const S=(a,k)=>a.map(p=>p&&[p[0]*k,p[1]*k]),SL=(a,k)=>a.map(l=>l.map(v=>v*k));
+ const hfShape=[[40,-17],[40,-4],[33,-4],[30,-6],[-4,-6],[-4,6],[30,6],[33,4],[40,4],[40,17],[33,17],[30,13],[-8,13],[-26,28],[-32,28],[-32,-28],[-26,-28],[-8,-13],[30,-13],[33,-17],null,[22,-6],[26,-6],[26,6],[22,6]];   // Hunifer: the prong tips flare (their bow bulge)
+ const hfLines=[[-30,0,-6,0],[-2,-9.5,36,-9.5],[-2,9.5,36,9.5],[-28,-14,-12,-11],[-28,14,-12,11]],hfDots=[[36,-10.5],[36,10.5],[-18,-12],[-18,12]];
+ SHIPS.huniferca={...SHIPS.hunifer,cls:'Heavy Cruiser',weight:102,name:'Hunifer Heavy Cruiser',short:'Hunifer CA',hull:135,reactor:42,broadside:false,pd:['FX','FX','ALL'],shape:hfShape,lines:hfLines,dots:hfDots,
+   weapons:[['HPL','S'],['HPL','S'],['ML','RS'],['ML','RS'],['ML','LS'],['ML','LS'],...rep(8,['MS','ALL'])]};   // mirror of the Hunibler Heavy Cruiser: 4 HC → 2 HPL
+ const H=SHIPS.hunheavy;
+ SHIPS.hundd={...SHIPS.hunolddd,cls:'Destroyer',weight:60,name:'Hunibler Destroyer',short:'Hunibler DD',hull:56,broadside:false,shape:S(H.shape,.72),lines:SL(H.lines,.72),dots:S(H.dots,.72),
+   weapons:[['SC','S'],['SC','S'],['SC','S'],['SC','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])]};   // 4 Small Coilguns on a small twin-prong hull; hull 56 (between the frigate's 51 and a TL4 destroyer's 64)
+ SHIPS.hunferdd={...SHIPS.huniferdd,cls:'Destroyer',weight:60,name:'Hunifer Destroyer',short:'Hunifer DD',hull:56,broadside:false,shape:S(hfShape,.72),lines:SL(hfLines,.72),dots:S(hfDots,.72),
+   weapons:[['SPL','S'],['SPL','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])]};   // 4 SC → 2 Small Plasma Lances
+}
 // ---- Chemantar (Nov 18, David): purple, fire light green. Placeholder outlines until David's sprites ----
 FACTIONS.Chemantar={color:'#a35cff',blurb:'Artillery cruisers: antiproton lances, laser batteries, light torpedoes'};
 const CHEM={faction:'Chemantar',color:'#a35cff',laser:'#9dff8a',torp:'#b8ff9e'};
