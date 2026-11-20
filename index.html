@@ -233,10 +233,15 @@ SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Des
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
 FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
-SHIPS.hunold={faction:'Hunibler',cls:'Old Heavy Cruiser',weight:99,name:'Hunibler Old Heavy Cruiser',short:'Hunibler Old',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
+SHIPS.hunold={faction:'Hunibler',cls:'Cruiser',weight:99,name:'Hunibler Cruiser',short:'Hunibler CL',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
     shape:[[36,-5],[36,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5]],
     lines:[[-30,0,34,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[20,0],[-18,-10],[-18,10]],
-    weapons:[['HC','S'],['HC','S'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};
+    weapons:[['HC','S'],['HC','S'],['ML','RS'],['ML','RS'],['ML','LS'],['ML','LS'],...rep(8,['MS','ALL'])],pd:['FX','ALL','ALL']};   // Nov 20 (David): heavy lasers → medium
+// Hunibler Heavy Cruiser (Nov 20, David): the Cruiser with 4 heavy coilguns; twin spindly bow prongs joined by a pylon. Reactor 51 (Dogahr demand ratio: 10 + 12 + 28 + 6 = 56 → ÷1.095)
+SHIPS.hunheavy={...SHIPS.hunold,cls:'Heavy Cruiser',weight:102,name:'Hunibler Heavy Cruiser',short:'Hunibler CA',reactor:51,
+    shape:[[38,-13],[38,-6],[-4,-6],[-4,6],[38,6],[38,13],[-8,13],[-26,28],[-32,28],[-32,-28],[-26,-28],[-8,-13],null,[24,-6],[28,-6],[28,6],[24,6]],
+    lines:[[-30,0,-6,0],[-2,-9.5,36,-9.5],[-2,9.5,36,9.5],[-28,-14,-12,-11],[-28,14,-12,11]],dots:[[31,-9.5],[31,9.5],[-18,-12],[-18,12]],
+    weapons:[['HC','S'],['HC','S'],['HC','S'],['HC','S'],['ML','RS'],['ML','RS'],['ML','LS'],['ML','LS'],...rep(8,['MS','ALL'])]};
 SHIPS.hunifer={faction:'Hunifer',cls:'Heavy Cruiser',weight:100,name:'Hunifer Heavy Cruiser',short:'Hunifer',color:'#6e7480',laser:'#ff3b3b',torp:'#ff4d4d',hull:120,shield:50,big:true,agile:true,evade:.05,doctrine:'hunt',broadside:true,
     shape:[[38,-10],[38,10],[30,10],[25,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5],[25,-5],[30,-10]],
     lines:[[-30,0,36,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[33,-6],[33,6],[-18,-10],[-18,10]],
