@@ -78,6 +78,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .btn.thrwarn{border-color:#ffb02e!important;background:#2a1a05!important;color:#ffe2a8!important}.btn .pen{color:#ffb02e;font-size:9px;margin-left:3px}.btn.big.thrwarn{padding:4px 5px}
 .warnbox{display:block!important;background:#2a1a05;border:1px solid #ffb02e;border-radius:4px;color:#ffe2a8;padding:2px 6px;margin:3px 0}
 #side .btn.aion,#rside .btn.aion,.btn.aion{background:#143a22;border-color:#3fbf6a;color:#c8ffd6}
+.aiw .btn{white-space:nowrap;padding:2px 5px}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -700,7 +701,9 @@ function autoQueue(s){aiAssist(s)}
 // Each decision point the AI plans the ship's whole impulse as usual; only its energy orders (generator, loading/charging/holding weapons, PD, shield reinforcement/repair)
 // and/or damage-control orders are kept. Maneuvering, targets, missile modes and firing stay with the player.
 const AI_E=['gen','start','hold','pd','reinf','repair'],AI_DC=['dc','dccancel'];
-function aiAssist(s){if(!s||s.dead||s.ai||!(s.aiE||s.aiDC))return;
+function autoPD(s){if(!s||s.dead||s.ai||!s.aiPD||s.aiE)return;   // Nov 20 (David): auto-reload PD — top up every mount whenever energy allows (generator upkeep protected)
+  s.pd.forEach((p,i)=>{let n=0;while(n++<4&&s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}})}
+function aiAssist(s){autoPD(s);if(!s||s.dead||s.ai||!(s.aiE||s.aiDC))return;
   const keep=s.queue.slice(),sv={target:s.target,msMode:s.msMode,subMode:s.subMode,fireSel:s.fireSel};
   let r;try{r=aiDecide(s)}catch(e){r={queue:[]}}
   s.target=sv.target;s.msMode=sv.msMode;s.subMode=sv.subMode;s.fireSel=sv.fireSel;s.queue=keep;
@@ -1021,7 +1024,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
   rh+=`<div class="panel"><h2>Fleet command</h2>
-   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
+   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
    ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
      <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
@@ -1035,7 +1038,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   // ---- left panel: your ship ----
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
-     ${s.team===0&&!s.ai?`<div class="row" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button></div>`:''}
+     ${s.team===0&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
      <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}${s.d.armor?` <span class="dim" title="front armor: soaks hits from the front 180° after shields">⛨${Math.ceil(s.armor)}</span>`:''}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
@@ -1093,6 +1096,8 @@ function doAct(a){doAct0(a)}
 function doAct0(a){const [k,v]=a.split(':');
   if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.hostReady=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
+  if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
+  if(k==='aipdall'){const L=ships.filter(x=>x.team===0&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
   if((k==='aie'||k==='aidc')&&P&&!P.dead&&!P.ai){const s=P;if(k==='aie')s.aiE=!s.aiE;else s.aiDC=!s.aiDC;
     log(`${s.name}: ${k==='aie'?'energy':'damage control'} ${(k==='aie'?s.aiE:s.aiDC)?'handed to the AI':'back under your control'}`,'dim');
     if(phase==='decide'&&(k==='aie'?s.aiE:s.aiDC)&&MP.role!=='guest')aiAssist(s);   // online, the host runs the guest's assist when his orders arrive
@@ -1382,11 +1387,11 @@ function mpApplyState(m){const first=$('start').style.display!=='none'||!ships.l
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
 function mpApplyOrders(orders){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
-    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
   MP.guestReady=true;mpTryCommit()}
 
