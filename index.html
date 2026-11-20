@@ -86,7 +86,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 <div id="rside"></div>
 <div id="dcAlert"></div>
 <div id="bar"></div>
-<div id="help"><span class="k">W</span><span class="k">X</span> accel/decel · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">A</span><span class="k">S</span><span class="k">D</span> slip/rev · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
+<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">A</span><span class="k">S</span><span class="k">D</span> slip/rev · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1>SPACE HEX TACTICS</h1>
  <div class="dim">Assemble both fleets. You command every ship on your side unless you hand it to the AI.</div>
@@ -348,20 +348,22 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 // ---- internal systems: each damageable system is one of the ship's hull points ----
 // weapons, PD mounts and missile launchers 1 box each; main engine 3; port thrusters 3; starboard thrusters 3; reactor 10 (−10% output each); sensors 5 (−2 hexes scan range each)
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
-  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<10;i++)b.push({k:'rea'});for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
+  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<10;i++)b.push({k:'rea'});for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
 function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));   // <0 port half, >0 starboard half
   const inA=arc=>{const [c,hw]=ARCS[arc];return hw>=180||Math.abs(norm(side-c*D2R))<=hw*D2R+1e-6};   // exact bearing, not hex-rounded
   if(x.k==='w'){const w=t.weapons[x.i];return w.alive&&inA(w.arc)}
   if(x.k==='pd'){const p=t.pd[x.i];return p.alive&&inA(p.arc)}
-  if(x.k==='eng')return zone==='rear';if(x.k==='thrP')return side<0;if(x.k==='thrS')return side>0;return true}
+  if(x.k==='eng')return zone==='rear';if(x.k==='thrF')return zone==='front';if(x.k==='thrP')return side<0;if(x.k==='thrS')return side>0;return true}
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
+const foreMul=s=>[1,1.5,2,Infinity][s.dmgThrF||0];   // Nov 20 (David): fore thrusters fire the reverse burn
 const thrMul=(s,dir)=>[1,1.5,2,Infinity][(dir>0?s.dmgThrP:s.dmgThrS)||0];   // port thrusters turn you to starboard (dir +1), starboard thrusters to port
 function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
   if(x.k==='w'){const w=t.weapons[x.i];w.alive=false;msg=`${w.T.name} (${w.arc}) destroyed`}
   else if(x.k==='pd'){t.pd[x.i].alive=false;msg=`PD screen (${t.pd[x.i].arc}) destroyed`}
   else if(x.k==='eng'){t.dmgEng=(t.dmgEng||0)+1;msg=t.dmgEng>=3?'MAIN ENGINE DESTROYED — no forward thrust':`main engine damaged (burns +${t.dmgEng*50}%)`}
+  else if(x.k==='thrF'){t.dmgThrF=(t.dmgThrF||0)+1;msg=t.dmgThrF>=3?'fore thrusters destroyed — no reverse burn':`fore thrusters damaged (reverse burn +${t.dmgThrF*50}%)`}
   else if(x.k==='thrP'){t.dmgThrP=(t.dmgThrP||0)+1;msg=t.dmgThrP>=3?'port thrusters destroyed — cannot turn to starboard':`port thrusters damaged (turning to starboard +${t.dmgThrP*50}%)`}
   else if(x.k==='thrS'){t.dmgThrS=(t.dmgThrS||0)+1;msg=t.dmgThrS>=3?'starboard thrusters destroyed — cannot turn to port':`starboard thrusters damaged (turning to port +${t.dmgThrS*50}%)`}
   else if(x.k==='sen'){t.dmgSen=(t.dmgSen||0)+1;msg=sensRange(t)<=0?'SENSORS DESTROYED — blind to enemy shields, hull and weapons':`sensors damaged (weapon scan range ${sensRange(t)} hexes)`}
@@ -372,8 +374,8 @@ const dcTeams=s=>s.d.dcTeams||(s.d.big?2:1);
 const dcFree=s=>dcTeams(s)-(s.dc||[]).length-s.queue.filter(q=>q.type==='dc').length;
 const dcOpen=s=>(s.damaged||[]).filter(x=>!(s.dc||[]).some(j=>j.box===x)&&!s.queue.some(q=>q.type==='dc'&&q.id===x.id)).length;
 const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&s.team===0&&dcFree(s)>0&&dcOpen(s)>0;
-function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
-const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
+function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrF'?'Fore thrusters':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
+const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
 const sensRange=s=>Math.max(0,10-2*(s.dmgSen||0));
 const scanWeapons=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
@@ -381,7 +383,7 @@ const scanStatus=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>
 function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   if(x.k==='w'){const w=s.weapons[x.i];w.alive=true;if(w.T.kind!=='missile'&&w.T.kind!=='torp')w.state='idle';if(w.T.kind==='torp'){w.state='idle';w.stages=0;w.charging=false;w.holding=false}}
   else if(x.k==='pd'){s.pd[x.i].alive=true;s.pd[x.i].shots=0;s.pd[x.i].pending=[]}
-  else if(x.k==='eng')s.dmgEng=Math.max(0,(s.dmgEng||0)-1);else if(x.k==='thrP')s.dmgThrP=Math.max(0,(s.dmgThrP||0)-1);else if(x.k==='thrS')s.dmgThrS=Math.max(0,(s.dmgThrS||0)-1);else if(x.k==='sen')s.dmgSen=Math.max(0,(s.dmgSen||0)-1);
+  else if(x.k==='eng')s.dmgEng=Math.max(0,(s.dmgEng||0)-1);else if(x.k==='thrF')s.dmgThrF=Math.max(0,(s.dmgThrF||0)-1);else if(x.k==='thrP')s.dmgThrP=Math.max(0,(s.dmgThrP||0)-1);else if(x.k==='thrS')s.dmgThrS=Math.max(0,(s.dmgThrS||0)-1);else if(x.k==='sen')s.dmgSen=Math.max(0,(s.dmgSen||0)-1);
   else{s.dmgRea=Math.max(0,(s.dmgRea||0)-1);s.reactor=s.reactor0*(1-.1*s.dmgRea)}
   s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(s.team===0&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
 function makeShip(key,q,r,f,team,ai,name){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
@@ -414,7 +416,7 @@ function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push(
 const torpDmg=w=>Math.round(torpStored(w)*2*(w.T.dmgMul||1));
 const bigMove=s=>s.d.big&&!s.d.agile;   // maneuvering class: agile cruisers (Hunibler) handle like destroyers
 const pivotCost=(s,dir)=>(bigMove(s)?R.pivot:R.pivot/2)/2*(s.d.moveMul||1)*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
-const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (s.d.moveMul||1)*(a==='R'?R.reverse:R.burn)*(bigMove(s)?1:.5)*(a==='R'?1:Math.min(engMul(s),2))*(isFinite(m)?m:1)};
+const burnCost=(s,a)=>{const tn=BURNS[a].turn;const m=tn?thrMul(s,Math.sign(tn)):1;return (s.d.moveMul||1)*(a==='R'?R.reverse:R.burn)*(bigMove(s)?1:.5)*(a==='R'?Math.min(foreMul(s),2):Math.min(engMul(s),2))*(isFinite(m)?m:1)};
 // turning with damaged thrusters: extra cost (for the warning on the buttons)
 const turnPen=(s,dir)=>{const m=thrMul(s,dir);return m>1&&isFinite(m)?m:0};
 const thrName=dir=>dir>0?'Port thrusters':'Starboard thrusters';
@@ -426,6 +428,7 @@ const BURNS={F:{c:'burn',burn:1},TL:{c:'burn',burn:1,turn:-2,kind:'turn'},TR:{c:
 function burnResult(s,a,f0){const A=BURNS[a];let f=f0??s.f;if(A.turn)f=(f+A.turn+NF)%NF;const v=fdir(A.slip?f+A.slip:f);return{f,dq:v[0]*A.burn,dr:v[1]*A.burn}}
 // small ships: a turn can't follow a turn, a slip can't follow a slip. Cruisers: turns and slips share one limit — after either, the next burn must be straight.
 function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return false;   // main engine out: only reverse (retro) thrust
+  if(a==='R'&&(s.dmgThrF||0)>=3)return false;   // fore thrusters out: no reverse burn
   if(A.turn<0&&(s.dmgThrS||0)>=3||A.turn>0&&(s.dmgThrP||0)>=3)return false;
   if(!A.kind)return true;if(bigMove(s))return !(s.lastAdj==='turn'||s.lastAdj==='slip');return s.lastAdj!==A.kind}
 
@@ -437,6 +440,7 @@ const qShieldPts=s=>s.queue.filter(x=>x.type==='reinf'||x.type==='repair').reduc
 const REINF_COST=2,REPAIR_COST=2;   // reinforcement and base-shield repair both 2 energy per point
 function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
+  if(act.type==='pivot'){const net=s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+act.dir;if(Math.abs(net)>(s.d.big?2:3))return false}   // Nov 20 (David): max pivot per impulse — cruisers 60°, small ships 90°
   if(act.type==='burn'){if(qHas(s,'burn'))return false;const pv=s.queue.filter(x=>x.type==='pivot');return burnAllowed(s,act.a)}
   if(act.type==='gen')return !s.d.noShield&&!qHas(s,'gen')&&act.lvl!==s.gen.lvl;
   if(act.type==='reinf'){if(s.d.noShield)return false;if(qShieldPts(s)+act.n>R.shieldRepairPerImp)return false;if(genLvl(s)<1)return false;   // reinforcement only at full generator strength
@@ -534,7 +538,7 @@ function shouldStop(){
 const r1=x=>Math.round(x*10)/10;
 function wLabel(s,key){if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];return 'PD '+(p.arc==='ALL'?'360':p.arc)}const w=s.weapons[+key.slice(1)];return w.T.ab+' '+w.arc}
 function recShip(s,i,orders){const t=s.target&&!s.target.dead?s.target:null;const o={i,pos:[r1(s.pq??s.q),r1(s.pr??s.r)],v:[s.vq,s.vr],spd:vlen(s.vq,s.vr),f:s.f,E:r1(s.E),hull:Math.ceil(s.hull),ar:s.armor,sh:r1(s.shield),rf:r1(reinfAmt(s)),gen:s.d.noShield?null:genLvl(s),
-    dmg:[s.dmgEng||0,s.dmgThrP||0,s.dmgThrS||0,s.dmgRea||0,s.dmgSen||0],ai:!!isAI(s)};
+    dmg:[s.dmgEng||0,s.dmgThrP||0,s.dmgThrS||0,s.dmgRea||0,s.dmgSen||0,s.dmgThrF||0],ai:!!isAI(s)};
   if(t){o.tgt=ships.indexOf(t);o.rng=hexDist(s,t);o.brg=Math.round(relBearing(s,t)/D2R)}
   o.wpn=s.weapons.map(w=>!w.alive?'X':w.T.kind==='torp'?'T'+w.stages+(w.charging?'c':''):w.T.kind==='missile'?w.state[0]+w.ammo:w.state[0]).join(' ');o.pd=s.pd.map(p=>p.alive?p.shots:'X').join('');
   if(orders){if(s.queue.length)o.orders=s.queue.map(x=>qLabel(s,x));if(s.fireSel.size&&t)o.fire=[...s.fireSel].map(k=>wLabel(s,k)+(canFireMount(s,k,t)?' '+Math.round(hitP(s,k,t)*100)+'%':''));if(s.subMode)o.aim='systems';if(s.msMode!=='off')o.msl=s.msMode}
@@ -690,7 +694,7 @@ function dcPanel(s,sd){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).lengt
     h+=sd?`<button class="btn dcb ${q?'armed':''}" data-act="dc:${x.id}" ${q||canQueue(s,{type:'dc',id:x.id,cost:0})?'':'disabled'} title="${q?'team assigned':'assign a team to repair this'}">${q?'🔧':'✖'} ${lab}</button>`:`<span class="chip bad">✖ ${lab}</span>`}
   return h+`</div>`}
 function dmgLine(s){const pip=n=>'●'.repeat(n||0)+'○'.repeat(3-(n||0));const sysLeft=s.boxes.length,struct=Math.max(0,s.hull-sysLeft);const sr=sensRange(s);
-  return `<div class="row dim sm" title="Each damageable system is one of the ship's hull points; every point of hull damage lands on a random remaining point (structure, or a system exposed to the attacker). Sensors: weapon-scan range (10 hexes, −2 per hit); at 0 you can't see enemy shields or hull.">Eng <b class="${s.dmgEng?'bad':''}">${pip(s.dmgEng)}</b> P <b class="${s.dmgThrP?'bad':''}">${pip(s.dmgThrP)}</b> S <b class="${s.dmgThrS?'bad':''}">${pip(s.dmgThrS)}</b> · Rea <b class="${s.dmgRea?'bad':''}">${100-10*(s.dmgRea||0)}%</b> · Sens <b class="${s.dmgSen?'bad':''}">${sr}</b> · Struct ${struct}</div>`}
+  return `<div class="row dim sm" title="Each damageable system is one of the ship's hull points; every point of hull damage lands on a random remaining point (structure, or a system exposed to the attacker). Sensors: weapon-scan range (10 hexes, −2 per hit); at 0 you can't see enemy shields or hull.">Eng <b class="${s.dmgEng?'bad':''}">${pip(s.dmgEng)}</b> F <b class="${s.dmgThrF?'bad':''}">${pip(s.dmgThrF)}</b> P <b class="${s.dmgThrP?'bad':''}">${pip(s.dmgThrP)}</b> S <b class="${s.dmgThrS?'bad':''}">${pip(s.dmgThrS)}</b> · Rea <b class="${s.dmgRea?'bad':''}">${100-10*(s.dmgRea||0)}%</b> · Sens <b class="${s.dmgSen?'bad':''}">${sr}</b> · Struct ${struct}</div>`}
 function internalHit(t){const c=[];t.weapons.forEach(w=>w.alive&&c.push({w}));t.pd.forEach(p=>p.alive&&c.push({p}));c.push({rea:1},{rea:1});
   const x=c[Math.floor(Math.random()*c.length)];let msg;if(x.w){x.w.alive=false;msg=`${x.w.T.name} (${x.w.arc}) destroyed`}else if(x.p){x.p.alive=false;msg=`PD screen (${x.p.arc}) destroyed`}else{t.dReactor=(t.dReactor||0)+1;msg='reactor damage'}
   log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good')}
@@ -1028,7 +1032,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
     h+=`<div class="row sm" style="flex-wrap:wrap;gap:3px 9px">${parts.join('')}</div>`;
     const pip=n=>'●'.repeat(n||0)+'○'.repeat(3-(n||0));const dead={};for(const x of (t.damaged||[]))if(x.k==='w'||x.k==='pd'){const nm=boxShort(t,x);dead[nm]=(dead[nm]||0)+1}
     const dl=Object.entries(dead).map(([n,c])=>n+(c>1?' ×'+c:'')).join(', ');
-    h+=`<div class="row dim sm">Damage: eng <b class="${t.dmgEng?'bad':''}">${pip(t.dmgEng)}</b> P <b class="${t.dmgThrP?'bad':''}">${pip(t.dmgThrP)}</b> S <b class="${t.dmgThrS?'bad':''}">${pip(t.dmgThrS)}</b> · rea <b class="${t.dmgRea?'bad':''}">${100-10*(t.dmgRea||0)}%</b> · sens <b class="${t.dmgSen?'bad':''}">${sensRange(t)}</b>${dl?` · <span class="bad">✖ ${dl}</span>`:''}${(t.dc||[]).length?` · 🔧 ${t.dc.length} repair${t.dc.length>1?'s':''} under way`:''}</div>`}
+    h+=`<div class="row dim sm">Damage: eng <b class="${t.dmgEng?'bad':''}">${pip(t.dmgEng)}</b> F <b class="${t.dmgThrF?'bad':''}">${pip(t.dmgThrF)}</b> P <b class="${t.dmgThrP?'bad':''}">${pip(t.dmgThrP)}</b> S <b class="${t.dmgThrS?'bad':''}">${pip(t.dmgThrS)}</b> · rea <b class="${t.dmgRea?'bad':''}">${100-10*(t.dmgRea||0)}%</b> · sens <b class="${t.dmgSen?'bad':''}">${sensRange(t)}</b>${dl?` · <span class="bad">✖ ${dl}</span>`:''}${(t.dc||[]).length?` · 🔧 ${t.dc.length} repair${t.dc.length>1?'s':''} under way`:''}</div>`}
   else h+=`<div class="row dim sm">Weapons and system damage: ${best?`not scanned — need ≤ ${best} hexes`:'no sensors'}</div>`;
   h+=fireHist(t);
   return h+`</div>`}
@@ -1090,8 +1094,8 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
     const db=decelBurn(s);
     b=`
       <div style="display:flex;flex-direction:column;gap:4px"><button class="btn big accel" data-act="burn:F" ${canQueue(s,{type:'burn',a:'F',cost:burnCost(s,'F')})?'':'disabled'} title="${burnCost(s,'F')} energy"><span class="k">W</span> ▲ ACCEL</button>
-      <button class="btn big decel" data-act="decel" ${db&&!qHas(s,'burn')?'':'disabled'} title="automatically picks the burn that cuts your speed most${db?' ('+burnCost(s,db)+' energy)':''}"><span class="k">X</span> ▼ DECEL</button></div>
-      <div style="display:grid;grid-template-columns:repeat(5,auto);gap:4px" title="1 burn per impulse. Turns (30° or 60°) and pivots (30° each) — 12 facings. Cruisers: after a turn or a slip, the next burn must be straight. Frigates/destroyers: a turn can't follow a turn, a slip can't follow a slip.">${B('1','↶ 30°','TL3')}${B('Q','↶ 60°','TL')}${B('E','↷ 60°','TR')}${B('3','↷ 30°','TR3')}${B('S','↓ Rev','R')}
+      <button class="btn big decel" data-act="burn:R" ${canQueue(s,{type:'burn',a:'R',cost:burnCost(s,'R')})?'':'disabled'} title="Reverse burn (fore thrusters): ${+burnCost(s,'R').toFixed(2)} energy${s.dmgThrF?` — fore thrusters damaged: +${s.dmgThrF*50}%`:''}"><span class="k">X</span> ▼ REVERSE${s.dmgThrF?`<b class="pen">⚠${Math.min(3,s.dmgThrF)>=3?'out':s.dmgThrF*50+'%'}</b>`:''}</button></div>
+      <div style="display:grid;grid-template-columns:repeat(4,auto);gap:4px" title="1 burn per impulse. Turns (30° or 60°) and pivots (30° each) — 12 facings. Cruisers: after a turn or a slip, the next burn must be straight. Frigates/destroyers: a turn can't follow a turn, a slip can't follow a slip.">${B('1','↶ 30°','TL3')}${B('Q','↶ 60°','TL')}${B('E','↷ 60°','TR')}${B('3','↷ 30°','TR3')}
       ${B('A','⇖ Slip','SL')}${B('D','⇗ Slip','SR')}${pv('Z','⟲ Piv 30°','-1')}${pv('C','⟳ Piv 30°','1')}</div>
       <button class="btn big go" data-act="go"><span class="k">Enter</span> Continue ▶</button>`}
   else if(dec)b=`<button class="btn big go" data-act="go"><span class="k">Enter</span> Continue ▶</button>`;
@@ -1131,7 +1135,7 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?(s.d.big?'Cruisers: after a turn or slip, the next burn must be straight':'A turn can\'t follow a turn, and a slip can\'t follow a slip'):'Not enough energy'),'dim')}
   else if(k==='dc'){queue(s,{type:'dc',id:+v,cost:0})}
   else if(k==='dccancel'){queue(s,{type:'dccancel',id:+v,cost:0})}
-  else if(k==='pivot'){if(!isFinite(pivotCost(s,+v)))log('Those thrusters are destroyed','bad');else if(queue(s,{type:'pivot',dir:+v,cost:pivotCost(s,+v)}))turnWarn(s,+v,pivotCost(s,+v))}
+  else if(k==='pivot'){if(!isFinite(pivotCost(s,+v)))log('Those thrusters are destroyed','bad');else if(queue(s,{type:'pivot',dir:+v,cost:pivotCost(s,+v)}))turnWarn(s,+v,pivotCost(s,+v));else if(Math.abs(s.queue.filter(x=>x.type==='pivot').reduce((a,x)=>a+x.dir,0)+(+v))>(s.d.big?2:3))log(`Max pivot per impulse: ${s.d.big?'60° for cruisers':'90° for small ships'}`,'dim')}
   else if(k==='chargeall')chargeAll(s);
   else if(k.startsWith('msl')){const t=tgt(s);const L=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.kind==='missile');
     if(k==='mslcyc'){for(const {i} of L)if(canQueue(s,{type:'start',i,cost:0}))queue(s,{type:'start',i,cost:0})}
@@ -1300,7 +1304,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
     if(k==='tab'){e.preventDefault();cycleSel();return}
     if(k==='t'){cycleTarget();return}
-    if(phase==='decide'){const km={q:'TL',w:'F',e:'TR',s:'R',a:'SL',d:'SR','1':'TL3','3':'TR3'};if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('decel');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='backspace'){e.preventDefault();doAct('undo')}}
+    if(phase==='decide'){const km={q:'TL',w:'F',e:'TR',s:'R',a:'SL',d:'SR','1':'TL3','3':'TR3'};if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('burn:R');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='backspace'){e.preventDefault();doAct('undo')}}
     if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{if(e.button===2)mouse.pan=true;if(e.button===0)clickMap(e)});addEventListener('mouseup',e=>{if(e.button===2)mouse.pan=false});
   canvas.addEventListener('mousemove',e=>{const nx=e.clientX*devicePixelRatio,ny=e.clientY*devicePixelRatio;if(mouse.pan&&mouse.x!=null){pan.x-=(nx-mouse.x)/cam.s;pan.y-=(ny-mouse.y)/cam.s}mouse.x=nx;mouse.y=ny});
