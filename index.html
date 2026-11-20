@@ -136,9 +136,11 @@ const LASER_ACC=r=>r<=1?1:r<=3?.9:r<=5?.8:r<=7?.7:r<=9?.6:r<=11?.5:r<=12?.4:.1;
 const COIL_TBL=[.95,.95,.85,.85,.75,.75,.65,.6,.5,.45,.35,.25,.15];const COIL_ACC=r=>r<=12?COIL_TBL[r]:.05;   // David's coilgun table
 const ACC={laser:Array.from({length:61},(_,r)=>LASER_ACC(r)),coil:Array.from({length:61},(_,r)=>COIL_ACC(r)),torp:Array.from({length:61},(_,r)=>LASER_ACC(r)-.05)};
 ACC.laser2=ACC.laser.map((p,r)=>r<=8?p-.1:.05);ACC.coil2=ACC.coil.map((p,r)=>r<=8?p-.1:.05);ACC.torp2=ACC.torp.map((p,r)=>r<=8?p-.1:.05);
-// TL1 (Nov 19, David): targeting computer ends at 6 hexes; inside it every accuracy is 20 points lower, beyond it a flat 5%.
+// TL1 (Nov 19, David): targeting computer ends at 6 hexes, beyond it a flat 5%.
 // Railgun turret: coilgun falloff, 5 points better (a turret, not a spinal mount), then the TL1 penalty.
-ACC.laser1=ACC.laser.map((p,r)=>r<=6?p-.2:.05);ACC.coil1=ACC.coil.map((p,r)=>r<=6?p-.2:.05);ACC.torp1=ACC.torp.map((p,r)=>r<=6?p-.2:.05);ACC.rail1=ACC.coil.map((p,r)=>r<=6?p+.05-.2:.05);
+// Nov 20 (David): no flat penalty — each TL4 curve is shrunk onto the 6-hex computer (TL1 hex r reads TL4 hex 2r), 5% beyond 6.
+const shrink1=(A,add=0)=>A.map((p,r)=>r<=6?Math.min(1,A[Math.min(A.length-1,2*r)]+add):.05);
+ACC.laser1=shrink1(ACC.laser);ACC.coil1=shrink1(ACC.coil);ACC.torp1=shrink1(ACC.torp);ACC.rail1=shrink1(ACC.coil,.05);
 const sixths=p=>Math.round(p*100)+'%';
 const TCR={laser:10,coil:6,torp:10,laser2:8,coil2:6,torp2:8,laser1:6,coil1:6,torp1:6,rail1:6};
 const accAt=(k,r)=>ACC[k][Math.min(Math.round(r),60)];
@@ -271,15 +273,15 @@ for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
 
 // ---- Martian TL1 (Nov 19, David). Early Frigate: no shields, chain-gun PD, railgun turrets. Placeholder outline (smaller, plainer Peregrine) until David's sprite ----
-SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Early Frigate',short:'Early FF',color:'#ff5a46',laser:'#46ff6e',torp:'#5dff7a',hull:40,shield:0,noShield:true,big:false,tl:1,accPen:.2,reactor:10,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Early Frigate',short:'Early FF',color:'#ff5a46',laser:'#46ff6e',torp:'#5dff7a',hull:40,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:10,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-20,-18],[-14,-18],[-10,-9],[22,-9],[22,9],[-10,9],[-14,18],[-20,18]],lines:[[-18,0,22,0]],dots:[[4,-9],[4,9],[-2,0]],
     weapons:[['SC1','S'],['RG','FX'],['RG','RS'],['RG','LS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL','ALL']};
-SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:.2,reactor:27,genCost:0,doctrine:'alpha',pdKind:'chain',
+SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Martian Early Heavy Cruiser',short:'Early CA',color:'#ff3b3b',laser:'#46ff6e',torp:'#5dff7a',hull:100,shield:0,noShield:true,big:true,tl:1,accPen:0,reactor:27,genCost:0,doctrine:'alpha',pdKind:'chain',
     shape:[[-30,-24],[-22,-24],[-16,-12],[30,-12],[30,12],[-16,12],[-22,24],[-30,24]],lines:[[-28,-4,30,-4],[-28,4,30,4]],dots:[[14,-12],[14,12],[-6,0]],   // placeholder outline until David's sprite
     weapons:[['MRG','FX'],['MRG','LS'],['MRG','RS'],...rep(3,['MC1','S']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};
 SHIPS.earlyffl={...SHIPS.earlyff,cls:'Early Laser Frigate',weight:41,name:'Martian Early Laser Frigate',short:'Early Laser FF',weapons:[['SC1','S'],['SL1','FX'],['SL1','RS'],['SL1','LS'],['MS','ALL'],['MS','ALL']]};   // Nov 19 (David): Early Frigate with small lasers in place of the railgun turrets
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
-SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:.2,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
     weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
 SHIPS.corvette2i={...SHIPS.corvette,cls:'Improved Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8};
