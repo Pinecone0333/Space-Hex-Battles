@@ -354,7 +354,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -1106,7 +1106,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(AIV.r5&&K==='ap'&&!s.killing&&pp<.65&&!(s.hull<s.d.hull*.35))return;   // antiproton lances (2-turn recharge): only good shots
     if(pp>=(s.killing?.1:.35))fire.push(key)});
   if(msReady.length){let n=msReady.length;
-    if(AIV.r7&&DDOC(s))n=dogWave(s,t,n,d);
+    if(AIV.r7&&AIV.dogHold&&DDOC(s))n=dogWave(s,t,n,d);   /* Nov 21 (David): off — the Dogahr fires every ready launcher, from the first impulse; held missiles are lost rate of fire */
     else if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
       if(s.salvo&&s.salvo.t===t&&T-s.salvo.T<6){n=T-s.salvo.T>=2?n:0}            // second half follows 2 impulses after the first
       else if(own>0)n=T%2?0:n;                                                   // allies' wave already in the air: join it
