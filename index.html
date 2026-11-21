@@ -1738,14 +1738,16 @@ function preloadBattleMusic(){if(!AC||musicBuf||musicLoading)return;musicLoading
   AC.decodeAudioData(u.buffer,buf=>{musicBuf=buf;musicLoading=false;if(battlePending){battlePending=false;startMusic()}},()=>{musicLoading=false})}catch(e){musicLoading=false}}
 {const _sg=setMusicGain;setMusicGain=function(){_sg();if(menuGain&&AC)menuGain.gain.setTargetAtTime(musicOn?musicVol:0,AC.currentTime,.1)}}
 musicVol=.4;   /* Nov 21 (David): default music volume 80% of the old 0.5 */
-try{const v=localStorage.getItem('shtMusicVol');if(v!=null&&isFinite(+v))musicVol=Math.max(0,Math.min(1,+v))}catch(e){}
+try{const v=localStorage.getItem('shtMusicVol');if(v!=null&&isFinite(+v)&&+v>=.05)musicVol=Math.min(1,+v)}catch(e){}
 /* music on/off button + volume slider on the selection screens (fixed top-right, above the faction picker) */
 {const box=document.createElement('div');box.id='musicbox';box.style.cssText='position:fixed;top:10px;right:12px;z-index:95;display:flex;align-items:center;gap:8px;background:#0b121bdd;border:1px solid #2b3c4f;border-radius:8px;padding:5px 8px';
   const mb=document.createElement('button');mb.id='musicbtn';mb.className='btn';mb.style.cssText='font-size:13px;padding:5px 9px';
   const sl=document.createElement('input');sl.type='range';sl.min=0;sl.max=100;sl.step=1;sl.id='musicvol';sl.title='Music volume';sl.style.cssText='width:110px;accent-color:#5ad18c;cursor:pointer';
   const pc=document.createElement('span');pc.className='dim';pc.style.cssText='font-size:12px;min-width:34px;text-align:right';
   const lab=()=>{mb.textContent=!musicOn?'♫ Music: Off':(!AC||AC.state!=='running')?'♫ Click for music':'♫ Music: On';mb.classList.toggle('aion',musicOn);if(document.activeElement!==sl)sl.value=Math.round(musicVol*100);pc.textContent=Math.round(musicVol*100)+'%'};lab();
-  mb.addEventListener('click',e=>{e.stopPropagation();if(!AC)initAudio();toggleMusic();if(musicOn)startMenuMusic();lab()});
+  mb.addEventListener('click',e=>{e.stopPropagation();if(!AC)initAudio();const blocked=!AC||AC.state!=='running';if(AC&&AC.state!=='running')AC.resume().catch(()=>{});
+    if(blocked&&musicOn){startMenuMusic();lab();return}   /* 'Click for music' starts it; it must not toggle it off */
+    toggleMusic();if(musicOn)startMenuMusic();lab()});
   sl.addEventListener('input',()=>{musicVol=+sl.value/100;if(!musicOn&&musicVol>0){musicOn=true}if(!AC)initAudio();startMenuMusic();setMusicGain();try{localStorage.setItem('shtMusicVol',musicVol)}catch(e){}lab()});
   ['pointerdown','click','keydown'].forEach(ev=>sl.addEventListener(ev,e=>e.stopPropagation()));
   box.append(mb,sl,pc);document.body.appendChild(box);
