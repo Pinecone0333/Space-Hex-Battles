@@ -102,7 +102,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 <div id="rside"></div>
 <div id="dcAlert"></div>
 <div id="bar"></div>
-<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music <input id="musicvolB" type="range" min="0" max="100" step="1" title="Music volume" style="width:80px;vertical-align:middle;accent-color:#5ad18c;cursor:pointer"> · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
+<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music <input id="musicvolB" type="range" min="0" max="100" step="1" value="40" autocomplete="off" title="Music volume" style="width:80px;vertical-align:middle;accent-color:#5ad18c;cursor:pointer"> · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1>SPACE HEX TACTICS</h1>
  <div class="dim">Assemble both fleets. You command every ship on your side unless you hand it to the AI.</div>
@@ -1728,8 +1728,9 @@ function menuMusicKick(){const st=document.getElementById('start');if(!st||getCo
 addEventListener('pointerdown',menuMusicKick,true);addEventListener('keydown',menuMusicKick,true);
 let battlePending=false;
 let battleDelay=null;
-{const _sm=startMusic;const go=()=>{battleDelay=null;if(musicGain&&AC){const g=musicGain.gain;g.cancelScheduledValues(AC.currentTime);g.value=musicOn?musicVol:0}return _sm()};
-  startMusic=function(){if(musicLoading&&!musicSrc)battlePending=true;if(musicSrc||battleDelay)return;
+{const _sm=startMusic;const go=()=>{battleDelay=null;if(musicVol<.05)musicVol=.4;   /* Nov 21 (David): a battle never starts with the music at zero */
+if(musicGain&&AC){const g=musicGain.gain;g.cancelScheduledValues(AC.currentTime);g.value=musicOn?musicVol:0}return _sm()};
+  startMusic=function(){if(!musicSrc&&!battleDelay&&phase!=='over'){musicOn=true;if(musicVol<.05)musicVol=.4}if(musicLoading&&!musicSrc)battlePending=true;if(musicSrc||battleDelay)return;
     const fading=!!menuSrc;stopMenuMusic();
     if(fading){battleDelay=setTimeout(go,1600);return}   /* Nov 21 (David): menu fades out first, then the battle track starts from its first note at full volume */
     return go()}}
