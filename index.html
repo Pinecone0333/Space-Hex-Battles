@@ -1511,9 +1511,9 @@ function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio
   if(!best)return;if(best.team===0&&!best.ai)selectShip(best);else if(best.team===1&&P&&!P.dead){P.target=best;log(`${P.name} targeting ${best.name}`,'dim');buildHUD()}}
 function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} targeting ${P.target.name}`,'dim');buildHUD()}
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
-  renderBuilder();if(!MP.on)openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
+  renderBuilder();openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';renderBuilder();if(!MP.on)openFactionPicker(0,true)});
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';renderBuilder();openFactionPicker(0,true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
