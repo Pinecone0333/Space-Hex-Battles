@@ -635,7 +635,7 @@ function commit(){
     if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',s.team===0?1:.65);if(s.team===0)log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
   for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
   for(const s of alive()){if(s.msMode!=='def')continue;
-    const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead)&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=R.defRange);
+    const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead));   /* Nov 21 (David): Defend launches the moment a missile aimed at the ship appears, at any range (was within 16 hexes) */
     for(const th of thr){const w=s.weapons.find(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0);if(!w)break;
       w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
@@ -1746,6 +1746,11 @@ try{const v=localStorage.getItem('shtMusicVol');if(v!=null&&isFinite(+v))musicVo
   sb.addEventListener('input',()=>{musicVol=+sb.value/100;if(!musicOn&&musicVol>0)musicOn=true;setMusicGain();try{localStorage.setItem('shtMusicVol',musicVol)}catch(e){}});
   ['keydown','pointerdown'].forEach(ev=>sb.addEventListener(ev,e=>e.stopPropagation()));
   setInterval(()=>{if(document.activeElement!==sb)sb.value=Math.round((musicOn?musicVol:0)*100)},400)}}
+
+/* seamless loops (Nov 21): skip the silent tail/head of each track (the battle track ends in ~2.5 s of silence) */
+function audibleSpan(buf){const d=buf.getChannelData(0),n=d.length,th=.003;let a=0,b=n-1;while(a<n&&Math.abs(d[a])<th)a++;while(b>a&&Math.abs(d[b])<th)b--;return[Math.max(0,a/buf.sampleRate-.01),Math.min(buf.duration,(b+1)/buf.sampleRate+.05)]}
+function fitLoop(src){if(!src||src._fit||!src.buffer)return;src._fit=1;const buf=src.buffer;const sp=buf._sp||(buf._sp=audibleSpan(buf));if(sp[1]-sp[0]>2){src.loopStart=sp[0];src.loopEnd=sp[1]}}
+setInterval(()=>{fitLoop(musicSrc);fitLoop(menuSrc)},250);
 
 function toggleMusic(){musicOn=!musicOn;const st=document.getElementById('start');if(!(st&&getComputedStyle(st).display!=='none'))startMusic();setMusicGain()}
 init();
