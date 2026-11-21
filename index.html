@@ -7,7 +7,7 @@
 html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:11.5px/1.35 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden}
 #c{position:fixed;inset:0;display:block}
 #side{position:fixed;top:0;left:0;bottom:0;width:350px;overflow-y:auto;padding:5px;display:flex;flex-direction:column;gap:5px}
-#rside{position:fixed;top:0;right:0;bottom:0;width:280px;overflow:hidden;padding:5px;display:flex;flex-direction:column;gap:5px}
+#rside{position:fixed;top:0;right:0;bottom:0;width:320px;overflow:hidden;padding:5px;display:flex;flex-direction:column;gap:5px}
 #rside #log{flex:1;min-height:60px;overflow-y:auto}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.lab.s{width:32px}.v2{min-width:44px;text-align:right;white-space:nowrap}
 .sm{font-size:10.5px}.chips{letter-spacing:1px}.chip{border:1px solid var(--line);border-radius:3px;padding:0 4px;white-space:nowrap}
@@ -82,6 +82,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .dgm{display:block;margin:3px auto 4px;background:#0a1017;border:1px solid #1d2935;border-radius:5px}.dgm g[data-act]:hover rect,.dgm g[data-act]:hover circle{filter:brightness(1.6)}
 .firestrip{display:flex;flex-wrap:wrap;gap:3px;align-items:center}.firestrip .wrow.msl{flex-basis:100%;margin:0}
 .modes{gap:4px;align-items:center}.btn.mfire{background:#3a2410;border-color:#ff9a3d;color:#ffd6a8}.btn.mrep{background:#10253a;border-color:#5ab0ff;color:#cfe6ff}.dgm.m-fire{border-color:#7a4a1c}.dgm.m-repair{border-color:#2a5a8a}
+.tpop{position:fixed;z-index:60;background:#0d141d;border:1px solid #ffc04d;border-radius:6px;padding:6px;display:flex;flex-direction:column;gap:4px;box-shadow:0 4px 18px #000a;min-width:190px}.tpop .tph{font-size:11px;color:#ffd27a;margin-bottom:2px}.tpop .btn{text-align:left}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -1129,12 +1130,26 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
 function dcToggle(s,box){const job=(s.dc||[]).find(j=>j.box===box);if(job)return queue(s,{type:'dccancel',id:box.id,cost:0});
   const qi=s.queue.findIndex(q=>q.type==='dc'&&q.id===box.id);if(qi>=0){s.queue.splice(qi,1);return true}
   if(dcFree(s)<=0){log(`${s.name}: no free damage-control team`,'dim');return false}return queue(s,{type:'dc',id:box.id,cost:0})}
+// Nov 21 (David): clicking a partly charged torpedo asks what to do
+let lastClick={x:400,y:300};document.addEventListener('mousedown',e=>{lastClick={x:e.clientX,y:e.clientY}},true);
+function torpPopup(s,i){const w=s.weapons[i],t=tgt(s),key='w'+i,can=t&&canFireMount(s,key,t);closePop();
+  const el=document.createElement('div');el.id='tpop';el.className='tpop';
+  const b=(act,lab,ok,tt)=>`<button class="btn" data-tp="${act}" ${ok?'':'disabled'} ${tt?`title="${tt}"`:''}>${lab}</button>`;
+  el.innerHTML=`<div class="tph">${w.T.ab} — ${w.stages}/3 stages · ${torpDmg(w)} dmg${w.charging?' · charging':' · holding'}</div>`+
+    b('fire',s.fireSel.has(key)?'✓ Armed — disarm':`🎯 Fire now${can?' ('+sixths(hitP(s,key,t))+')':''}`,can||s.fireSel.has(key),can?'':'not bearing on the target or out of range')+
+    (w.charging?b('hold','⏸ Hold at '+w.stages+' stage'+(w.stages>1?'s':''),true,'stop charging; holding costs 1/6 of stored energy per turn'):b('charge','▶ Keep charging',true,`${w.T.perTurn} energy per stage, drained over a turn`))+b('x','Cancel',true);
+  document.body.appendChild(el);const W=el.offsetWidth,H=el.offsetHeight;el.style.left=Math.min(innerWidth-W-6,lastClick.x+8)+'px';el.style.top=Math.min(innerHeight-H-6,lastClick.y-8)+'px';
+  el.querySelectorAll('[data-tp]').forEach(x=>x.addEventListener('click',e=>{e.stopPropagation();const a=x.dataset.tp;
+    if(a==='fire'){s.fireSel.has(key)?s.fireSel.delete(key):s.fireSel.add(key)}else if(a==='hold')queue(s,{type:'hold',i,cost:0});else if(a==='charge')queue(s,{type:'start',i,cost:0});closePop();buildHUD()}))}
+function closePop(){const o=$('tpop');if(o)o.remove()}
+document.addEventListener('mousedown',e=>{const o=$('tpop');if(o&&!o.contains(e.target))setTimeout(()=>{if(!o.contains(document.activeElement))closePop()},0)});
 function smartW(s,i){const w=s.weapons[i],box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===i);
   if(dgMode==='repair'){if(box)dcToggle(s,box);else log(`${w.T.ab} isn't damaged`,'dim');return}
   if(!w.alive){log(`${w.T.ab} is destroyed — switch to Repair mode to send a team`,'dim');return}
+  if(w.T.kind==='torp'&&w.stages>0&&w.stages<3){torpPopup(s,i);return}   // partly charged torpedo: ask
   const t=tgt(s),key='w'+i;if(t&&(s.fireSel.has(key)||canFireMount(s,key,t))){s.fireSel.has(key)?s.fireSel.delete(key):s.fireSel.add(key);return}   // ready and bearing: arm / disarm
   const K=w.T.kind;const q=s.queue.findIndex(x=>(x.type==='start'||x.type==='hold'||x.type==='pausew')&&x.i===i);if(q>=0){s.queue.splice(q,1);return}   // click again to undo
-  if(K==='torp'){if(w.charging)queue(s,{type:'hold',i,cost:0});else queue(s,{type:'start',i,cost:0});return}
+  if(K==='torp'){if(w.stages>0&&w.stages<3){torpPopup(s,i);return}if(w.charging)queue(s,{type:'hold',i,cost:0});else queue(s,{type:'start',i,cost:0});return}
   if(w.charging&&(K==='ap'||drains(w))){queue(s,{type:'pausew',i,cost:0});return}
   if(!queue(s,{type:'start',i,cost:K==='ap'||drains(w)?0:w.T.cost})&&w.state==='idle')log(`${s.name}: not enough energy to load ${w.T.ab}`,'dim')}
 function smartPD(s,i){const p=s.pd[i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===i);
@@ -1156,19 +1171,19 @@ function fireStrip(s,t,sd){if(!t||!sd)return '';const d=hexDist(s,t);let h='';
 function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',rh='';
   const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
-  rh+=`<div class="panel"><h2>Fleet command</h2>
-   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
-   ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
-     <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
-     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
   const s=P;const ct=s&&!s.dead?tgt(s):null;
   if(ct)rh+=scanPanel(s,ct);
   const foes=ships.filter(x=>x.team===1&&x!==ct);
   if(foes.length)rh+=`<div class="panel"><h2>Enemy ships <span class="dim" style="text-transform:none">(click to target)</span></h2><div class="tabs scroll" style="max-height:170px">${foes.map(x=>{const ok=scanStatus(x);return `<div class="tab ${x.dead?'dead':''}" data-tgt="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
     <div class="mini">${ok?bar(x.hull,x.d.hull)+bar(x.shield,x.d.shield,'sh'):'<span class="dim">no sensor data</span>'}</div><span class="dim">${s&&!s.dead&&!x.dead?hexDist(s,x)+' hexes · ':''}v ${vlen(x.vq,x.vr)}</span></div>`}).join('')}</div></div>`;
-  if(s&&!s.dead&&s.queue.length&&!s.ai)rh+=`<div class="panel"><h2>Queued for ${s.name} <button class="btn" data-act="undo" style="float:right">Undo ⌫</button></h2><div class="dim">${s.queue.map(x=>qLabel(s,x)).join(' · ')}</div></div>`;
+  const qPanel=s&&!s.dead&&s.queue.length&&!s.ai?`<div class="panel"><h2>Queued for ${s.name} <button class="btn" data-act="undo" style="float:right">Undo ⌫</button></h2><div class="dim">${s.queue.map(x=>qLabel(s,x)).join(' · ')}</div></div>`:'';
   rh+=`<div class="panel" id="log"></div>`;
-  // ---- left panel: your ship ----
+  // ---- left panel: your fleet, your ship, its orders (Nov 21, David: your side on the left, the enemy on the right) ----
+  h+=`<div class="panel"><h2>Fleet command</h2>
+   <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
+   ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
+     <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
+     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
      ${s.team===0&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
@@ -1186,6 +1201,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
     if(sd){const nA=s.fireSel.size;h+=`<div class="row modes"><button class="btn ${dgMode==='fire'?'mfire':''}" data-act="dgmode:fire" title="Fire mode (F): click a weapon that bears to arm or disarm it; click an empty or charging weapon to load, pause or resume; click PD to load a shot">🎯 Fire</button><button class="btn ${dgMode==='repair'?'mrep':''}" data-act="dgmode:repair" title="Repair mode (F): click a damaged or destroyed system to send a damage-control team, click again to recall">🔧 Repair</button><span class="dim sm" style="white-space:nowrap">${dgMode==='fire'?(nA?`<b class="warn">${nA} armed</b>`:'nothing armed'):`${dcFree(s)}/${dcTeams(s)} teams free`}</span>${nA&&dgMode==='fire'?btn('disarm','Clear',true,'Disarm everything'):''}</div>`}
     h+=shipDiagram(s,'own',t);
+    h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
   else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
   {const av=own.filter(dcAvail);const key=av.map(x=>x.name+dcFree(x)+':'+dcOpen(x)).join('|');const el=$('dcAlert');
