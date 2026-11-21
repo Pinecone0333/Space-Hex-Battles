@@ -90,7 +90,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 <div id="rside"></div>
 <div id="dcAlert"></div>
 <div id="bar"></div>
-<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/repair mode · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
+<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1>SPACE HEX TACTICS</h1>
  <div class="dim">Assemble both fleets. You command every ship on your side unless you hand it to the AI.</div>
@@ -351,6 +351,8 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 
 // ---- internal systems: each damageable system is one of the ship's hull points ----
 // weapons, PD mounts and missile launchers 1 box each; main engine 3; port thrusters 3; starboard thrusters 3; reactor 10 (−10% output each); sensors 5 (−2 hexes scan range each)
+// Nov 21 (David): all shield values halved (rounded to whole points); reinforcement and base-shield repair now 1 energy per point
+for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
   for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<10;i++)b.push({k:'rea'});for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
@@ -438,6 +440,7 @@ const turnGap=s=>s.d.turnGap??(s.d.pivotMax===1||s.d.cls==='Dreadnought'?3:/Frig
 const turnReady=s=>T-(s.lastTurnT??-99)>=turnGap(s);
 function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return false;   // main engine out: only reverse (retro) thrust
   if(a==='R'&&(s.dmgThrF||0)>=3)return false;   // fore thrusters out: no reverse burn
+  if(a==='R'&&T-(s.lastRevT??-99)<2)return false;   // Nov 21 (David): reverse burns only every other impulse
   if(A.turn<0&&(s.dmgThrS||0)>=3||A.turn>0&&(s.dmgThrP||0)>=3)return false;
   if(A.kind==='turn')return turnReady(s);return true}
 
@@ -446,7 +449,7 @@ const pdC=s=>s.d.pdKind==='chain'?0:1;   // chain-gun PD (TL1) is free to load
 const qCost=s=>s.queue.reduce((a,x)=>a+x.cost,0);
 const qHas=(s,type)=>s.queue.some(x=>x.type===type);
 const qShieldPts=s=>s.queue.filter(x=>x.type==='reinf'||x.type==='repair').reduce((a,x)=>a+x.n,0);   // max 2 shield points per impulse
-const REINF_COST=2,REPAIR_COST=2;   // reinforcement and base-shield repair both 2 energy per point
+const REINF_COST=1,REPAIR_COST=1;   // reinforcement and base-shield repair both 1 energy per point (Nov 21, David; was 2)
 function canQueue(s,act){
   if(s.E-qCost(s)<act.cost-1e-9)return false;
   if(act.type==='pivot'&&Math.abs(rotQ(s)+act.dir)>maxPiv(s))return false;   // Nov 20 (David): total rotation per impulse (pivots + turn-burns) — cruisers 60°, small ships 90°, Hunibler/Hunifer 90°/120°, Dreadnought 30°
@@ -465,7 +468,7 @@ function canQueue(s,act){
 function queue(s,act){if(act.type==='pd'&&s.d.pdKind==='chain')act.cost=0;if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'||drains(s.weapons[act.i])))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;s.E-=a.cost;
-    if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';if(BURNS[a.a].kind==='turn')s.lastTurnT=T;s.burnFx=1}
+    if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';if(BURNS[a.a].kind==='turn')s.lastTurnT=T;if(a.a==='R')s.lastRevT=T;s.burnFx=1}
     else if(a.type==='pivot'){s.f=(s.f+a.dir+NF)%NF}
     else if(a.type==='gen'){const on=genLvl(s)>0;s.gen={lvl:a.lvl,from:on&&a.lvl>0?s.gen.from:T+1};s.genLvl=a.lvl;if(a.lvl<1){s.shield=Math.min(s.shield,s.d.shield*a.lvl);s.reinf=[]}}   // renewing while running extends seamlessly
     else if(a.type==='reinf'){s.reinf.push({amt:a.n,exp:T+IMP});if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
@@ -1014,7 +1017,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
         if(pp>=.5-pen-1e-6)fire.push(key)});
       const q=s.queue;s.queue=[];return{queue:q,fire}}
     const selfDef=s.mode==='charge'||s.holdImp>=6||hurt;   // held off too long or getting hurt: keep the lasers/coilguns working   // while torpedoes charge, return fire with lasers/coilguns; once torpedoes are full, hold everything for the alpha strike
-    const strip=trig&&d>2&&t.shield+reinfAmt(t)>25&&keys.some((k,i)=>s.weapons[i].alive&&(s.weapons[i].T.kind==='beam'||s.weapons[i].T.kind==='slug')&&canFireMount(s,k,t));   // shields up: lasers/coilguns knock them down, torpedoes follow next impulse
+    const strip=trig&&d>2&&t.shield+reinfAmt(t)>t.d.shield*.5&&keys.some((k,i)=>s.weapons[i].alive&&(s.weapons[i].T.kind==='beam'||s.weapons[i].T.kind==='slug')&&canFireMount(s,k,t));   // shields up: lasers/coilguns knock them down, torpedoes follow next impulse
     keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind;
       if(K==='missile'){if(d<=16)fire.push(key);return}
       if(K==='torp'){if(w.stages>=3&&trig&&!(AIV.strip&&strip)){fire.push(key);s.alphaDone=true}return}
@@ -1065,7 +1068,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
   h+=fireHist(t);
   return h+`</div>`}
 // ---- Ship diagrams (Nov 21, David): your ship and the enemy as clickable top-down sprites, mounts placed by firing arc ----
-const DG={W:300,H:232};let dgMode='fire';   // Nov 21 (David): the diagram's click mode — 'fire' (arm to fire / reload) or 'repair' (damage control)
+const DG={W:300,H:232};let dgMode='repair',dgTab='fire';   // Nov 21 (David): weapons panel tabs — 'fire' (the classic weapon list) or 'dc' (ship diagram, repair clicks)   // Nov 21 (David): the diagram's click mode — 'fire' (arm to fire / reload) or 'repair' (damage control)
 function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
   const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
   const L=x1-x0||1,Wd=y1-y0||1,xc=(x0+x1)/2,yc=(y0+y1)/2,sc=Math.min((DG.W-30)/Wd,(DG.H-24)/L);
@@ -1213,8 +1216,29 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
-    if(sd){const nA=s.fireSel.size;h+=`<div class="row modes"><button class="btn ${dgMode==='fire'?'mfire':''}" data-act="dgmode:fire" title="Fire mode (F): click a weapon that bears to arm or disarm it; click an empty or charging weapon to load, pause or resume; click PD to load a shot">🎯 Fire</button><button class="btn ${dgMode==='repair'?'mrep':''}" data-act="dgmode:repair" title="Repair mode (F): click a damaged or destroyed system to send a damage-control team, click again to recall">🔧 Repair</button><span class="dim sm" style="white-space:nowrap">${dgMode==='fire'?(nA?`<b class="warn">${nA} armed</b>`:'nothing armed'):`${dcFree(s)}/${dcTeams(s)} teams free`}</span>${nA&&dgMode==='fire'?btn('disarm','Clear',true,'Disarm everything'):''}</div>`}
-    h+=shipDiagram(s,'own',t);
+    {const nDmg=(s.damaged||[]).length;h+=`<div class="row tabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire control</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage control${nDmg?` <b class="warn">${nDmg}</b>`:''}</button></div>`}
+    if(dgTab==='fire'){
+    const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff',lances:s.d.torp,aplances:'#f2e8ff'};
+    for(const G of GROUPS){const ws=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.grp===G.id);if(!ws.length)continue;
+      if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
+      for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
+        if(!w.alive)st='<span class="bad">destroyed</span>';
+        else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
+          if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.holding?'Resume':'Charge',true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
+        else if(K==='ap'){st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+AP_IMP-(w.paid||0))}">${w.paid||0}/${AP_IMP}→${when(T+AP_IMP-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${AP_IMP}</span>`:'<span class="dim">empty</span>';
+          if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this charge; progress is kept');
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Charge',true,`${w.T.cost} energy over 2 turns (${+(w.T.cost/AP_IMP).toFixed(3)} per impulse); ${w.T.dmg} damage at any range; holds free`)}
+        else if(drains(w)){const N=cycleImp(s,w);st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+N-(w.paid||0))}">${w.paid||0}/${N}→${when(T+N-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${N}</span>`:'<span class="dim">empty</span>';
+          if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this reload; progress is kept');
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Load',true,`${w.T.cost} energy drained over ${N} impulses (${+(w.T.cost/N).toFixed(3)} per impulse); pauses if short`)}
+        else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
+          if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
+        if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):''),K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'')}
+        const bears=w.alive&&t&&inArc(s,w.arc,t);
+        h+=`<div class="wrow"><span class="arc ${bears?'bears':''}">${w.arc}</span><span class="wn" style="color:${GC[G.id]}">${w.T.ab}</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`}}
+    s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1}))ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit')}
+      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''}">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'CHN':'PD'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
+    }else{dgMode='repair';h+=shipDiagram(s,'own',t)+`<div class="row sm">${dmgLine(s).replace(/<\/?div[^>]*>/g,'')}</div>`}
     h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
   else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
@@ -1266,9 +1290,8 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='hold')queue(s,{type:'hold',i:+v,cost:0});
   else if(k==='pausew')queue(s,{type:'pausew',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
-  else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?`${s.name} can turn-burn every ${turnGap(s)>1?turnGap(s)===2?'other impulse':turnGap(s)+'rd impulse':'impulse'} — next at ${when((s.lastTurnT??-99)+turnGap(s))}`:(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
-  else if(k==='dgmode')dgMode=v;
-  else if(k==='disarm')s.fireSel.clear();
+  else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)&&v==='R'?((s.dmgThrF||0)>=3?'Fore thrusters destroyed — no reverse burn':(s.dmgEng||0)>=3&&false?'':`Reverse burns only every other impulse — next at ${when((s.lastRevT??-99)+2)}`):!burnAllowed(s,v)&&(s.dmgEng||0)>=3?'Main engine destroyed — reverse burns only':!burnAllowed(s,v)?`${s.name} can turn-burn every ${turnGap(s)>1?turnGap(s)===2?'other impulse':turnGap(s)+'rd impulse':'impulse'} — next at ${when((s.lastTurnT??-99)+turnGap(s))}`:(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
+  else if(k==='dgtab')dgTab=v;
   else if(k==='wclick')smartW(s,+v);
   else if(k==='pdclick')smartPD(s,+v);
   else if(k==='sysclick')smartSys(s,v);
@@ -1444,7 +1467,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(k==='tab'){e.preventDefault();cycleSel();return}
     if(k==='t'){cycleTarget();return}
     if(phase==='decide'){const km={q:'TL',w:'F',e:'TR',s:'R','1':'TL3','3':'TR3'};if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('burn:R');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='backspace'){e.preventDefault();doAct('undo')}}
-    if(k==='f'&&phase==='decide'){dgMode=dgMode==='fire'?'repair':'fire';buildHUD()}if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
+    if(k==='f'&&phase==='decide'){dgTab=dgTab==='fire'?'dc':'fire';buildHUD()}if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{if(e.button===2)mouse.pan=true;if(e.button===0)clickMap(e)});addEventListener('mouseup',e=>{if(e.button===2)mouse.pan=false});
   canvas.addEventListener('mousemove',e=>{const nx=e.clientX*devicePixelRatio,ny=e.clientY*devicePixelRatio;if(mouse.pan&&mouse.x!=null){pan.x-=(nx-mouse.x)/cam.s;pan.y-=(ny-mouse.y)/cam.s}mouse.x=nx;mouse.y=ny});
   canvas.addEventListener('wheel',e=>{e.preventDefault();zoomMul=clamp(zoomMul*(e.deltaY>0?.9:1.1),.2,4)},{passive:false});
