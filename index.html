@@ -39,6 +39,7 @@ input[type=range]{flex:1;accent-color:#58b8ff}
 #help{position:fixed;bottom:8px;left:350px;right:285px;text-align:center;color:var(--dim);font-size:11px}
 #log div{margin:1px 0}
 .overlay{position:fixed;inset:0;background:rgba(2,5,9,.85);display:flex;align-items:center;justify-content:center;z-index:5}
+#start{background:radial-gradient(ellipse at 50% 30%,#0b1726 0%,#04070c 70%)}   /* Nov 21: opaque — the battle map no longer shows through the setup screens */
 .box{background:#08111b;border:1px solid var(--line);border-radius:8px;padding:22px 26px;max-width:880px}
 .box h1{margin:0 0 4px;font-size:22px;letter-spacing:.08em}
 .cards{display:flex;gap:16px;margin:16px 0}
@@ -1173,32 +1174,32 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
     if(it.t==='w'){const w=s.weapons[it.i],K=w.T.kind,box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===it.i),job=box&&dgJob(s,box);
       const bears=w.alive&&t&&inArc(s,w.arc,t),armed=own&&s.fireSel&&s.fireSel.has('w'+it.i);
       let fill='#1a2230',stroke='#55606e',dash='',frac=0,lab=w.T.ab,col='#c9d3de';
-      if(!w.alive){fill='#2a0d0d';stroke=job?'#5ab0ff':'#ff4d4d';lab=job?'🔧':'✕';col=job?'#9fd0ff':'#ff6b6b';tip=`${w.T.name} (${w.arc}) — DESTROYED${own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''}`}
+      if(!w.alive){fill='#2a0d0d';stroke='#ff4d4d';lab=job?'🔧':'✕';col=job?'#9fd0ff':'#ff6b6b';tip=`${w.T.name} (${w.arc}) — DESTROYED${own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''}`}
       else if(!seeW){fill='#1a2230';stroke='#3a4452';lab='?';tip=`${w.T.name} (${w.arc}) — not scanned`}
       else{const N=K==='ap'?AP_IMP:K==='torp'?IMP:cycleImp(s,w);
-        if(K==='torp'){frac=w.stages/3;const hot=w.stages>=3;fill=hot?(own?'#173d22':'#3d2210'):w.stages?'#2e2410':'#1a2230';stroke=w.charging?'#ffc04d':hot?(own?'#4cff7a':'#ff7a3d'):w.stages?'#ffc04d':'#55606e';dash=w.charging?'3 2':'';
+        if(K==='torp'){frac=w.stages/3;const hot=w.stages>=3;fill=hot?'#173d22':w.stages?'#2e2410':'#1a2230';stroke=w.charging?'#ffc04d':hot?'#4cff7a':w.stages?'#ffc04d':'#55606e';dash=w.charging?'3 2':'';
           tip=`${w.T.name} (${w.arc}) — ${w.stages}/3 stages, ${torpDmg(w)} dmg${w.charging?` · charging (${w.paid||0}/${IMP}, next stage ${when(T+IMP-(w.paid||0))})`:w.holding?' · holding':''}${own&&sd?w.charging?' · click: Hold':' · click: '+(w.holding?'Resume':'Charge'):''}`}
-        else if(K==='missile'){const st=w.state;fill=st==='ready'?(own?'#173d22':'#3d2210'):'#1a2230';stroke=st==='ready'?(own?'#4cff7a':'#ff7a3d'):st==='cycling'?'#ffc04d':st==='reloading'?'#5ab0ff':'#55606e';lab='';
+        else if(K==='missile'){const st=w.state;fill=st==='ready'?'#173d22':'#1a2230';stroke=st==='ready'?'#4cff7a':st==='cycling'?'#ffc04d':st==='reloading'?'#ffc04d':'#55606e';lab='';
           tip=`Missile launcher — ${st}${own?' · '+w.ammo+'/4 missiles':''}${st==='cycling'&&w.readyT?' · ready '+when(w.readyT):''}${own&&sd&&st==='idle'?' · click: cycle (free)':''}`}
-        else{const ready=w.state==='ready';fill=ready?(own?'#173d22':'#3d2210'):'#1a2230';stroke=ready?(own?'#4cff7a':'#ff7a3d'):w.charging||w.state==='cycling'?'#ffc04d':w.state==='paused'?'#ffc04d':'#55606e';dash=w.state==='paused'?'2 2':'';
+        else{const ready=w.state==='ready';fill=ready?'#173d22':'#1a2230';stroke=ready?'#4cff7a':w.charging||w.state==='cycling'?'#ffc04d':w.state==='paused'?'#ffc04d':'#55606e';dash=w.state==='paused'?'2 2':'';
           frac=w.charging||w.state==='paused'?(w.paid||0)/N:w.state==='cycling'&&w.readyT?1-(w.readyT-T)/N:0;
           tip=`${w.T.name} (${w.arc}) — ${ready?'READY':w.charging?`charging ${w.paid||0}/${N} → ${when(T+N-(w.paid||0))}`:w.state==='paused'?`paused ${w.paid||0}/${N}`:w.state==='cycling'?`ready ${when(w.readyT)}`:'empty'}${K==='lance'&&t?` · ${lanceDmg(w.T,d)} dmg at ${d} hexes`:` · ${w.T.dmg} dmg`}${own&&t&&ready&&bears?` · hit ${sixths(hitP(s,'w'+it.i,t))}`:''}${own&&sd?w.charging?' · click: Pause':w.state==='paused'?' · click: Resume':w.state==='idle'?` · click: Load${drains(w)||K==='ap'?'':' ('+w.T.cost+')'}`:'':''}`}}
       if(own&&sd)act=`wclick:${it.i}`;
       if(it.r<8){body=`<rect x="${-it.r}" y="${-it.r}" width="${2*it.r}" height="${2*it.r}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>${!w.alive?`<text y="3" font-size="8" text-anchor="middle" fill="${col}">${lab}</text>`:''}`}
-      else{const wd=Math.max(24,lab.length*5.2+6),ht=13,arcL=w.arc==='ALL'?'360':w.arc;body=`<text y="-9" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${bears?'#cfe8ff':'#6f7d8c'}">${arcL}</text><rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?(own?'#4cff7a':'#ff7a3d'):'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
+      else{const wd=Math.max(24,lab.length*5.2+6),ht=13,arcL=w.arc==='ALL'?'360':w.arc;body=`<text y="-9" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${bears?'#cfe8ff':'#6f7d8c'}">${arcL}</text><rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?'#4cff7a':'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
       if(own&&t&&w.alive&&dgMode==='fire'&&canFireMount(s,'w'+it.i,t))body+=`<text y="${it.r<8?it.r+7:15}" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${armed?'#fff':'#ffd24d'}">${sixths(hitP(s,'w'+it.i,t))}</text>`;
       if(armed)ring=it.r<8?`<rect x="${-it.r-2.5}" y="${-it.r-2.5}" width="${2*it.r+5}" height="${2*it.r+5}" rx="2" fill="none" stroke="#fff" stroke-width="1.4"/>`:`<rect x="${-Math.max(24,lab.length*5.2+6)/2-2.5}" y="-9" width="${Math.max(24,lab.length*5.2+6)+5}" height="18" rx="4" fill="none" stroke="#fff" stroke-width="1.6"/>`}
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
-      const shots=p.alive&&seeW?p.shots:0;const fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots>=2?'#16384a':shots?'#132a36':'#1a2230',stroke=!p.alive?(job?'#5ab0ff':'#ff4d4d'):!seeW?'#3a4452':shots?'#7fd8ff':'#55606e';
-      body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?(job?'#9fd0ff':'#ff6b6b'):'#9fdcff'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;
+      const shots=p.alive&&seeW?p.shots:0;const fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots?'#173d22':p.pending.length?'#2e2410':'#1a2230',stroke=!p.alive?'#ff4d4d':!seeW?'#3a4452':shots?'#4cff7a':p.pending.length?'#ffc04d':'#55606e';
+      body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?'#ff6b6b':shots?'#c8ffd8':'#c9d3de'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;
       tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
       if(own&&s.fireSel&&s.fireSel.has('pd'+it.i))ring=`<circle r="${it.r+2.5}" fill="none" stroke="#fff" stroke-width="1.3"/>`;
       if(own&&sd)act=`pdclick:${it.i}`}
     else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
-      const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n>=mx?'#ff4d4d':n?'#ffc04d':'#4cff7a';
+      const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n?'#ff4d4d':'#4cff7a';
       const short={eng:'ENG',thrF:'FT',thrP:'PT',thrS:'ST',rea:'R',sen:'S'}[k];
       const val=k==='rea'?`${100-10*n}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
-      body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
+      body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs&&own?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
       tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${100-10*n}% (${n}/10 hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
       if(own&&sd&&n&&dgMode==='repair')act=`sysclick:${k}`}
     if(own&&sd)tip+=dgMode==='fire'?(it.t==='sys'?'':' · [Fire mode: click to arm/disarm if it can fire, otherwise load/pause/resume]'):' · [Repair mode: click a damaged system to send or recall a team]';
@@ -1572,7 +1573,7 @@ function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;con
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
   renderBuilder();openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';menuWant=true;setTimeout(()=>{if(AC)startMenuMusic()},2600);renderBuilder();openFactionPicker(0,true)});
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openFactionPicker(0,true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
@@ -1737,7 +1738,7 @@ function setMusicGain(){if(musicGain)musicGain.gain.setTargetAtTime(musicOn?musi
 /* Nov 21 (David): "Preparing For Battle" loops on the faction select / fleet screens; fades out when the battle music starts */
 let menuGain=null,menuBuf=null,menuSrc=null,menuLoading=false,menuWant=true;
 function startMenuMusic(){menuWant=true;if(!AC||menuSrc||menuLoading||musicSrc)return;
-  if(!menuGain){menuGain=AC.createGain();menuGain.connect(AC.destination)}{const g=menuGain.gain,n=AC.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(0,n);g.linearRampToValueAtTime(musicOn?musicVol:0,n+2.5)}
+  if(!menuGain){menuGain=AC.createGain();menuGain.connect(AC.destination)}{const g=menuGain.gain,n=AC.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(0,n);g.linearRampToValueAtTime(musicOn?musicVol:0,n+1)}
   const play=()=>{if(menuSrc||!menuWant||musicSrc)return;menuSrc=AC.createBufferSource();menuSrc.buffer=menuBuf;menuSrc.loop=true;menuSrc.connect(menuGain);menuSrc.start()};
   if(menuBuf)return play();
   menuLoading=true;try{const b=atob(document.getElementById('menuMusicData').textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
