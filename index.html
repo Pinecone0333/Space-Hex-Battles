@@ -79,6 +79,8 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .warnbox{display:block!important;background:#2a1a05;border:1px solid #ffb02e;border-radius:4px;color:#ffe2a8;padding:2px 6px;margin:3px 0}
 #side .btn.aion,#rside .btn.aion,.btn.aion{background:#143a22;border-color:#3fbf6a;color:#c8ffd6}
 .aiw .btn{white-space:nowrap;padding:2px 5px}
+.dgm{display:block;margin:3px auto 4px;background:#0a1017;border:1px solid #1d2935;border-radius:5px}.dgm g[data-act]:hover rect,.dgm g[data-act]:hover circle{filter:brightness(1.6)}
+.firestrip{display:flex;flex-wrap:wrap;gap:3px;align-items:center}.firestrip .wrow.msl{flex-basis:100%;margin:0}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -693,10 +695,11 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
       const r=Math.random()*(struct+valid.length);let box=null;if(r>=struct&&valid.length)box=valid[Math.floor(r-struct)];else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
       t.hull-=1;if(box){t.boxes.splice(t.boxes.indexOf(box),1);sysHit(t,box)}}
     if(t.hull<=0){t.hull=0;t.dead=true;burst(t.px,70,'#ffcf6b',true);sfxAt('boom');log(`${t.name} destroyed!`,t.isPlayer?'bad':'good')}}}
-function dcPanel(s,sd){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).length)return '';
+function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).length)return '';
   const teams=dcTeams(s),busy=s.dc.length+s.queue.filter(q=>q.type==='dc').length;
   let h=`<div class="row sm ${dcAvail(s)?'pulse':''}" style="flex-wrap:wrap;gap:3px 5px"><span class="dim" title="Damage control: each team repairs one damaged system; a repair takes one full turn. Cruisers have 2 teams, small ships 1.">DC <b class="txt">${teams-busy}/${teams}</b> free</span>`;
   for(const j of s.dc)h+=`<span class="chip">🔧${boxShort(s,j.box)} ${when(j.done)}${sd?`<button class="btn x" data-act="dccancel:${j.box.id}" title="recall the team (progress lost)">✕</button>`:''}</span>`;
+  if(compact)return h+`<span class="dim">· click a damaged system on the diagram</span></div>`;
   const seen={};for(const x of dmg){if(s.dc.some(j=>j.box===x))continue;const nm=boxShort(s,x);(seen[nm]=seen[nm]||[]).push(x)}
   for(const nm in seen){const x=seen[nm][0],q=s.queue.some(a=>a.type==='dc'&&seen[nm].some(b=>b.id===a.id));const lab=`${nm}${seen[nm].length>1?' ×'+seen[nm].length:''}`;
     h+=sd?`<button class="btn dcb ${q?'armed':''}" data-act="dc:${x.id}" ${q||canQueue(s,{type:'dc',id:x.id,cost:0})?'':'disabled'} title="${q?'team assigned':'assign a team to repair this'}">${q?'🔧':'✖'} ${lab}</button>`:`<span class="chip bad">✖ ${lab}</span>`}
@@ -1041,19 +1044,104 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
      <div class="row"><span class="lab s">Shld</span>${bar(t.shield,t.d.shield,'sh')}<span class="v2">${t.shield.toFixed(0)}/${t.d.shield}${reinfAmt(t)?`<span style="color:#a5d8ff">+${reinfAmt(t).toFixed(0)}</span>`:''}</span></div></div>
      <div class="row dim sm">generator ${genLvl(t)?Math.round(genLvl(t)*100)+'%':'<span class="bad">OFF</span>'}</div>`;
   else h+=`<div class="row bad sm">Sensors destroyed — shields and hull unknown</div>`;
-  if(wOK){const ws=t.weapons.filter(w=>w.alive);const grp=k=>ws.filter(w=>w.T.kind===k);const parts=[];
-    for(const w of grp('torp'))parts.push(`<span class="${w.stages>=3?'bad':w.stages?'warn':'dim'}" title="${w.T.name}: ${torpDmg(w)} damage stored${w.charging?', charging':''}">${w.T.ab} ${'▮'.repeat(w.stages)}${'▯'.repeat(3-w.stages)}${w.charging?'▷':''}</span>`);
-    const tally=(k,lab)=>{const g=grp(k);if(!g.length)return;const r=g.filter(w=>w.state==='ready').length;parts.push(`<span class="${r?'warn':'dim'}">${lab} ${r}/${g.length} hot</span>`)};
-    tally('beam','lasers');tally('slug','coilguns');tally('lance','lances');tally('ap','antiproton lances');
-    const m=grp('missile');if(m.length){const r=m.filter(w=>w.state==='ready').length;parts.push(`<span class="${r?'warn':'dim'}">launchers ${r}/${m.length} ready</span>`)}
-    const pd=t.pd.filter(p=>p.alive);if(pd.length)parts.push(`<span class="dim">PD ${pd.reduce((a,p)=>a+p.shots,0)} shots</span>`);
-    h+=`<div class="row sm" style="flex-wrap:wrap;gap:3px 9px">${parts.join('')}</div>`;
-    const pip=n=>'●'.repeat(n||0)+'○'.repeat(3-(n||0));const dead={};for(const x of (t.damaged||[]))if(x.k==='w'||x.k==='pd'){const nm=boxShort(t,x);dead[nm]=(dead[nm]||0)+1}
-    const dl=Object.entries(dead).map(([n,c])=>n+(c>1?' ×'+c:'')).join(', ');
-    h+=`<div class="row dim sm">Damage: eng <b class="${t.dmgEng?'bad':''}">${pip(t.dmgEng)}</b> F <b class="${t.dmgThrF?'bad':''}">${pip(t.dmgThrF)}</b> P <b class="${t.dmgThrP?'bad':''}">${pip(t.dmgThrP)}</b> S <b class="${t.dmgThrS?'bad':''}">${pip(t.dmgThrS)}</b> · rea <b class="${t.dmgRea?'bad':''}">${100-10*(t.dmgRea||0)}%</b> · sens <b class="${t.dmgSen?'bad':''}">${sensRange(t)}</b>${dl?` · <span class="bad">✖ ${dl}</span>`:''}${(t.dc||[]).length?` · 🔧 ${t.dc.length} repair${t.dc.length>1?'s':''} under way`:''}</div>`}
-  else h+=`<div class="row dim sm">Weapons and system damage: ${best?`not scanned — need ≤ ${best} hexes`:'no sensors'}</div>`;
+  h+=shipDiagram(t,'enemy',s);
+  if(!wOK)h+=`<div class="row dim sm">Weapons and system damage: ${best?`not scanned — need ≤ ${best} hexes`:'no sensors'}</div>`;
   h+=fireHist(t);
   return h+`</div>`}
+// ---- Ship diagrams (Nov 21, David): your ship and the enemy as clickable top-down sprites, mounts placed by firing arc ----
+const DG={W:260,H:200};
+function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
+  const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
+  const L=x1-x0||1,Wd=y1-y0||1,xc=(x0+x1)/2,yc=(y0+y1)/2,sc=Math.min((DG.W-30)/Wd,(DG.H-24)/L);
+  const tp=(x,y)=>({x:DG.W/2+(y-yc)*sc,y:DG.H/2-(x-xc)*sc});   // nose up, starboard to the right
+  const spread=(n,a,b)=>n<=1?[(a+b)/2]:Array.from({length:n},(_,k)=>a+(b-a)*k/(n-1));
+  const items=[];const add=(it,x,y)=>{const p=tp(x,y);items.push({...it,x:p.x,y:p.y})};
+  const byArc={};d.weapons.forEach(([k,arc],i)=>{const kind=WT[k].kind;const g=kind==='missile'?'MS':arc;(byArc[g]=byArc[g]||[]).push(i)});
+  for(const [g,idx] of Object.entries(byArc)){const n=idx.length;
+    if(g==='MS'){const per=Math.min(4,n),rows=Math.ceil(n/per);idx.forEach((i,k)=>{const r=Math.floor(k/per),c=k%per,cn=Math.min(per,n-r*per);add({t:'w',i,r:5},x0+L*(.34-r*.09),yc+(c-(cn-1)/2)*Wd*.13)});continue}
+    const yy=g==='S'?spread(n,yc-Math.min(Wd*.22,n*4),yc+Math.min(Wd*.22,n*4)):g==='FX'||g==='F'?spread(n,yc-Wd*.32,yc+Wd*.32):null;
+    idx.forEach((i,k)=>{let x,y;
+      if(g==='S'){x=x1-L*.13;y=yy[k]}
+      else if(g==='FX'||g==='F'){x=x1-L*.33;y=yy[k]}
+      else if(g==='RX'){x=x1-L*(.3+.12*k);y=yc+Wd*.3}else if(g==='LX'){x=x1-L*(.3+.12*k);y=yc-Wd*.3}
+      else if(g==='LS'||g==='RS'){x=spread(n,x0+L*.25,x1-L*.42)[k];y=g==='LS'?y0+Wd*.2:y1-Wd*.2}
+      else{x=spread(n,x0+L*.5,x1-L*.5+L*.12)[k];y=yc+(k%2?1:-1)*Wd*.08}   // 360° mounts on the centerline
+      add({t:'w',i,r:11},x,y)})}
+  const pdg={};d.pd.forEach((arc,i)=>(pdg[arc]=pdg[arc]||[]).push(i));
+  for(const [arc,idx] of Object.entries(pdg))idx.forEach((i,k)=>{const side=k%2?1:-1,step=Math.floor(k/2);let x,y;
+    if(arc==='FX'||arc==='F'){x=x1-L*(.2+.08*step);y=yc+side*Wd*.36}else if(arc==='LS'||arc==='RS'){x=x0+L*.55;y=arc==='LS'?y0+Wd*.12:y1-Wd*.12}
+    else{x=x0+L*(.6-.1*step);y=yc+side*Wd*.24}add({t:'pd',i,r:6},x,y)});
+  add({t:'sys',k:'eng',r:10},x0+L*.05,yc);add({t:'sys',k:'thrF',r:8},x1-L*.01,yc+Wd*.42);add({t:'sys',k:'thrP',r:8},x0+L*.16,y0+Wd*.08);add({t:'sys',k:'thrS',r:8},x0+L*.16,y1-Wd*.08);
+  add({t:'sys',k:'rea',r:11},x0+L*.47,yc);add({t:'sys',k:'sen',r:9},x1-L*.52,yc+Wd*.42);
+  for(let it=0;it<60;it++)for(let a=0;a<items.length;a++)for(let b=a+1;b<items.length;b++){const A=items[a],B=items[b],dx=B.x-A.x,dy=B.y-A.y,dd=Math.hypot(dx,dy)||.01,m=A.r+B.r+1.5;
+    if(dd<m){const push=(m-dd)/2,ux=dx/dd,uy=dy/dd;A.x-=ux*push;A.y-=uy*push;B.x+=ux*push;B.y+=uy*push}}
+  for(const it of items){it.x=clamp(it.x,it.r+2,DG.W-it.r-2);it.y=clamp(it.y,it.r+2,DG.H-it.r-2)}
+  const hull=[];let cur=[];for(const p of d.shape||[]){if(!p){if(cur.length)hull.push(cur);cur=[];continue}cur.push(tp(p[0],p[1]))}if(cur.length)hull.push(cur);
+  const inner=d.inner?[d.inner.map(p=>tp(p[0],p[1]))]:[];
+  return d._dg={items,hull,inner}}
+const dgJob=(s,b)=>(s.dc||[]).some(j=>j.box===b)||s.queue.some(q=>q.type==='dc'&&q.id===b.id);
+const SYSN={eng:'Main engine',thrF:'Fore thrusters',thrP:'Port thrusters',thrS:'Starboard thrusters',rea:'Reactor',sen:'Sensors'};
+const SYSMAX={eng:3,thrF:3,thrP:3,thrS:3,rea:10,sen:5};
+const sysDmg=(s,k)=>({eng:s.dmgEng,thrF:s.dmgThrF,thrP:s.dmgThrP,thrS:s.dmgThrS,rea:s.dmgRea,sen:s.dmgSen}[k]||0);
+// mode: 'own' (clickable) or 'enemy' (read-only; weapon states only when scanned)
+function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phase==='decide'&&!s.ai,seeW=own||scanWeapons(s),seeS=own||scanStatus(s);
+  const poly=pts=>pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  let g=L.hull.map(h=>`<polygon points="${poly(h)}" fill="${s.color}14" stroke="${s.color}aa" stroke-width="1.2"/>`).join('')+L.inner.map(h=>`<polygon points="${poly(h)}" fill="${s.color}10" stroke="${s.color}55"/>`).join('');
+  const d=t?hexDist(s,t):0;
+  for(const it of L.items){let body='',tip='',act='',ring='';
+    if(it.t==='w'){const w=s.weapons[it.i],K=w.T.kind,box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===it.i),job=box&&dgJob(s,box);
+      const bears=w.alive&&t&&inArc(s,w.arc,t),armed=own&&s.fireSel&&s.fireSel.has('w'+it.i);
+      let fill='#1a2230',stroke='#55606e',dash='',frac=0,lab=w.T.ab,col='#c9d3de';
+      if(!w.alive){fill='#2a0d0d';stroke=job?'#5ab0ff':'#ff4d4d';lab=job?'🔧':'✕';col=job?'#9fd0ff':'#ff6b6b';tip=`${w.T.name} (${w.arc}) — DESTROYED${own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''}`}
+      else if(!seeW){fill='#1a2230';stroke='#3a4452';lab='?';tip=`${w.T.name} (${w.arc}) — not scanned`}
+      else{const N=K==='ap'?AP_IMP:K==='torp'?IMP:cycleImp(s,w);
+        if(K==='torp'){frac=w.stages/3;const hot=w.stages>=3;fill=hot?(own?'#173d22':'#3d2210'):w.stages?'#2e2410':'#1a2230';stroke=w.charging?'#ffc04d':hot?(own?'#4cff7a':'#ff7a3d'):w.stages?'#ffc04d':'#55606e';dash=w.charging?'3 2':'';
+          tip=`${w.T.name} (${w.arc}) — ${w.stages}/3 stages, ${torpDmg(w)} dmg${w.charging?` · charging (${w.paid||0}/${IMP}, next stage ${when(T+IMP-(w.paid||0))})`:w.holding?' · holding':''}${own&&sd?w.charging?' · click: Hold':' · click: '+(w.holding?'Resume':'Charge'):''}`}
+        else if(K==='missile'){const st=w.state;fill=st==='ready'?(own?'#173d22':'#3d2210'):'#1a2230';stroke=st==='ready'?(own?'#4cff7a':'#ff7a3d'):st==='cycling'?'#ffc04d':st==='reloading'?'#5ab0ff':'#55606e';lab='';
+          tip=`Missile launcher — ${st}${own?' · '+w.ammo+'/4 missiles':''}${st==='cycling'&&w.readyT?' · ready '+when(w.readyT):''}${own&&sd&&st==='idle'?' · click: cycle (free)':''}`}
+        else{const ready=w.state==='ready';fill=ready?(own?'#173d22':'#3d2210'):'#1a2230';stroke=ready?(own?'#4cff7a':'#ff7a3d'):w.charging||w.state==='cycling'?'#ffc04d':w.state==='paused'?'#ffc04d':'#55606e';dash=w.state==='paused'?'2 2':'';
+          frac=w.charging||w.state==='paused'?(w.paid||0)/N:w.state==='cycling'&&w.readyT?1-(w.readyT-T)/N:0;
+          tip=`${w.T.name} (${w.arc}) — ${ready?'READY':w.charging?`charging ${w.paid||0}/${N} → ${when(T+N-(w.paid||0))}`:w.state==='paused'?`paused ${w.paid||0}/${N}`:w.state==='cycling'?`ready ${when(w.readyT)}`:'empty'}${K==='lance'&&t?` · ${lanceDmg(w.T,d)} dmg at ${d} hexes`:` · ${w.T.dmg} dmg`}${own&&t&&ready&&bears?` · hit ${sixths(hitP(s,'w'+it.i,t))}`:''}${own&&sd?w.charging?' · click: Pause':w.state==='paused'?' · click: Resume':w.state==='idle'?` · click: Load${drains(w)||K==='ap'?'':' ('+w.T.cost+')'}`:'':''}`}}
+      if(own&&sd)act=`wclick:${it.i}`;
+      if(it.r<8){body=`<rect x="${-it.r}" y="${-it.r}" width="${2*it.r}" height="${2*it.r}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>${!w.alive?`<text y="3" font-size="8" text-anchor="middle" fill="${col}">${lab}</text>`:''}`}
+      else{const wd=22,ht=14;body=`<rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?(own?'#4cff7a':'#ff7a3d'):'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
+      if(armed)ring=`<circle r="${it.r+3}" fill="none" stroke="#fff" stroke-width="1.2"/>`}
+    else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
+      const shots=p.alive&&seeW?p.shots:0;const fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots>=2?'#16384a':shots?'#132a36':'#1a2230',stroke=!p.alive?(job?'#5ab0ff':'#ff4d4d'):!seeW?'#3a4452':shots?'#7fd8ff':'#55606e';
+      body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?(job?'#9fd0ff':'#ff6b6b'):'#9fdcff'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;
+      tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
+      if(own&&sd)act=`pdclick:${it.i}`}
+    else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
+      const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n>=mx?'#ff4d4d':n?'#ffc04d':'#4cff7a';
+      const short={eng:'ENG',thrF:'FT',thrP:'PT',thrS:'ST',rea:'R',sen:'S'}[k];
+      const val=k==='rea'?`${100-10*n}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
+      body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
+      tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${100-10*n}% (${n}/10 hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
+      if(own&&sd&&n)act=`sysclick:${k}`}
+    g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${ring}${body}</g>`}
+  const note=!own&&!seeW?`<text x="${DG.W/2}" y="${DG.H-4}" font-size="9" text-anchor="middle" fill="#7a8796">weapons not scanned</text>`:'';
+  return `<svg class="dgm" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}${note}</svg>`}
+// smart clicks on your own diagram (no firing — that stays on the Fire buttons)
+function dcToggle(s,box){const job=(s.dc||[]).find(j=>j.box===box);if(job)return queue(s,{type:'dccancel',id:box.id,cost:0});
+  const qi=s.queue.findIndex(q=>q.type==='dc'&&q.id===box.id);if(qi>=0){s.queue.splice(qi,1);return true}
+  if(dcFree(s)<=0){log(`${s.name}: no free damage-control team`,'dim');return false}return queue(s,{type:'dc',id:box.id,cost:0})}
+function smartW(s,i){const w=s.weapons[i],box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===i);if(!w.alive){if(box)dcToggle(s,box);return}
+  const K=w.T.kind;const q=s.queue.findIndex(x=>(x.type==='start'||x.type==='hold'||x.type==='pausew')&&x.i===i);if(q>=0){s.queue.splice(q,1);return}   // click again to undo
+  if(K==='torp'){if(w.charging)queue(s,{type:'hold',i,cost:0});else queue(s,{type:'start',i,cost:0});return}
+  if(w.charging&&(K==='ap'||drains(w))){queue(s,{type:'pausew',i,cost:0});return}
+  if(!queue(s,{type:'start',i,cost:K==='ap'||drains(w)?0:w.T.cost})&&w.state==='idle')log(`${s.name}: not enough energy to load ${w.T.ab}`,'dim')}
+function smartPD(s,i){const p=s.pd[i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===i);if(!p.alive){if(box)dcToggle(s,box);return}
+  if(!queue(s,{type:'pd',i,cost:1}))log(`${s.name}: PD mount is full (2 shots) or not enough energy`,'dim')}
+function smartSys(s,k){const boxes=(s.damaged||[]).filter(b=>b.k===k);const free=boxes.find(b=>!dgJob(s,b));
+  if(free&&dcFree(s)>0){queue(s,{type:'dc',id:free.id,cost:0});return}const busy=boxes.find(b=>dgJob(s,b));if(busy){dcToggle(s,busy);return}
+  if(free)log(`${s.name}: no free damage-control team`,'dim')}
+// fire strip: one button per weapon that can fire now, plus missile launch controls
+function fireStrip(s,t,sd){if(!t||!sd)return '';const d=hexDist(s,t);let h='';
+  s.weapons.forEach((w,i)=>{if(!w.alive||w.T.kind==='missile')return;const key='w'+i;if(!canFireMount(s,key,t))return;
+    h+=fireBtn(s,key,`${w.T.ab} ${w.arc} ${sixths(hitP(s,key,t))}${w.T.kind==='lance'?' · '+lanceDmg(w.T,d):w.T.kind==='torp'?' · '+torpDmg(w):''}`,'')});
+  const ms=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.kind==='missile');if(ms.length)h+=missileRow(s,ms,t,sd,'#c7a6ff').replace('class="wrow"','class="wrow msl"');
+  s.pd.forEach((p,i)=>{const key='pd'+i;if(p.alive&&canFireMount(s,key,t))h+=fireBtn(s,key,`PD ${p.arc==='ALL'?'360':p.arc} ${sixths(hitP(s,key,t))}`,'offensive fire, 1 dmg per hit')});
+  return h?`<div class="firestrip">${h}</div>`:`<div class="row dim sm">Nothing can fire at ${t.name} right now</div>`}
 function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',rh='';
   const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
@@ -1081,30 +1169,11 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row dim sm">${s.gen.from>T?`online ${when(s.gen.from)} · `:''}${g?`cap ${Math.round(shieldCap(s))} · `:''}regen <b class="txt">+${regenRate(s).toFixed(1)}</b>/turn <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>
      ${sd?`<div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`:''}`}
-     ${dmgLine(s)}${dcPanel(s,sd)}
+     ${dcPanel(s,sd,true)}
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
-    const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff',lances:s.d.torp,aplances:'#f2e8ff'};
-    for(const G of GROUPS){const ws=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.grp===G.id);if(!ws.length)continue;
-      if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
-      for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
-        if(!w.alive)st='<span class="bad">destroyed</span>';
-        else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
-          if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.holding?'Resume':'Charge',true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
-        else if(K==='ap'){st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+AP_IMP-(w.paid||0))}">${w.paid||0}/${AP_IMP}→${when(T+AP_IMP-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${AP_IMP}</span>`:'<span class="dim">empty</span>';
-          if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this charge; progress is kept');
-          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Charge',true,`${w.T.cost} energy over 2 turns (${+(w.T.cost/AP_IMP).toFixed(3)} per impulse); ${w.T.dmg} damage at any range; holds free`)}
-        else if(drains(w)){const N=cycleImp(s,w);st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+N-(w.paid||0))}">${w.paid||0}/${N}→${when(T+N-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${N}</span>`:'<span class="dim">empty</span>';
-          if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this reload; progress is kept');
-          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Load',true,`${w.T.cost} energy drained over ${N} impulses (${+(w.T.cost/N).toFixed(3)} per impulse); pauses if short`)}
-        else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
-          if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
-        if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):''),K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'')}
-        const bears=w.alive&&t&&inArc(s,w.arc,t);
-        h+=`<div class="wrow"><span class="arc ${bears?'bears':''}">${w.arc}</span><span class="wn" style="color:${GC[G.id]}">${w.T.ab}</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`}}
-    s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1}))ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit')}
-      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''}">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'CG':'PD'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
+    h+=shipDiagram(s,'own',t)+fireStrip(s,t,sd);
     h+=`</div>`}
   else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
   {const av=own.filter(dcAvail);const key=av.map(x=>x.name+dcFree(x)+':'+dcOpen(x)).join('|');const el=$('dcAlert');
@@ -1156,6 +1225,9 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='pausew')queue(s,{type:'pausew',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
   else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?(s.d.big?'Cruisers: after a turn, the next burn must be straight':'A turn can\'t follow a turn'):(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
+  else if(k==='wclick')smartW(s,+v);
+  else if(k==='pdclick')smartPD(s,+v);
+  else if(k==='sysclick')smartSys(s,v);
   else if(k==='dc'){queue(s,{type:'dc',id:+v,cost:0})}
   else if(k==='dccancel'){queue(s,{type:'dccancel',id:+v,cost:0})}
   else if(k==='pivot'){if(!isFinite(pivotCost(s,+v)))log('Those thrusters are destroyed','bad');else if(queue(s,{type:'pivot',dir:+v,cost:pivotCost(s,+v)}))turnWarn(s,+v,pivotCost(s,+v));else if(Math.abs(rotQ(s)+(+v))>maxPiv(s))log(`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`,'dim')}
