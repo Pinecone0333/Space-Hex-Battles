@@ -155,27 +155,27 @@ const TCR={laser:10,coil:6,torp:10,laser2:8,coil2:6,torp2:8,laser1:6,coil1:6,tor
 const accAt=(k,r)=>ACC[k][Math.min(Math.round(r),60)];
 const ARCS={RX:[30,90],LX:[-30,90],S:[0,15],F:[0,30],FX:[0,120],LS:[-90,90],RS:[90,90],FH:[0,90],RH:[180,90],ALL:[0,180]};
 const WT={
-  SL:{name:'Small Laser',ab:'SL',grp:'lasers',kind:'beam',acc:'laser',dmg:4,cost:2},
-  ML:{name:'Medium Laser',ab:'ML',grp:'lasers',kind:'beam',acc:'laser',dmg:6,cost:3},
-  HL:{name:'Heavy Laser',ab:'HL',grp:'lasers',kind:'beam',acc:'laser',dmg:8,cost:4},
-  SC:{name:'Small Coilgun',ab:'SC',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
-  MC:{name:'Medium Coilgun',ab:'MC',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
-  HC:{name:'Heavy Coilgun',ab:'HC',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
-  XC:{name:'Superheavy Coilgun',ab:'XC',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},
-  TC:{name:'Titan Coilgun',ab:'TC',grp:'coils',kind:'slug',acc:'coil',dmg:22,cost:11},   // one more step: 22 dmg / 11 energy   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
+  SL:{name:'Small Laser',ab:'LC(s)',grp:'lasers',kind:'beam',acc:'laser',dmg:4,cost:2},
+  ML:{name:'Medium Laser',ab:'LC(m)',grp:'lasers',kind:'beam',acc:'laser',dmg:6,cost:3},
+  HL:{name:'Heavy Laser',ab:'LC(h)',grp:'lasers',kind:'beam',acc:'laser',dmg:8,cost:4},
+  SC:{name:'Small Coilgun',ab:'CG(s)',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
+  MC:{name:'Medium Coilgun',ab:'CG(m)',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
+  HC:{name:'Heavy Coilgun',ab:'CG(h)',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
+  XC:{name:'Superheavy Coilgun',ab:'CG(sh)',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},
+  TC:{name:'Titan Coilgun',ab:'CG(t)',grp:'coils',kind:'slug',acc:'coil',dmg:22,cost:11},   // one more step: 22 dmg / 11 energy   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
   MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:14,cost:0,mag:4},
-  ST:{name:'Small Energy Torpedo',ab:'ST',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
-  MT:{name:'Medium Energy Torpedo',ab:'MT',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
-  HT:{name:'Heavy Energy Torpedo',ab:'HT',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
+  ST:{name:'Small Energy Torpedo',ab:'ET(s)',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
+  MT:{name:'Medium Energy Torpedo',ab:'ET(m)',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
+  HT:{name:'Heavy Energy Torpedo',ab:'ET(h)',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
   // Plasma Lance (Nov 17, David): loads like lasers (ready one turn after paying), holds free, torpedo accuracy; damage falls off with range (index = hexes, 13+ uses the last entry)
-  SPL:{name:'Small Plasma Lance',ab:'SPL',grp:'lances',kind:'lance',acc:'torp',cost:9,dmgR:[36,36,31,31,24,24,17,17,12,12,7,7,7,3]},
-  MPL:{name:'Medium Plasma Lance',ab:'MPL',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[48,48,40,40,32,32,24,24,16,16,8,8,8,3]},
-  HPL:{name:'Heavy Plasma Lance',ab:'HPL',grp:'lances',kind:'lance',acc:'torp',cost:15,dmgR:[60,60,51,51,40,40,29,29,20,20,11,11,11,4]}
+  SPL:{name:'Small Plasma Lance',ab:'PL(s)',grp:'lances',kind:'lance',acc:'torp',cost:9,dmgR:[36,36,31,31,24,24,17,17,12,12,7,7,7,3]},
+  MPL:{name:'Medium Plasma Lance',ab:'PL(m)',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[48,48,40,40,32,32,24,24,16,16,8,8,8,3]},
+  HPL:{name:'Heavy Plasma Lance',ab:'PL(h)',grp:'lances',kind:'lance',acc:'torp',cost:15,dmgR:[60,60,51,51,40,40,29,29,20,20,11,11,11,4]}
 };
 // Antiproton Lance (Nov 18, David): 2× a full torpedo's damage, flat at every range; costs 2× a full torpedo, drained over 2 turns (1/16 per impulse); holds free; torpedo accuracy
-WT.SAP={name:'Small Antiproton Lance',ab:'SAP',grp:'aplances',kind:'ap',acc:'torp',cost:18,dmg:36};
-WT.MAP={name:'Medium Antiproton Lance',ab:'MAP',grp:'aplances',kind:'ap',acc:'torp',cost:24,dmg:48};
-WT.HAP={name:'Heavy Antiproton Lance',ab:'HAP',grp:'aplances',kind:'ap',acc:'torp',cost:30,dmg:60};
+WT.SAP={name:'Small Antiproton Lance',ab:'APL(s)',grp:'aplances',kind:'ap',acc:'torp',cost:18,dmg:36};
+WT.MAP={name:'Medium Antiproton Lance',ab:'APL(m)',grp:'aplances',kind:'ap',acc:'torp',cost:24,dmg:48};
+WT.HAP={name:'Heavy Antiproton Lance',ab:'APL(h)',grp:'aplances',kind:'ap',acc:'torp',cost:30,dmg:60};
 const AP_IMP=2*IMP;
 const torpHot=(s,e)=>(s.torpMem||{})[e.name]!==false||!AIV.tmem||T-((s.torpSeen||{})[e.name]??-99)>=IMP;   // a turn after seeing torpedoes fire, assume they've recharged enough to matter
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
@@ -183,8 +183,8 @@ const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]
 for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
 // TL1 weapons (Nov 19, David): the TL2 rule (2/3 damage for the same energy) with the TL1 targeting computer; the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.SC.dmg*2/3),tl1:true};
-WT.RG={name:'Small Railgun Turret',ab:'SRG',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
-WT.MRG={name:'Medium Railgun Turret',ab:'MRG',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
+WT.RG={name:'Small Railgun Turret',ab:'RG(s)',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
+WT.MRG={name:'Medium Railgun Turret',ab:'RG(m)',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
 WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',dmg:Math.round(WT.SL.dmg*2/3),tl1:true};
 WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.MC.dmg*2/3),tl1:true};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
@@ -1049,7 +1049,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
   h+=fireHist(t);
   return h+`</div>`}
 // ---- Ship diagrams (Nov 21, David): your ship and the enemy as clickable top-down sprites, mounts placed by firing arc ----
-const DG={W:260,H:200};
+const DG={W:300,H:232};
 function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
   const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
   const L=x1-x0||1,Wd=y1-y0||1,xc=(x0+x1)/2,yc=(y0+y1)/2,sc=Math.min((DG.W-30)/Wd,(DG.H-24)/L);
@@ -1059,14 +1059,14 @@ function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
   const byArc={};d.weapons.forEach(([k,arc],i)=>{const kind=WT[k].kind;const g=kind==='missile'?'MS':arc;(byArc[g]=byArc[g]||[]).push(i)});
   for(const [g,idx] of Object.entries(byArc)){const n=idx.length;
     if(g==='MS'){const per=Math.min(4,n),rows=Math.ceil(n/per);idx.forEach((i,k)=>{const r=Math.floor(k/per),c=k%per,cn=Math.min(per,n-r*per);add({t:'w',i,r:5},x0+L*(.34-r*.09),yc+(c-(cn-1)/2)*Wd*.13)});continue}
-    const yy=g==='S'?spread(n,yc-Math.min(Wd*.22,n*4),yc+Math.min(Wd*.22,n*4)):g==='FX'||g==='F'?spread(n,yc-Wd*.32,yc+Wd*.32):null;
+    const yy=g==='S'?spread(n,yc-Math.min(Wd*.3,n*6),yc+Math.min(Wd*.3,n*6)):g==='FX'||g==='F'?spread(n,yc-Wd*.36,yc+Wd*.36):null;
     idx.forEach((i,k)=>{let x,y;
-      if(g==='S'){x=x1-L*.13;y=yy[k]}
-      else if(g==='FX'||g==='F'){x=x1-L*.33;y=yy[k]}
+      if(g==='S'){x=x1-L*.08;y=yy[k]}
+      else if(g==='FX'||g==='F'){x=x1-L*.24;y=yy[k]}   // FX mounts sit well forward (their arc covers the whole front)
       else if(g==='RX'){x=x1-L*(.3+.12*k);y=yc+Wd*.3}else if(g==='LX'){x=x1-L*(.3+.12*k);y=yc-Wd*.3}
       else if(g==='LS'||g==='RS'){x=spread(n,x0+L*.25,x1-L*.42)[k];y=g==='LS'?y0+Wd*.2:y1-Wd*.2}
       else{x=spread(n,x0+L*.5,x1-L*.5+L*.12)[k];y=yc+(k%2?1:-1)*Wd*.08}   // 360° mounts on the centerline
-      add({t:'w',i,r:11},x,y)})}
+      add({t:'w',i,r:16},x,y)})}
   const pdg={};d.pd.forEach((arc,i)=>(pdg[arc]=pdg[arc]||[]).push(i));
   for(const [arc,idx] of Object.entries(pdg))idx.forEach((i,k)=>{const side=k%2?1:-1,step=Math.floor(k/2);let x,y;
     if(arc==='FX'||arc==='F'){x=x1-L*(.2+.08*step);y=yc+side*Wd*.36}else if(arc==='LS'||arc==='RS'){x=x0+L*.55;y=arc==='LS'?y0+Wd*.12:y1-Wd*.12}
@@ -1104,7 +1104,7 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
           tip=`${w.T.name} (${w.arc}) — ${ready?'READY':w.charging?`charging ${w.paid||0}/${N} → ${when(T+N-(w.paid||0))}`:w.state==='paused'?`paused ${w.paid||0}/${N}`:w.state==='cycling'?`ready ${when(w.readyT)}`:'empty'}${K==='lance'&&t?` · ${lanceDmg(w.T,d)} dmg at ${d} hexes`:` · ${w.T.dmg} dmg`}${own&&t&&ready&&bears?` · hit ${sixths(hitP(s,'w'+it.i,t))}`:''}${own&&sd?w.charging?' · click: Pause':w.state==='paused'?' · click: Resume':w.state==='idle'?` · click: Load${drains(w)||K==='ap'?'':' ('+w.T.cost+')'}`:'':''}`}}
       if(own&&sd)act=`wclick:${it.i}`;
       if(it.r<8){body=`<rect x="${-it.r}" y="${-it.r}" width="${2*it.r}" height="${2*it.r}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>${!w.alive?`<text y="3" font-size="8" text-anchor="middle" fill="${col}">${lab}</text>`:''}`}
-      else{const wd=22,ht=14;body=`<rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?(own?'#4cff7a':'#ff7a3d'):'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
+      else{const wd=Math.max(24,lab.length*5.2+6),ht=13,arcL=w.arc==='ALL'?'360':w.arc;body=`<text y="-9" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${bears?'#cfe8ff':'#6f7d8c'}">${arcL}</text><rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?(own?'#4cff7a':'#ff7a3d'):'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
       if(armed)ring=`<circle r="${it.r+3}" fill="none" stroke="#fff" stroke-width="1.2"/>`}
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
       const shots=p.alive&&seeW?p.shots:0;const fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots>=2?'#16384a':shots?'#132a36':'#1a2230',stroke=!p.alive?(job?'#5ab0ff':'#ff4d4d'):!seeW?'#3a4452':shots?'#7fd8ff':'#55606e';
