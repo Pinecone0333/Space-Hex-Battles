@@ -96,6 +96,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .faccard:hover{background:#13212f;border-color:var(--fc)}.faccard.on{box-shadow:0 0 0 2px var(--fc) inset}
 .fc-s{flex:none;background:#070c12;border-radius:6px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
 .facpick.first{background:#05080cf2}.facpick.first .fp-in{border-color:#3a5674}
+.slotc{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;background:#08121b;cursor:default}.slotc[data-slotsel]{cursor:pointer}.slotc.sel{background:#102236;border-color:#3b6a8f}.slotc select{background:#0b1520;color:var(--txt);border:1px solid #2a4258;font-family:inherit;font-size:11px}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -106,7 +107,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 <div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music <input id="musicvolB" type="range" min="0" max="100" step="1" value="40" autocomplete="off" title="Music volume" style="width:80px;vertical-align:middle;accent-color:#5ad18c;cursor:pointer"> · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1>SPACE HEX TACTICS</h1>
- <div class="dim">Assemble both fleets. You command every ship on your side unless you hand it to the AI.</div>
+ <div class="dim">Build up to 8 fleets and put them on teams (same team = allies). You command your own fleet; AI fleets fight on their own.</div>
  <div id="mp" style="margin:10px 0;padding:8px 10px;border:1px solid #2a4258;border-radius:6px;background:#08121b"></div>
  <div id="builder" class="cards"></div>
  <div id="forms" class="row" style="justify-content:center;gap:14px;margin-bottom:8px"></div>
@@ -140,8 +141,13 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const IMP=8;
 // online two-player state (see mp.js). Host simulates; guest renders snapshots and sends orders.
-const MP={on:false,role:null,conn:null,peer:null,hostReady:false,guestReady:false,opp:{fleet:[],form:'line',faction:'Dogahr'}};
-const isAI=s=>s.ai||(s.team===1&&!MP.on);
+const MP={on:false,role:null,conn:null,conns:[],peer:null,ready:{},hostReady:false,guestReady:false,opp:{fleet:[],form:'line',faction:'Dogahr'}};
+/* Nov 21 (David): up to 8 fleets on up to 8 teams, up to 8 human players. ME = this browser's player id (host 0), MYTEAM = my fleet's team.
+   s.owner = player id of a human-commanded fleet, null for an AI fleet. "Friendly" = same team as me; "mine" = owned by me. */
+let ME=0,MYTEAM=0;const own=s=>s.owner===ME,fr=s=>s.team===MYTEAM;
+const TLET='ABCDEFGH',TCOL8=['#4fd8ff','#ff8a3d','#7dff8a','#ff5ad6','#ffe14d','#b48cff','#ff6b6b','#5affea'];
+const MAXSLOTS=8;let SLOTS=[{kind:'human',owner:0,team:0,name:'You'},{kind:'ai',owner:null,team:1,name:'AI fleet'},null,null,null,null,null,null];
+const isAI=s=>s.ai||s.owner==null;
 function net(){if(MP.role==='host'&&typeof mpSendState==='function')mpSendState()}
 const R={reactor:42, burn:2, reverse:4, pivot:2, genCost:10, genRegen:4, shieldRepairPerImp:2, startDist:20,
   pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.75, magReloadTurns:2};
@@ -392,12 +398,12 @@ function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
   else if(x.k==='thrS'){t.dmgThrS=(t.dmgThrS||0)+1;msg=t.dmgThrS>=3?'starboard thrusters destroyed — cannot turn to port':`starboard thrusters damaged (turning to port +${t.dmgThrS*50}%)`}
   else if(x.k==='sen'){t.dmgSen=(t.dmgSen||0)+1;msg=sensRange(t)<=0?'SENSORS DESTROYED — blind to enemy shields, hull and weapons':`sensors damaged (weapon scan range ${sensRange(t)} hexes)`}
   else{t.dmgRea=(t.dmgRea||0)+1;t.reactor=Math.max(0,t.reactor0*(1-.1*t.dmgRea));t.E=Math.min(t.E,t.reactor);msg=t.reactor<=0?'REACTOR DEAD — ship is dead in the water':`reactor hit (output ${Math.round(100-10*t.dmgRea)}%)`}
-  log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good',{s:ships.indexOf(t),g:`${t.name}: system damaged (out of scan range)`});if(t.team===0&&!t.ai&&dcTeams(t)-(t.dc||[]).length>0){dcEvt.push(t.name);dcHide=''}}
+  log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good',{s:ships.indexOf(t),g:`${t.name}: system damaged (out of scan range)`});if(own(t)&&!t.ai&&dcTeams(t)-(t.dc||[]).length>0){dcEvt.push(t.name);dcHide=''}}
 // ---- damage control: teams repair one damaged system each; a repair takes a full turn. Cruisers have 2 teams, small ships 1 ----
 const dcTeams=s=>s.d.dcTeams||(s.d.big?2:1);
 const dcFree=s=>dcTeams(s)-(s.dc||[]).length-s.queue.filter(q=>q.type==='dc').length;
 const dcOpen=s=>(s.damaged||[]).filter(x=>!(s.dc||[]).some(j=>j.box===x)&&!s.queue.some(q=>q.type==='dc'&&q.id===x.id)).length;
-const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&s.team===0&&dcFree(s)>0&&dcOpen(s)>0;
+const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&own(s)&&dcFree(s)>0&&dcOpen(s)>0;
 function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrF'?'Fore thrusters':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
@@ -409,23 +415,23 @@ const inBow=(t,a)=>Math.abs(norm(Math.atan2(a.px.y-t.px.y,a.px.x-t.px.x)-fAng(t.
 const darkCovers=(t,a)=>darkOn(t)&&inBow(t,a);
 /* deployed (dark) missiles: visible to the enemy only inside the sensor range of one of its ships */
 const mslSpotted=(m,team)=>!m.dorm||m.owner.team===team||ships.some(x=>!x.dead&&x.team===team&&Math.hypot(m.px.x-x.px.x,m.px.y-x.px.y)/HS<=sensRange(x));
-const scanWeapons=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
-const scanStatus=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0);
+const scanWeapons=(e,team=MYTEAM)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
+const scanStatus=(e,team=MYTEAM)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0);
 function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   if(x.k==='w'){const w=s.weapons[x.i];w.alive=true;if(w.T.kind!=='missile'&&w.T.kind!=='torp')w.state='idle';if(w.T.kind==='torp'){w.state='idle';w.stages=0;w.charging=false;w.holding=false}}
   else if(x.k==='pd'){s.pd[x.i].alive=true;s.pd[x.i].shots=0;s.pd[x.i].pending=[]}
   else if(x.k==='eng')s.dmgEng=Math.max(0,(s.dmgEng||0)-1);else if(x.k==='thrF')s.dmgThrF=Math.max(0,(s.dmgThrF||0)-1);else if(x.k==='thrP')s.dmgThrP=Math.max(0,(s.dmgThrP||0)-1);else if(x.k==='thrS')s.dmgThrS=Math.max(0,(s.dmgThrS||0)-1);else if(x.k==='sen')s.dmgSen=Math.max(0,(s.dmgSen||0)-1);
   else{s.dmgRea=Math.max(0,(s.dmgRea||0)-1);s.reactor=s.reactor0*(1-.1*s.dmgRea)}
-  s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(s.team===0&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
-function makeShip(key,q,r,f,team,ai,name){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
-  const sh0={key,d,name,team,ai,isPlayer:team===0,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,armor:d.armor||0,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
+  s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(own(s)&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
+function makeShip(key,q,r,f,team,ai,name,owner=(team===0?0:null)){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
+  const sh0={key,d,name,team,owner,ai,isPlayer:owner===ME,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,armor:d.armor||0,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
     lastAdj:null,dead:false,msMode:'off',subMode:false,queue:[],fireSel:new Set(),flash:0,hist:[],target:null,
     auto:{},
     weapons:d.weapons.map(([t,arc])=>({t,T:WT[t],arc,alive:true,state:'idle',readyT:0,ammo:WT[t].mag||0,stages:0,charging:false,paid:0,holding:false})),
     pd:d.pd.map(arc=>({arc,alive:true,shots:0,pending:[]}))};sh0.reactor0=sh0.reactor;sh0.boxes=buildBoxes(sh0);sh0.damaged=[];sh0.dc=[];return sh0}
 const alive=()=>ships.filter(s=>!s.dead);
 const enemiesOf=s=>ships.filter(x=>!x.dead&&x.team!==s.team);
-const mine=()=>ships.filter(s=>s.team===0&&!s.dead&&!s.ai);
+const mine=()=>ships.filter(s=>own(s)&&!s.dead&&!s.ai);
 function nearestEnemy(s){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d<bd){bd=d;b=e}}return b}
 function tgt(s){if(!s.target||s.target.dead)s.target=isAI(s)&&AIV.focus?pickTarget(s):nearestEnemy(s);return s.target}
 // AI target choice: close, weakened, and already under fire from allies (focus fire beats spreading damage)
@@ -443,7 +449,7 @@ function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0
   for(const w of s.weapons){if(w.alive&&w.T.kind==='ap'&&w.charging)out.push({lab:w.T.ab+'▷',c:w.T.cost/AP_IMP});if(w.alive&&drains(w)&&w.charging)out.push({lab:w.T.ab+'▷',c:w.T.cost/cycleImp(s,w)});if(!w.alive||w.T.kind!=='torp')continue;if(w.charging)out.push({lab:w.T.ab+'▷',c:w.T.perTurn/IMP});else if(w.holding&&w.stages>0)out.push({lab:w.T.ab+' hold',c:torpStored(w)/6/IMP})}
   return out}
 const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
-function torpNote(s,msg,cls){if(s.team===0)log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
+function torpNote(s,msg,cls){if(own(s))log(`${s.name}: ${msg}`,cls);fx.push({type:'note',t:.05,max:.05,si:ships.indexOf(s),msg:`${s.name}: ${msg}`,cls})}
 const torpDmg=w=>Math.round(torpStored(w)*2*(w.T.dmgMul||1));
 const bigMove=s=>s.d.big&&!s.d.agile;   // maneuvering class: agile cruisers (Hunibler) handle like destroyers
 const pivotCost=(s,dir)=>(bigMove(s)?R.pivot:R.pivot/2)/2*(s.d.moveMul||1)*(dir?thrMul(s,dir):1);   // per 30° pivot: half the old 60° price (cruiser 1, small ship 0.5)   // small ships (frigates/destroyers) pay half
@@ -512,25 +518,25 @@ function upkeep(s){
   for(const j of (s.dc||[]).slice())if(T>=j.done){s.dc.splice(s.dc.indexOf(j),1);dcFinish(s,j)}
   s.E=Math.min(s.reactor,s.E+income(s));
   s.reinf=s.reinf.filter(x=>x.exp>T&&x.amt>0);
-  if(!s.d.noShield&&genLvl(s)>0){const c=genCost(s)*genLvl(s)/IMP;if(s.E>=c-1e-9)s.E-=c;else{s.gen={lvl:0,from:0};s.genLvl=0;if(s.team===0||s.isPlayer)log(`${s.name}: not enough energy to run the shield generator — it shut down`,'bad')}}
-  if(s.dark){const c=genCost(s)/IMP;if(!s.d.runDark||genLvl(s)<1-1e-9||s.E<c-1e-9){s.dark=false;if(s.team===0)log(`${s.name}: Run Dark dropped (${genLvl(s)<1-1e-9?'generator not at 100%':'no energy'})`,'bad')}else s.E-=c}
-  if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
+  if(!s.d.noShield&&genLvl(s)>0){const c=genCost(s)*genLvl(s)/IMP;if(s.E>=c-1e-9)s.E-=c;else{s.gen={lvl:0,from:0};s.genLvl=0;if(fr(s)||s.isPlayer)log(`${s.name}: not enough energy to run the shield generator — it shut down`,'bad')}}
+  if(s.dark){const c=genCost(s)/IMP;if(!s.d.runDark||genLvl(s)<1-1e-9||s.E<c-1e-9){s.dark=false;if(own(s))log(`${s.name}: Run Dark dropped (${genLvl(s)<1-1e-9?'generator not at 100%':'no energy'})`,'bad')}else s.E-=c}
+  if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||fr(s))log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
   for(const w of s.weapons){if(!w.alive||w.T.kind!=='torp'||!w.holding||w.stages<=0||w.charging)continue;const c=torpStored(w)/6/IMP;if(s.E>=c-1e-9){s.E-=c;w.holdPaid=T}else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}   /* Nov 21: held torpedoes are paid first — a stalled charge just pauses, a lost hold throws the charge away */
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
-    if((K==='ap'||drains(w))&&w.charging){const N=K==='ap'?AP_IMP:cycleImp(s,w),c=w.T.cost/N;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);   // short of energy: charging pauses, progress kept
-      if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;if(w.paid>=N){w.charging=false;w.paid=0;w.state='ready';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab}`);if(me&&K==='ap')torpNote(s,`${w.T.ab} charged (${w.T.dmg} dmg)`,'good')}}
+    if((K==='ap'||drains(w))&&w.charging){const N=K==='ap'?AP_IMP:cycleImp(s,w),c=w.T.cost/N;const me=!isAI(s)&&(own(s)||typeof MP!=='undefined'&&MP.on);   // short of energy: charging pauses, progress kept
+      if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;if(w.paid>=N){w.charging=false;w.paid=0;w.state='ready';if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab}`);if(me&&K==='ap')torpNote(s,`${w.T.ab} charged (${w.T.dmg} dmg)`,'good')}}
       else if(!w.apShort){w.apShort=1;if(me)torpNote(s,`not enough energy — ${w.T.ab} charging paused`,'bad')}
       if(s.E>=c)w.apShort=0;continue}
     if(K==='torp'){
-      if(w.charging){const c=w.T.perTurn/IMP;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);
+      if(w.charging){const c=w.T.perTurn/IMP;const me=!isAI(s)&&(own(s)||typeof MP!=='undefined'&&MP.on);
         if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;
           if(w.paid>=IMP){w.paid=0;w.stages++;
-            if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(me)torpNote(s,`${w.T.ab} fully charged (${torpDmg(w)} dmg) — now holding`,'good')}
-            else{if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`);if(me)torpNote(s,`${w.T.ab} reached stage ${w.stages} (${torpDmg(w)} dmg) — keep charging or Hold`,'warn')}}}
+            if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(me)torpNote(s,`${w.T.ab} fully charged (${torpDmg(w)} dmg) — now holding`,'good')}
+            else{if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`);if(me)torpNote(s,`${w.T.ab} reached stage ${w.stages} (${torpDmg(w)} dmg) — keep charging or Hold`,'warn')}}}
         else{w.charging=false;w.paid=0;if(w.stages>0){w.holding=true;w.state='holding'}else w.state='idle';if(me)torpNote(s,`not enough energy to keep charging ${w.T.ab} — ${w.stages?`holding at ${torpDmg(w)} dmg`:'charge lost'}`,'bad')}}
       if(w.holding&&w.stages>0&&w.holdPaid!==T){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
-    else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(s.team===0&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
+    else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(own(s)&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
   for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(2,p.shots+1);return false}return true})}
 }
 
@@ -547,9 +553,9 @@ function afterMove(){
   for(const s of ships)if(!s.dead){s.hist.push({T,q:s.q,r:s.r});if(s.hist.length>40)s.hist.shift();tgt(s)}
   for(const s of alive()){if(isAI(s)){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else autoQueue(s)}
   if(!P||P.dead||P.ai)P=mine()[0]||null;
-  const guestHumans=MP.on&&ships.some(x=>x.team===1&&!x.dead&&!x.ai);
-  const stop=P?shouldStop():guestHumans?'Waiting for your opponent\'s orders':(pauseReq?(pauseReq=false,'Paused — untick AI on a ship to command it'):false);
-  if(stop){phase='decide';MP.hostReady=!P;MP.guestReady=!guestHumans;for(const s of ships)if(!s.dead&&!isAI(s))s.fireSel=new Set();if(typeof stop==='string')log(stop,'dim');buildHUD();net()}
+  const guestHumans=MP.on&&ships.some(x=>x.owner!=null&&x.owner!==ME&&!x.dead&&!x.ai);
+  const stop=P?shouldStop():guestHumans?'Waiting for the other players\' orders':(pauseReq?(pauseReq=false,'Paused — untick AI on a ship to command it'):false);
+  if(stop){phase='decide';mpResetReady();for(const s of ships)if(!s.dead&&!isAI(s))s.fireSel=new Set();if(typeof stop==='string')log(stop,'dim');buildHUD();net()}
   else{for(const s of mine())s.fireSel=new Set();buildHUD();commit()}
 }
 let lastFireOpp=0,seenMissiles=new Set();
@@ -581,18 +587,18 @@ function recShip(s,i,orders){const t=s.target&&!s.target.dead?s.target:null;cons
   o.wpn=s.weapons.map(w=>!w.alive?'X':w.T.kind==='torp'?'T'+w.stages+(w.charging?'c':''):w.T.kind==='missile'?w.state[0]+w.ammo:w.state[0]).join(' ');o.pd=s.pd.map(p=>p.alive?p.shots:'X').join('');
   if(orders){if(s.queue.length)o.orders=s.queue.map(x=>qLabel(s,x));if(s.fireSel.size&&t)o.fire=[...s.fireSel].map(k=>wLabel(s,k)+(canFireMount(s,k,t)?' '+Math.round(hitP(s,k,t)*100)+'%':''));if(s.subMode)o.aim='systems';if(s.msMode!=='off')o.msl=s.msMode}
   if((s.dc||[]).length)o.dcw=s.dc.map(j=>boxShort(s,j.box));if(s.dead)o.dead=true;return o}
-function recImpulse(){if(!REC||MP.role==='guest')return;if(T>0&&impOf(T)===IMP)setTimeout(histSave,0);REC.imp.push({T:when(T),ships:ships.map((s,i)=>s.dead?{i,dead:true}:recShip(s,i,true)),msl:[missiles.filter(m=>m.owner.team===0&&!m.intercept).length,missiles.filter(m=>m.owner.team===1&&!m.intercept).length]})}
+function recImpulse(){if(!REC||MP.role==='guest')return;if(T>0&&impOf(T)===IMP)setTimeout(histSave,0);REC.imp.push({T:when(T),ships:ships.map((s,i)=>s.dead?{i,dead:true}:recShip(s,i,true)),msl:[missiles.filter(m=>m.owner.team===MYTEAM&&!m.intercept).length,missiles.filter(m=>m.owner.team!==MYTEAM&&!m.intercept).length]})}
 function recStart(){REC={game:'Space Hex Tactics battle record',v:1,id:Date.now()+'-'+Math.floor(Math.random()*1e6),date:new Date().toISOString(),online:MP.on?(MP.role==='host'?'host = team 0':'guest'):false,
   start:{mode:startMode,charge:chargeMode,speed:startSpeed.slice(),dist:R.startDist,form:fleetForm.slice(),impulsesPerTurn:IMP},
   key:{pos:'axial hex q,r',v:'hexes/turn (axial)',f:'facing 0=N 1=NE 2=SE 3=S 4=SW 5=NW',brg:'target bearing off the nose, degrees (+ = starboard)',dmg:'[engine, port thr, stbd thr, reactor, sensors] hits',
     wpn:'per weapon in ship order: r=ready c=cycling i=idle h=holding, T#=torpedo stages (c=charging), missiles state+ammo, X=destroyed',pd:'PD shots per mount',fire:'weapons fired this impulse with hit chance',orders:'energy spent / maneuvers this impulse'},
-  ships:ships.map((s,i)=>({i,name:s.name,cls:s.d.name,key:s.key,team:s.team,side:s.team===0?(MP.on?'host':'player'):(MP.on?'guest':'enemy'),ai:!!isAI(s),reactor:s.reactor0,hull:s.d.hull,shield:s.d.shield,
+  ships:ships.map((s,i)=>({i,name:s.name,cls:s.d.name,key:s.key,team:s.team,side:s.owner!=null?'player '+(s.owner+1)+(s.owner===ME?' (you)':''):'AI',teamL:TLET[s.team],ai:!!isAI(s),reactor:s.reactor0,hull:s.d.hull,shield:s.d.shield,
     weapons:s.weapons.map(w=>w.T.ab+' '+w.arc),pd:s.pd.map(p=>p.arc)})),imp:[],log:[],result:null}}
 // ---- past battles: the last 10 records kept in this browser (saved every turn and at the end) ----
 const HKEY='spaceHexBattles';
 function histLoad(){try{return JSON.parse(localStorage.getItem(HKEY)||'[]')}catch(e){return []}}
 function histSave(){if(!REC||MP.role==='guest')return;try{const L=histLoad().filter(x=>x.id!==REC.id);const s0=REC.ships;
-    const side=t=>s0.filter(x=>x.team===t).map(x=>x.name).join(', ');const you=s0.find(x=>x.team===0&&!x.ai)?0:-1;
+    const side=t=>s0.filter(x=>x.team===t).map(x=>x.name).join(', ');const you=s0.find(x=>x.team===MYTEAM&&!x.ai)?MYTEAM:-1;
     const res=REC.result?(REC.result.winner==='team 0'?'won':REC.result.winner==='team 1'?'lost':'draw')+' '+REC.result.at:'in progress '+when(T);
     L.unshift({id:REC.id,date:REC.date,title:side(0)+' vs '+side(1),res,txt:recText()});while(L.length>10)L.pop();
     for(;;){try{localStorage.setItem(HKEY,JSON.stringify(L));break}catch(e){if(L.length<=1)break;L.pop()}}}catch(e){}}
@@ -600,8 +606,8 @@ function renderHistory(){const el=$('pastBattles');if(!el)return;const L=histLoa
   el.innerHTML=`<details><summary class="dim" style="cursor:pointer">💾 Past battles (${L.length}) — saved in this browser</summary><div style="margin-top:6px">${L.map((x,i)=>{const d=new Date(x.date);
     return `<div class="row sm" style="gap:10px;border-bottom:1px solid var(--line);padding:2px 0"><span class="dim" style="width:120px">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span><span style="flex:1">${x.title}</span><span class="${x.res.startsWith('won')?'good':x.res.startsWith('lost')?'bad':'dim'}">${x.res}</span><button class="btn" data-hist="${i}">Save record</button></div>`}).join('')}</div></details>`;
   el.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{const x=histLoad()[+b.dataset.hist];if(x)recDownload(x.txt)})}
-function recEnd(){if(!REC||REC.result)return;const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);
-  REC.result={at:when(T),winner:forfeitTeam!=null?'team '+(1-forfeitTeam):a0&&!a1?'team 0':a1&&!a0?'team 1':'none',forfeit:forfeitTeam!=null?'team '+forfeitTeam:undefined,final:ships.map((s,i)=>recShip(s,i,false))};histSave()}
+function recEnd(){if(!REC||REC.result)return;const AT=teamsAlive(),a0=AT.length===1&&AT[0]===0,a1=AT.length===1&&AT[0]!==0;
+  REC.result={at:when(T),winner:AT.length===1?'team '+AT[0]:'none',forfeit:forfeited.length?forfeited.map(p=>'player '+(p+1)):undefined,final:ships.map((s,i)=>recShip(s,i,false))};histSave()}
 function recText(){const R0=REC;if(!R0)return '';const head={...R0,imp:undefined,log:undefined};
   return '{\n"header":'+JSON.stringify(head)+',\n"impulses":[\n'+R0.imp.map(x=>JSON.stringify(x)).join(',\n')+'\n],\n"log":[\n'+R0.log.map(x=>JSON.stringify(x)).join(',\n')+'\n]}\n'}
 function saveRecord(){if(MP.role==='guest'){mpSend({t:'getrec'});mpBanner('Asking the host for the battle record…');return}
@@ -630,13 +636,13 @@ function commit(){
     if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
     if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
-      if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true}));if(s.team===0)sfx('missile',.35);continue}
-      s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',s.team===0?1:.65);continue}
+      if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true}));if(own(s))sfx('missile',.35);continue}
+      s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',fr(s)?1:.65);continue}
     let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else w.state='idle';
     fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,fx:w.T.fx,dmg,hit:Math.random()<hitP(s,key,t)})}};
   for(const s of alive()){if(!s.mslLight)continue;s.mslLight=false;const t=tgt(s);if(!t)continue;let n=0;
     for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
-    if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',s.team===0?1:.65);if(s.team===0)log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
+    if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',fr(s)?1:.65);if(own(s))log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
   for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
   for(const s of alive()){const DL=defLaunchers(s);if(!DL.length)continue;
     const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead));   /* Nov 21 (David): Defend launches the moment a missile aimed at the ship appears, at any range (was within 16 hexes) */
@@ -644,7 +650,7 @@ function commit(){
       w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
-    const d=Math.min(i*.14,1.6),vol=sh.s.team===0?1:.65;let f;
+    const d=Math.min(i*.14,1.6),vol=fr(sh.s)?1:.65;let f;
     if(sh.kind==='lance'||sh.kind==='ap')f={type:'lance',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.85,max:.85,color:sh.kind==='ap'?'#f2e8ff':sh.s.d.torp,w:4+sh.dmg/8,snd:['rail',vol]};   // plasma lance: a spear of plasma thrust out to the target, not a ball
     else if(sh.fx==='rail')f={type:'rail',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.55,max:.55,color:'#d8ecff',snd:['rail',vol*.7]};   // railgun turret: a hypervelocity streak, sparks on impact
     else if(sh.kind==='pd'&&sh.s.d.pdKind==='chain')f={type:'chain',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.6,max:.6,color:'#ffd27a',snd:['pd',vol]};
@@ -667,7 +673,7 @@ function fireHist(t){const L=t.fireLog||[];const seen=new Set(),out=[];for(let i
     return `<div class="${cls}"><b>${e.ab}</b> ${what} · ${when(e.T)} <span class="dim">(${ago?ago+' imp ago':'just now'}${e.at!==t.name?'':''}${nxt})</span></div>`}).join('')}</div>`}
 function finishResolve(){
   const sum={};for(const sh of pending){const k=sh.s.name+'→'+sh.t.name;sum[k]=sum[k]||{n:0,h:0,d:0,team:sh.s.team};sum[k].n++;if(sh.hit){sum[k].h++;sum[k].d+=sh.dmg;applyDamage(sh.t,sh.dmg,sh.s,null,sh.s.subMode&&(sh.kind==='beam'||sh.kind==='pd'))}else missText(sh.t)}
-  for(const k in sum)log(`${when(T)} ${k}: ${sum[k].h}/${sum[k].n} hits, ${sum[k].d} dmg`,sum[k].team===0?'good':'bad');
+  for(const k in sum)log(`${when(T)} ${k}: ${sum[k].h}/${sum[k].n} hits, ${sum[k].d} dmg`,sum[k].team===MYTEAM?'good':'bad');
   pending=[];if(checkEnd())return;nextImpulse()}
 
 // ---- missiles (continuous Newtonian) ----
@@ -724,10 +730,10 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
   t.lastHitT=T;const sp=Math.min(t.shield,left);t.shield-=sp;left-=sp;   // shields absorb fully until they run out
   const absorbed=dmg-left;fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(26,50),text:'-'+dmg,t:1.4,max:1.4,color:left<=0?'#7fc8ff':'#ff6b6b',d:FXD});
   sfxAt(left<=0?'hitShield':'hitHull',.8);if(absorbed>0)t.flash=.4;
-  if(t.shield<=0&&sp>0&&(t.team===0||scanStatus(t)))log(`${t.name} base shields DOWN`,t.isPlayer?'bad':'good');
+  if(t.shield<=0&&sp>0&&(fr(t)||scanStatus(t)))log(`${t.name} base shields DOWN`,t.isPlayer?'bad':'good');
   if(left>0&&t.armor>0){const from=fromPt||(src&&src.px);   // front armor (Golthan): soaks hits from the front 180° after shields, before hull and systems; not repairable
     if(from&&Math.abs(norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f)))<=Math.PI/2+1e-6){const a=Math.min(t.armor,left);t.armor-=a;left-=a;
-      if(t.armor<=0&&(t.team===0||scanStatus(t)))log(`${t.name}: front armor breached`,t.isPlayer?'bad':'good')}}
+      if(t.armor<=0&&(fr(t)||scanStatus(t)))log(`${t.name}: front armor breached`,t.isPlayer?'bad':'good')}}
   if(left>0&&sub&&src){const from=src.px,zone=hitZone(t,from);const cnt=src.subCnt||(src.subCnt={});const n=(cnt[t.name]||0)+1;
     // subsystem targeting (lasers/PD): every third hit that gets past the shields knocks out a system instead of doing hull damage
     if(n>=3){const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));if(valid.length){cnt[t.name]=0;const box=valid[Math.floor(Math.random()*valid.length)];t.boxes.splice(t.boxes.indexOf(box),1);
@@ -759,13 +765,19 @@ const ring=(p,r,color,big)=>fx.push({type:'ring',x:p.x,y:p.y,r,t:big?.7:.45,max:
 const inPt=(m,k)=>{const tp=m.target.px,o=m.ppx||m.px;let dx=o.x-tp.x,dy=o.y-tp.y;const l=Math.hypot(dx,dy)||1;return{x:tp.x+dx/l*HS*k,y:tp.y+dy/l*HS*k}};   // a point k hexes out on the side the missile came in from
 const ghost=(m,x,y,life)=>fx.push({type:'ghost',x,y,h:m.h||0,col:m.owner.d.laser,ic:!!m.intercept,t:life,max:life});
 function stopMusic(){if(!musicSrc||!AC)return;const src=musicSrc;musicSrc=null;musicGain.gain.setTargetAtTime(0,AC.currentTime,.5);setTimeout(()=>{try{src.stop()}catch(e){}if(!musicSrc)musicGain.gain.value=musicOn?musicVol:0},2500)}
-function checkEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);if(a0&&a1)return false;phase='over';recEnd();stopMusic();net();showEnd();buildHUD();return true}
-/* Nov 21 (David): forfeit. forfeitTeam = team (in this browser's numbering) that gave up; the other side wins. */
-let forfeitTeam=null,ffArm=0;
-function doForfeit(team){if(phase==='over'||!ships.length)return;forfeitTeam=team;phase='over';log(team===0?'You forfeited the battle':'The enemy forfeited the battle',team===0?'bad':'good');recEnd();stopMusic();net();showEnd();buildHUD()}
-function showEnd(){let a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);if(forfeitTeam!=null){a0=forfeitTeam!==0;a1=forfeitTeam===0}
-  setTimeout(()=>{const win=a0&&!a1,draw=!a0&&!a1;const t=$('endTitle');t.textContent=draw?'MUTUAL DESTRUCTION':win?'VICTORY':'DEFEAT';t.style.color=draw?'var(--warn)':win?'var(--good)':'var(--bad)';
-    const lost=ships.filter(s=>s.dead);$('endSub').textContent=`${forfeitTeam===0?'You forfeited. ':forfeitTeam===1?'The enemy forfeited. ':''}${when(T)}. Lost: ${lost.filter(s=>s.team===0).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>s.team===1).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
+function mpResetReady(){MP.ready={};MP.ready[ME]=!P;if(MP.on&&MP.role==='host')for(const x of MP.conns){MP.ready[x.pid]=!ships.some(s=>s.owner===x.pid&&!s.dead&&!s.ai)}}
+function mpResetReadyKeep(){const old=MP.ready||{};mpResetReady();for(const k in old)if(old[k])MP.ready[k]=true}
+const mpAllReady=()=>Object.values(MP.ready||{}).every(Boolean);
+const nTeams=()=>new Set(ships.map(s=>s.team)).size;
+const teamsAlive=()=>[...new Set(ships.filter(s=>!s.dead).map(s=>s.team))].sort((a,b)=>a-b);
+function checkEnd(){if(teamsAlive().length>1)return false;phase='over';recEnd();stopMusic();net();showEnd();buildHUD();return true}
+/* Nov 21: forfeit = a player's ships withdraw (removed from the battle); the battle ends when one team is left */
+let ffArm=0,forfeited=[];
+function doForfeit(pid){if(phase==='over'||!ships.length)return;const L=ships.filter(s=>!s.dead&&s.owner===pid);if(!L.length)return;for(const s of L){s.dead=true;s.withdrew=true}if(!forfeited.includes(pid))forfeited.push(pid);
+  log(pid===ME?'You forfeited — your ships withdraw':`Player ${pid+1} forfeited — their ships withdraw`,pid===ME?'bad':'dim');if(P&&P.dead)P=mine()[0]||null;if(!checkEnd()){buildHUD();net();if(typeof mpTryCommit==='function'&&MP.role==='host'){mpResetReadyKeep();mpTryCommit()}}}
+function showEnd(){const AT=teamsAlive();
+  setTimeout(()=>{const win=AT.length===1&&AT[0]===MYTEAM,draw=!AT.length;const t=$('endTitle');t.textContent=draw?'MUTUAL DESTRUCTION':win?(ships.some(s=>own(s)&&!s.dead)?'VICTORY':'VICTORY — your team won'):'DEFEAT';t.style.color=draw?'var(--warn)':win?'var(--good)':'var(--bad)';
+    const lost=ships.filter(s=>s.dead);const nT=new Set(ships.map(s=>s.team)).size;$('endSub').textContent=`${forfeited.includes(ME)?'You forfeited. ':''}${forfeited.filter(p=>p!==ME).map(p=>'Player '+(p+1)+' forfeited. ').join('')}${!draw&&!win&&AT.length===1&&nT>2?'Team '+TLET[AT[0]]+' won. ':''}${when(T)}. Lost: ${lost.filter(s=>fr(s)).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>!fr(s)).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
 
 // ---- automation (player standing orders + AI helpers) ----
 function autoQueue(s){aiAssist(s)}
@@ -1119,7 +1131,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
 // ---- UI ----
 const $=id=>document.getElementById(id);
 function log(text,cls,intel){if(REC&&MP.role!=='guest')REC.log.push([T,text]);
-  if(intel){const x=ships[intel.s];if(x&&x.team!==0&&!scanWeapons(x)){if(!intel.g)return;text=intel.g}}   // enemy system details only within sensor range
+  if(intel){const x=ships[intel.s];if(x&&!fr(x)&&!scanWeapons(x)){if(!intel.g)return;text=intel.g}}   // enemy system details only within sensor range
   logLines.push({text,cls:cls||''});if(logLines.length>12)logLines.shift();const el=$('log');if(el)el.innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('')}
 function bar(v,max,cls){return `<div class="bar ${cls||''}"><i style="width:${max>0?clamp(v/max*100,0,100):0}%"></i></div>`}
 const btn=(id,label,ok,title)=>`<button class="btn" data-act="${id}" ${ok?'':'disabled'} ${title?`title="${title}"`:''}>${label}</button>`;
@@ -1138,7 +1150,7 @@ function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireS
   return `<div class="wrow"><span class="arc">×${ws.length}</span><span class="wn" style="color:${col}">MSL</span><span class="ws"><span class="chips">${ch}</span> <span class="dim">${rdy} rdy · ${ammo}</span></span><span class="wc">${ctl}</span></div>`}
 // target scan: shields/hull need working sensors; weapon status needs a friendly ship within its sensor range
 function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> ✕</h2></div>`;
-  const d=hexDist(s,t),stOK=scanStatus(t),wOK=scanWeapons(t),best=Math.max(0,...ships.filter(o=>o.team===0&&!o.dead).map(sensRange));
+  const d=hexDist(s,t),stOK=scanStatus(t),wOK=scanWeapons(t),best=Math.max(0,...ships.filter(o=>fr(o)&&!o.dead).map(sensRange));
   let h=`<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> <span class="dim" style="text-transform:none">${t.d.name}</span></h2>
    <div class="row dim sm">${d} hexes · v ${vlen(t.vq,t.vr)} · facing ${fName(t.f)}</div>`;
   if(stOK)h+=`<div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(t.hull,t.d.hull)}<span class="v2">${Math.ceil(t.hull)}/${t.d.hull}${t.d.armor?` <span class="dim" title="front armor">⛨${Math.ceil(t.armor)}</span>`:''}</span></div>
@@ -1288,11 +1300,11 @@ function fireStrip(s,t,sd){if(!t||!sd)return '';const d=hexDist(s,t);let h='';
   s.pd.forEach((p,i)=>{const key='pd'+i;if(p.alive&&canFireMount(s,key,t))h+=fireBtn(s,key,`PD ${p.arc==='ALL'?'360':p.arc} ${sixths(hitP(s,key,t))}`,'offensive fire, 1 dmg per hit')});
   return h?`<div class="firestrip">${h}</div>`:`<div class="row dim sm">Nothing can fire at ${t.name} right now</div>`}
 function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',rh='';
-  const own=ships.filter(x=>x.team===0);const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
+  const ownS=ships.filter(x=>own(x));const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
   const s=P;const ct=s&&!s.dead?tgt(s):null;
   if(ct)rh+=scanPanel(s,ct);
-  const foes=ships.filter(x=>x.team===1&&x!==ct);
+  const foes=ships.filter(x=>!fr(x)&&x!==ct);
   if(foes.length)rh+=`<div class="panel"><h2>Enemy ships <span class="dim" style="text-transform:none">(click to target)</span></h2><div class="tabs scroll" style="max-height:170px">${foes.map(x=>{const ok=scanStatus(x);return `<div class="tab ${x.dead?'dead':''}" data-tgt="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
     <div class="mini">${ok?bar(x.hull,x.d.hull)+bar(x.shield,x.d.shield,'sh'):'<span class="dim">no sensor data</span>'}</div><span class="dim">${s&&!s.dead&&!x.dead?hexDist(s,x)+' hexes · ':''}v ${vlen(x.vq,x.vr)}</span></div>`}).join('')}</div></div>`;
   const qPanel=s&&!s.dead&&s.queue.length&&!s.ai?`<div class="panel"><h2>Queued for ${s.name} <button class="btn" data-act="undo" style="float:right">Undo ⌫</button></h2><div class="dim">${s.queue.map(x=>qLabel(s,x)).join(' · ')}</div></div>`:'';
@@ -1300,12 +1312,12 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   // ---- left panel: your fleet, your ship, its orders (Nov 21, David: your side on the left, the enemy on the right) ----
   h+=`<div class="panel"><h2 style="display:flex;align-items:center">Fleet command<button class="btn" data-act="forfeit" style="margin-left:auto;color:var(--bad);font-size:11px;padding:2px 7px;text-transform:none;letter-spacing:0" title="Give up this battle: the enemy wins. Click twice to confirm.">${Date.now()-ffArm<4000?'Confirm forfeit?':'🏳 Forfeit'}</button></h2>
    <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
-   ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
+   ${ownS.length>1||(ownS[0]&&ownS[0].ai)?`<div class="tabs scroll" style="max-height:150px">${ownS.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
      <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
-     ${s.team===0&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
+     ${own(s)&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
      <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}${s.d.armor?` <span class="dim" title="front armor: soaks hits from the front 180° after shields">⛨${Math.ceil(s.armor)}</span>`:''}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
@@ -1344,8 +1356,8 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
     }else{dgMode='repair';h+=dcDiagram(s)+`<div class="sm dim" style="margin:3px 0"><span style="color:#4cff7a">■</span> working &nbsp;·&nbsp; <span style="color:#ff4d4d">■</span> damaged — click to repair &nbsp;·&nbsp; 🔧 team on it</div>`+(dcPanel(s,sd,false)||`<div class="row sm good">No damage.</div>`)}
     h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
-  else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
-  {const av=own.filter(dcAvail);const key=av.map(x=>x.name+dcFree(x)+':'+dcOpen(x)).join('|');const el=$('dcAlert');
+  else h+=`<div class="panel dim">${ownS.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
+  {const av=ownS.filter(dcAvail);const key=av.map(x=>x.name+dcFree(x)+':'+dcOpen(x)).join('|');const el=$('dcAlert');
     if(av.length&&phase!=='over'&&dcHide!==key){el.style.display='flex';el.dataset.key=key;el.innerHTML=`<b>🔧 DAMAGE CONTROL AVAILABLE</b><span>${av.map(x=>`<a data-dcsel="${ships.indexOf(x)}">${x.name}</a>: ${dcFree(x)} team${dcFree(x)>1?'s':''} free · ${dcOpen(x)} damaged system${dcOpen(x)>1?'s':''}`).join(' &nbsp;|&nbsp; ')}</span><button class="btn" data-dchide="1" title="Hide until the next damage-control event">✕</button>`}
     else el.style.display='none'}
   $('side').innerHTML=h;$('rside').innerHTML=rh;$('log').innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('');$('log').scrollTop=1e6;
@@ -1366,22 +1378,22 @@ function upkeepRow(s){const L=upkeepList(s);const tot=L.reduce((a,x)=>a+x.c,0),n
   return `<div class="row sm upk" title="Ongoing energy expenses, paid every impulse. Income is +${income(s).toFixed(2)} per impulse."><span class="lab">Upkeep</span><b class="${tot?'warn':'dim'}">−${tot.toFixed(2)}</b><span class="dim">/imp</span>${L.length?' <span class="dim">'+L.map(x=>`${x.lab} ${x.c.toFixed(2)}`).join(' · ')+'</span>':''}<span style="margin-left:auto" class="${net<0?'bad':'good'}">net ${net>=0?'+':''}${net.toFixed(2)}</span></div>`}
 const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+label:label}</button>`;
 function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pausew'?`${s.weapons[x.i].T.ab} pause`:x.type==='pd'?'PD load':'')+(x.cost?` (${x.cost})`:'')}
-function selectShip(x){if(x&&x.team===0&&!x.dead){P=x;buildHUD()}}
+function selectShip(x){if(x&&own(x)&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
 function doAct(a){doAct0(a)}
 function doAct0(a){const [k,v]=a.split(':');
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
-    if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(0);return}
-  if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.hostReady=true;mpTryCommit();return}commit();return}
+    if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
+  if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
-  if(k==='aipdall'){const L=ships.filter(x=>x.team===0&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
+  if(k==='aipdall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
   if((k==='aie'||k==='aidc')&&P&&!P.dead&&!P.ai){const s=P;if(k==='aie')s.aiE=!s.aiE;else s.aiDC=!s.aiDC;
     log(`${s.name}: ${k==='aie'?'energy':'damage control'} ${(k==='aie'?s.aiE:s.aiDC)?'handed to the AI':'back under your control'}`,'dim');
     if(phase==='decide'&&(k==='aie'?s.aiE:s.aiDC)&&MP.role!=='guest')aiAssist(s);   // online, the host runs the guest's assist when his orders arrive
     if(phase==='decide'&&!(k==='aie'?s.aiE:s.aiDC))s.queue=s.queue.filter(x=>!(k==='aie'?AI_E:AI_DC).includes(x.type));   // drop what the AI had queued this impulse
     buildHUD();return}
-  if(k==='aieall'||k==='aidcall'){const L=ships.filter(x=>x.team===0&&!x.dead&&!x.ai),f=k==='aieall'?'aiE':'aiDC',on=!L.every(x=>x[f]);
+  if(k==='aieall'||k==='aidcall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),f=k==='aieall'?'aiE':'aiDC',on=!L.every(x=>x[f]);
     for(const x of L){x[f]=on;if(phase==='decide'){if(on){if(MP.role!=='guest')aiAssist(x)}else x.queue=x.queue.filter(q=>!(f==='aiE'?AI_E:AI_DC).includes(q.type))}}
     log(`All ships: ${f==='aiE'?'energy':'damage control'} ${on?'handed to the AI':'back under your control'}`,'dim');buildHUD();return}
   const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
@@ -1422,9 +1434,9 @@ function wireHUD(){if($('recSave'))$('recSave').onclick=saveRecord;
   document.querySelectorAll('#side [data-auto]').forEach(el=>el.addEventListener('change',()=>{P.auto[el.dataset.auto]=el.checked}));
   document.querySelectorAll('[data-stop]').forEach(el=>el.addEventListener('change',()=>{STOP[el.dataset.stop]=el.checked}));
   document.querySelectorAll('[data-sel]').forEach(el=>el.addEventListener('click',e=>{if(e.target.tagName==='INPUT')return;selectShip(ships[+el.dataset.sel])}));
-  document.querySelectorAll('[data-allai]').forEach(el=>el.addEventListener('click',()=>{const on=el.dataset.allai==='1';for(const x of ships)if(x.team===0&&!x.dead){x.ai=on;x.queue=[]}
+  document.querySelectorAll('[data-allai]').forEach(el=>el.addEventListener('click',()=>{const on=el.dataset.allai==='1';for(const x of ships)if(own(x)&&!x.dead){x.ai=on;x.queue=[]}
     P=on?null:mine()[0];log(on?'All ships under AI command':'All ships under your command','dim');
-    if(on&&phase==='decide'){for(const x of alive()){const a=aiDecide(x);x.queue=a.queue;x.fireChoice=a.fire}commit()}else buildHUD()}));
+    if(on&&phase==='decide'){if(MP.role==='guest'){mpSent=false;mpSendOrders();return}for(const x of alive())if(own(x)){const a=aiDecide(x);x.queue=a.queue;x.fireChoice=a.fire}if(MP.role==='host'){P=mine()[0]||null;MP.ready[ME]=!P||MP.ready[ME];mpTryCommit()}else commit()}else buildHUD()}));
   document.querySelectorAll('[data-ai]').forEach(el=>el.addEventListener('change',()=>{const x=ships[+el.dataset.ai];x.ai=el.checked;x.queue=[];if(x.ai&&x===P){const o=mine();P=o[0]||P}if(!x.ai)P=x;log(`${x.name}: ${x.ai?'AI in command':'under your command'}`,'dim');buildHUD()}));
   document.querySelectorAll('[data-tgt]').forEach(el=>el.addEventListener('click',()=>{const x=ships[+el.dataset.tgt];if(P&&!x.dead){P.target=x;log(`${P.name} targeting ${x.name}`,'dim');buildHUD()}}))}
 
@@ -1437,7 +1449,7 @@ const vcx=()=>SIDE()+(W-SIDE()-RSIDE())/2,vcy=()=>(Hh-BAR())/2;
 const sx=x=>(x-cam.x)*cam.s+vcx(),sy=y=>(y-cam.y)*cam.s+vcy();
 const animK=()=>phase==='moving'?clamp(animT/ANIM,0,1):1;
 function posOf(o){const k=animK();const a=o.ppx||o.px,b=o.px;return{x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k}}
-function camShip(){return (P&&!P.dead)?P:(mine()[0]||ships.find(x=>x.team===0&&!x.dead)||alive()[0])}
+function camShip(){return (P&&!P.dead)?P:(mine()[0]||ships.find(x=>own(x)&&!x.dead)||ships.find(x=>fr(x)&&!x.dead)||alive()[0])}
 function updateCam(dt){const C=camShip();if(!C)return;const dpr=devicePixelRatio,m=70*dpr;const A=posOf(C),tg=tgt(C)||C,B=posOf(tg);
   // frame BOTH your ship and its target in the visible area (right of the side panel, above the order bar)
   const cx=(A.x+B.x)/2,cy=(A.y+B.y)/2;const vw=W-SIDE()-RSIDE()-2*m,vh=Hh-BAR()-2*m-30*dpr;
@@ -1461,18 +1473,18 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
   for(const s of ships){if(s.dead)continue;const c=hp(s.q,s.r);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;const x=sx(c.x)+R_*.98*Math.cos(a),y=sy(c.y)+R_*.98*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle=TEAMCOL[s.team]+(s===P?'':'99');ctx.lineWidth=(s===P?2.5:1.5)*dpr;ctx.stroke();ctx.lineWidth=1}
   // drift arrows: one turn of coasting
   for(const s of ships){if(s.dead)continue;const a=posOf(s);let vq=s.vq,vr=s.vr;
-    if(s.team===0&&phase==='decide'){const qb=s.queue.find(x=>x.type==='burn');if(qb){const b=burnResult(s,qb.a);vq+=b.dq;vr+=b.dr}}
-    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},s.team!==0?'#ffd24dcc':s.color+(s===P&&phase==='decide'?'cc':'66'),s.team!==0?[6,4]:[3,5])}}
+    if(own(s)&&phase==='decide'){const qb=s.queue.find(x=>x.type==='burn');if(qb){const b=burnResult(s,qb.a);vq+=b.dq;vr+=b.dr}}
+    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?'#ffd24dcc':s.color+(s===P&&phase==='decide'?'cc':'66'),!fr(s)?[6,4]:[3,5])}}
   const PT=P&&!P.dead?tgt(P):null;if(PT){const a=posOf(P),b=posOf(PT);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(P,PT)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
-  for(const s of ships)if(!s.dead&&s.team===0&&s.dark&&s.d.runDark){const p=posOf(s),R0=12*HS,a0=s.drawAng==null?fAng(s.f):s.drawAng,on=darkOn(s);   /* Run Dark: bow wedge (±60°), enemies inside marked green, outside red */
+  for(const s of ships)if(!s.dead&&own(s)&&s.dark&&s.d.runDark){const p=posOf(s),R0=12*HS,a0=s.drawAng==null?fAng(s.f):s.drawAng,on=darkOn(s);   /* Run Dark: bow wedge (±60°), enemies inside marked green, outside red */
     ctx.save();ctx.fillStyle=on?'rgba(90,220,140,.07)':'rgba(200,200,120,.05)';ctx.strokeStyle=on?'rgba(90,220,140,.45)':'rgba(200,200,120,.35)';ctx.setLineDash([5,5]);ctx.lineWidth=devicePixelRatio;
     ctx.beginPath();ctx.moveTo(sx(p.x),sy(p.y));ctx.arc(sx(p.x),sy(p.y),R0*cam.s,a0-Math.PI/3,a0+Math.PI/3);ctx.closePath();ctx.fill();ctx.stroke();ctx.setLineDash([]);
     for(const e of ships){if(e.dead||e.team===s.team)continue;const q=posOf(e),inn=Math.abs(norm(Math.atan2(q.y-p.y,q.x-p.x)-a0))<=Math.PI/3+1e-6;ctx.strokeStyle=inn?'rgba(90,230,140,.9)':'rgba(255,90,90,.9)';ctx.lineWidth=2*devicePixelRatio;ctx.beginPath();ctx.arc(sx(q.x),sy(q.y),16*devicePixelRatio,0,Math.PI*2);ctx.stroke()}
     ctx.restore()}
-  for(const s of ships)if(!s.dead){let f=s.f;if(s.team===0&&phase==='decide'){for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn')f=burnResult(s,x.a,f).f}}
+  for(const s of ships)if(!s.dead){let f=s.f;if(own(s)&&phase==='decide'){for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn')f=burnResult(s,x.a,f).f}}
     s.drawAng=s.drawAng==null?fAng(f):s.drawAng+norm(fAng(f)-s.drawAng)*.25;drawShip(s,posOf(s),s.drawAng,1)}
-  for(const m of missiles){if(m.dorm&&!mslSpotted(m,0))continue;const p=posOf(m);if(m.dorm){ctx.save();ctx.globalAlpha=m.owner.team===0?.45:.7}drawMissile(p.x,p.y,m.h||0,m.owner.d.laser,m.intercept);if(m.dorm){ctx.strokeStyle=m.owner.team===0?'rgba(199,166,255,.5)':'rgba(255,120,120,.8)';ctx.setLineDash([2,3]);ctx.lineWidth=devicePixelRatio;ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),7*devicePixelRatio,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore()}}
+  for(const m of missiles){if(m.dorm&&!mslSpotted(m,MYTEAM))continue;const p=posOf(m);if(m.dorm){ctx.save();ctx.globalAlpha=fr(m.owner)?.45:.7}drawMissile(p.x,p.y,m.h||0,m.owner.d.laser,m.intercept);if(m.dorm){ctx.strokeStyle=fr(m.owner)?'rgba(199,166,255,.5)':'rgba(255,120,120,.8)';ctx.setLineDash([2,3]);ctx.lineWidth=devicePixelRatio;ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),7*devicePixelRatio,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore()}}
   for(const f of fx){if(f.d>0)continue;const a=clamp(f.t/f.max,0,1);
     if(f.type==='lance'){const k=1-f.t/f.max,ext=Math.min(1,k/.22),fade=k<.22?1:Math.max(0,1-(k-.22)/.78);   // thrust out fast, then burn and fade
       const x1=sx(f.x1),y1=sy(f.y1),x2=sx(f.x1+(f.x2-f.x1)*ext),y2=sy(f.y1+(f.y2-f.y1)*ext),dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,w=f.w*dpr*(.6+.4*fade);
@@ -1507,13 +1519,13 @@ function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(p
   if(s.d.inner){ctx.beginPath();s.d.inner.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=s.color+'26';ctx.fill();ctx.strokeStyle=s.color+'cc';ctx.lineWidth=1/sc*dpr;ctx.stroke()}   // aft hull block (Condor)
   ctx.strokeStyle=s.color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of s.d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of s.d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
   if(s.burnFx>0){ctx.fillStyle=`rgba(255,180,90,${s.burnFx})`;ctx.beginPath();ctx.moveTo(-36,-5);ctx.lineTo(-52-Math.random()*8,0);ctx.lineTo(-36,5);ctx.closePath();ctx.fill()}
-  ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=TEAMCOL[s.team];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(s.team===0?(s.ai?' (AI)':''):''),ly=Y+48*sc+8*dpr;
-    {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=s.team!==0?'#ffd24d':'#8fe3ff';ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
+  ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=own(s)?TEAMCOL[0]:fr(s)?'#7dffa0':TEAMCOL[1];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(own(s)?(s.ai?' (AI)':''):'')+(nTeams()>2&&!fr(s)?' ['+TLET[s.team]+']':'')+(fr(s)&&!own(s)?(s.owner!=null?' (P'+(s.owner+1)+')':' (ally)'):''),ly=Y+48*sc+8*dpr;
+    {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=!fr(s)?'#ffd24d':'#8fe3ff';ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
 
 // ---- flow: fleet builder ----
-const fleet=[[],[]];const MAXSHIPS=20;
+const fleet=[[],[],[],[],[],[],[],[]];const MAXSHIPS=20;
 const FORMS={line:'Line abreast',wedge:'Wedge',column:'Column',block:'Block',echelon:'Echelon',screen:'Screen (escorts forward)'};
-const fleetForm=['line','line'];let startMode='stations',startSpeed=[4,4],chargeMode='time';   // starting speed (hexes/turn, toward the enemy) chosen per side   // 'stations' = every weapon loaded, torpedoes full, PD loaded; 'cold' = everything empty
+const fleetForm=['line','line','line','line','line','line','line','line'];let startMode='stations',startSpeed=[4,4,4,4,4,4,4,4],chargeMode='time';   // starting speed (hexes/turn, toward the enemy) chosen per side   // 'stations' = every weapon loaded, torpedoes full, PD loaded; 'cold' = everything empty
 // formation slot offsets in hexes: x = lateral, y = depth behind the front rank (heaviest ships get the first slots)
 function formSlots(form,list){const n=list.length,sp=4;const out=[];
   const centerOut=k=>{const r=[];for(let i=0;i<k;i++)r.push(i===0?0:(i%2?1:-1)*Math.ceil(i/2));return r};
@@ -1526,7 +1538,8 @@ function formSlots(form,list){const n=list.length,sp=4;const out=[];
     if(!heavy.length||!light.length)return formSlots('line',list);
     const res=new Array(n);centerOut(light.length).forEach((c,j)=>res[light[j]]={x:c*sp,y:0});centerOut(heavy.length).forEach((c,j)=>res[heavy[j]]={x:c*sp*1.3,y:5});return res}
   return out}
-const fleetFaction=['Martian','Dogahr'],fleetTL=[4,4];
+const fleetFaction=['Martian','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr'],fleetTL=[4,4,4,4,4,4,4,4];
+const mySlotIdx=()=>{const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);return i<0?0:i};
 const TLNOTE={5:'built for shields: 1.5× shields, targeting +2 hexes',4:'shielded refits',3:'no shields, weaker reactors',2:'no shields, 8-hex targeting, 2/3-damage weapons'};
 function shipLabel(k){const d=SHIPS[k];return `<span class="fbadge" style="background:${FACTIONS[d.faction].color}22;border-color:${FACTIONS[d.faction].color};color:${FACTIONS[d.faction].color}">${d.faction}</span> <b>${d.cls}</b>`}
 // ---- Setup screen helpers (Nov 21, David): faction select screen, ship sprites, weapon tooltips ----
@@ -1563,57 +1576,84 @@ function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();c
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a);
     return `<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${f}</b><span class="dim">${F.blurb}</span>
       <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}</span></div></button>`}).join('');
-  el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${t?'the enemy fleet':'your fleet'}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
+  el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${slotLabel(t)==='You'?'your fleet':slotLabel(t)}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
   el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;
-    const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder()})}
-function renderBuilder(){renderHistory();const box=$('builder');
+    const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder();lobbyChanged()})}
+/* Nov 21 (David): fleet lobby — up to 8 fleets (each human builds his own; the host / single player builds the AI fleets), each assigned to a team A–H */
+let selSlot=0;
+const slotLabel=i=>{const s=SLOTS[i];if(!s)return '';return s.kind==='human'?(s.owner===ME?'You':'Player '+(s.owner+1)):'AI fleet '+(SLOTS.slice(0,i+1).filter(x=>x&&x.kind==='ai').length)};
+const canEditSlot=i=>{const s=SLOTS[i];if(!s)return false;if(MP.role==='guest')return s.kind==='human'&&s.owner===ME;return s.kind==='ai'||s.owner===ME};
+const canManage=()=>MP.role!=='guest';
+function lobbyChanged(){if(MP.role==='guest'){if(typeof mpSendMySlot==='function')mpSendMySlot()}else if(MP.role==='host'&&typeof mpBroadcastLobby==='function')mpBroadcastLobby()}
+function renderBuilder(){renderHistory();const box=$('builder');if(!SLOTS[selSlot]||!canEditSlot(selSlot))selSlot=mySlotIdx();
   const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
-    const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);
-    return `<div class="fleetcol"><h3 style="color:${TEAMCOL[t]}">${t?'Enemy fleet':'Your fleet'} <span class="dim" style="font-weight:normal;font-size:11px">${fleet[t].length}/${MAXSHIPS}</span></h3>
-     <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${t===0?`<label class="dim"><input type="checkbox" data-fai="${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
+    const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);const hum=SLOTS[t].kind==='human';
+    return `<div class="fleetcol"><h3 style="color:${TCOL8[SLOTS[t].team]}">${slotLabel(t)} <span class="dim" style="font-weight:normal;font-size:11px">Team ${TLET[SLOTS[t].team]} · ${fleet[t].length}/${MAXSHIPS}</span></h3>
+     <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${hum?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
      <div class="row" style="margin-top:10px"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${[5,4,3,2,1].map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
      <div class="addlist">${avail.length?'':'<span class="dim">No ships at this tech level for this faction yet.</span>'}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
-  const both=fleet[0].length>1&&fleet[1].length>1;
-  box.innerHTML=side(0)+(MP.on?mpOppSide():side(1));
-  const smSel=`<label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>${(MP.on?[0]:[0,1]).map(t=>` <label style="color:${TEAMCOL[t]}"><span class="dim">${MP.on?'Your':t?'Enemy':'Your'} starting speed</span> <select data-sspeed="${t}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[t]===v?'selected':''}>${v} hex/turn</option>`).join('')}</select></label>`).join('')}`;
-  $('forms').innerHTML=smSel+((MP.on?fleet[0].length>1:both)?` <span class="dim">Starting formation</span> ${(MP.on?[0]:[0,1]).map(t=>`<label style="color:${TEAMCOL[t]}">${t?'Enemy':'Yours'} <select data-form="${t}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" ${fleetForm[t]===k?'selected':''}>${l}</option>`).join('')}</select></label>`).join(' ')}`:'');
-  $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();if(MP.role==='host')mpSendFleet()};
-  $('cmode').onchange=e=>{chargeMode=e.target.value;renderBuilder();if(MP.role==='host')mpSendFleet()};
-  document.querySelectorAll('[data-sspeed]').forEach(el=>el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;if(MP.on)mpSendFleet()});
-  $('forms').querySelectorAll('[data-form]').forEach(b=>b.onchange=()=>{fleetForm[+b.dataset.form]=b.value;if(MP.on)mpSendFleet()});
-  box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder()});
-  box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder()});
-  box.querySelectorAll('[data-fai]').forEach(b=>b.onchange=()=>{fleet[0][+b.dataset.fai].ai=b.checked});
+  const card=i=>{const s=SLOTS[i];const ed=canEditSlot(i),fac=fleetFaction[i];
+    return `<div class="slotc ${i===selSlot?'sel':''}" ${ed?`data-slotsel="${i}"`:''} style="border-left:5px solid ${TCOL8[s.team]}">
+      <div class="row" style="gap:6px"><b style="color:${TCOL8[s.team]}">${slotLabel(i)}</b>${s.kind==='human'&&s.owner!==ME?'<span class="dim">(human)</span>':''}
+       <span style="margin-left:auto" class="dim">Team</span>${canManage()?`<select data-steam="${i}">${[...TLET].map((L,k)=>`<option value="${k}" ${k===s.team?'selected':''}>${L}</option>`).join('')}</select>`:`<b style="color:${TCOL8[s.team]}">${TLET[s.team]}</b>`}
+       ${canManage()&&s.kind==='ai'?`<button class="btn" data-sdel="${i}" title="Remove this AI fleet">✕</button>`:''}</div>
+      <div class="row sm" style="gap:6px;flex-wrap:wrap"><span style="color:${FACTIONS[fac].color}">${fac}</span><span class="dim">TL${fleetTL[i]} · ${fleet[i].length} ship${fleet[i].length===1?'':'s'}</span>
+       ${ed?`<label class="dim">speed <select data-sspeed="${i}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[i]===v?'selected':''}>${v}</option>`).join('')}</select></label>${fleet[i].length>1?`<label class="dim">form <select data-form="${i}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" ${fleetForm[i]===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}${i!==selSlot?'<span class="warn">✎ edit</span>':''}`:''}</div></div>`};
+  const used=SLOTS.filter(Boolean).length;
+  const list=`<div class="fleetcol" style="flex:0 0 330px"><h3>Fleets <span class="dim" style="font-weight:normal;font-size:11px">${used}/${MAXSLOTS} · same team = allies</span></h3>${SLOTS.map((s,i)=>s?card(i):'').join('')}
+    ${canManage()&&used<MAXSLOTS?`<button class="btn" id="addai" style="margin-top:6px">+ Add AI fleet</button>`:''}
+    ${MP.on?`<div class="dim sm" style="margin-top:6px">${MP.role==='host'?'Players join with your code; the host sets teams and builds the AI fleets.':'The host sets teams and builds the AI fleets; build your own fleet here.'}</div>`:''}</div>`;
+  box.innerHTML=list+side(selSlot);
+  const smSel=`<label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
+  $('forms').innerHTML=smSel;
+  $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();lobbyChanged()};
+  $('cmode').onchange=e=>{chargeMode=e.target.value;renderBuilder();lobbyChanged()};
+  box.querySelectorAll('[data-sspeed]').forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;lobbyChanged()}});
+  box.querySelectorAll('[data-form]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{fleetForm[+b.dataset.form]=b.value;lobbyChanged()}});
+  box.querySelectorAll('[data-steam]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{SLOTS[+b.dataset.steam].team=+b.value;renderBuilder();lobbyChanged()}});
+  box.querySelectorAll('[data-sdel]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=+b.dataset.sdel;SLOTS[i]=null;fleet[i]=[];if(selSlot===i)selSlot=mySlotIdx();renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-slotsel]').forEach(b=>b.onclick=()=>{selSlot=+b.dataset.slotsel;renderBuilder()});
+  const ad=$('addai');if(ad)ad.onclick=()=>{const i=SLOTS.findIndex(x=>!x);if(i<0)return;const usedT=new Set(SLOTS.filter(Boolean).map(x=>x.team));let tm=0;while(usedT.has(tm)&&tm<7)tm++;SLOTS[i]={kind:'ai',owner:null,team:tm,name:''};fleet[i]=[];fleetFaction[i]='Dogahr';fleetTL[i]=4;fleetForm[i]='line';startSpeed[i]=4;selSlot=i;renderBuilder();lobbyChanged()};
+  box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-fai]').forEach(b=>b.onchange=()=>{const [t,i]=b.dataset.fai.split(':');fleet[+t][+i].ai=b.checked;lobbyChanged()});
   box.querySelectorAll('[data-facpick]').forEach(b=>b.onclick=()=>openFactionPicker(+b.dataset.facpick));bindShipTips(box);const tipEl=$('shiptip');if(tipEl)tipEl.style.display='none';
-  box.querySelectorAll('[data-fac]').forEach(b=>b.onchange=()=>{const t=+b.dataset.fac;fleetFaction[t]=b.value;const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===b.value).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);renderBuilder()});
-  box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{fleetTL[+b.dataset.tl]=+b.value;renderBuilder()});
-  $('go').disabled=!(fleet[0].length&&(MP.on?MP.opp.fleet.length:fleet[1].length))||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':'Launch battle ▶';if(MP.on)mpSendFleet()}
-function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.opp.fleet.map(x=>({...x}));fleetForm[1]=MP.opp.form;startSpeed[1]=MP.opp.speed??4}const half=R.startDist/2;ships=[];const count={};for(const t of [0,1])fleet[t].sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
-  const used=new Set();
-  for(const t of [0,1]){const form=(fleet[0].length>1&&fleet[1].length>1)?fleetForm[t]:'line';const slots=formSlots(form,fleet[t]);
-   fleet[t].forEach((x,i)=>{const sl=slots[i];const dir=t?-1:1;
-    const X=sl.x*HX*1.5*(t?-1:1),Y=dir*(half+sl.y)*HX*SQ3;let h=pixToHex(X,Y);let q=h.q,r=h.r;
-    for(let k=0;used.has(q+','+r)&&k<20;k++){r+=dir}used.add(q+','+r);
-    const d=SHIPS[x.key];count[t+x.key]=(count[t+x.key]||0)+1;const same=fleet[t].filter(y=>y.key===x.key).length>1;
-    const both=t===1&&fleet[0].some(y=>y.key===x.key);const name=d.short+(t===0?(same?' '+count[t+x.key]:''):(same||both?' '+'ABCDEFGHIJKLMNOPQRST'[count[t+x.key]-1]:''));
-    const sh=makeShip(x.key,q,r,t?6:0,t,t===0||MP.on?!!x.ai:true,name);sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}
+  box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{fleetTL[+b.dataset.tl]=+b.value;renderBuilder();lobbyChanged()});
+  const teamsWithShips=new Set(SLOTS.map((s,i)=>s&&fleet[i].length?s.team:null).filter(x=>x!=null));
+  $('go').disabled=teamsWithShips.size<2||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':teamsWithShips.size<2?'Need fleets on at least two teams':'Launch battle ▶'}
+function start(){if(MP.role==='guest')return;
+  /* Nov 21 (David): up to 8 fleets; each team starts on its own bearing around the centre (2 teams: facing each other as before); fleets on the same team stand side by side */
+  const act=[];for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&fleet[i]&&fleet[i].length)act.push(i);
+  const mi=mySlotIdx();MYTEAM=SLOTS[mi]?SLOTS[mi].team:0;
+  const teams=[...new Set(act.map(i=>SLOTS[i].team))].sort((a,b)=>a-b),nT=teams.length;const half=R.startDist/2;ships=[];const used=new Set();
+  for(const i of act)fleet[i].sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
+  const tot={},cnt={};for(const i of act)for(const x of fleet[i])tot[x.key]=(tot[x.key]||0)+1;
+  teams.forEach((tm,k)=>{const ang=Math.PI/2+2*Math.PI*k/nT,out={x:Math.cos(ang),y:Math.sin(ang)},lat={x:out.y,y:-out.x};
+    const C={x:out.x*half*HX*SQ3,y:out.y*half*HX*SQ3};const toC=Math.atan2(-out.y,-out.x);let bf=0,bd=9;for(let f=0;f<NF;f++){const dd=Math.abs(norm(fAng(f)-toC));if(dd<bd-1e-9){bd=dd;bf=f}}
+    const lay=act.filter(i=>SLOTS[i].team===tm).map(i=>{const S=formSlots(fleet[i].length>1?fleetForm[i]:'line',fleet[i]);const xs=S.map(p=>p.x);return{i,S,lo:Math.min(...xs),hi:Math.max(...xs)}});
+    let cur=-(lay.reduce((a,l)=>a+l.hi-l.lo,0)+(lay.length-1)*8)/2;
+    for(const l of lay){const off=cur-l.lo;cur+=l.hi-l.lo+8;const slot=SLOTS[l.i],owner=slot.kind==='human'?slot.owner:null;
+      fleet[l.i].forEach((x,j)=>{const p=l.S[j];const lx=(p.x+off)*HX*1.5;let ly=p.y*HX*SQ3;let h,q,r;
+        for(let g=0;g<30;g++){const X=C.x+lat.x*lx+out.x*ly,Y=C.y+lat.y*lx+out.y*ly;h=pixToHex(X,Y);q=h.q;r=h.r;if(!used.has(q+','+r))break;ly+=HX*SQ3}used.add(q+','+r);
+        const d=SHIPS[x.key];cnt[x.key]=(cnt[x.key]||0)+1;const name=d.short+(tot[x.key]>1?' '+cnt[x.key]:'');
+        const sh=makeShip(x.key,q,r,bf,tm,owner==null?true:!!x.ai,name,owner);sh.slot=l.i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}});
   for(const sh of ships)sh.target=nearestEnemy(sh);
   if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
-  for(const sh of ships){const v=startSpeed[sh.team]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
-  P=mine()[0]||null;forfeitTeam=null;ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
+  for(const sh of ships){const v=startSpeed[sh.slot]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
+  P=mine()[0]||null;forfeited=[];ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
   const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;
-  $('start').style.display='none';$('end').style.display='none';log(`${fleet[0].length} vs ${fleet[1].length} at ${R.startDist} hexes. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}; starting speed ${MP.on?`host ${startSpeed[0]} / guest ${startSpeed[1]}`:`yours ${startSpeed[0]} / enemy ${startSpeed[1]}`} hex/turn.`,'warn');
+  $('start').style.display='none';$('end').style.display='none';log(`${[...new Set(ships.map(s=>s.team))].sort((a,b)=>a-b).map(t=>'Team '+TLET[t]+' ('+ships.filter(s=>s.team===t).length+')').join(' vs ')} at ${R.startDist} hexes. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}.`,'warn');
   for(const sh of alive()){if(isAI(sh)){const a=aiDecide(sh);sh.queue=a.queue;sh.fireChoice=a.fire}else autoQueue(sh)}
-  recStart();phase='decide';MP.hostReady=!P;MP.guestReady=!(MP.on&&ships.some(x=>x.team===1&&!x.ai));if(!P&&!MP.on)commit();else if(MP.on&&MP.hostReady&&MP.guestReady)commit();buildHUD();net()}
+  recStart();phase='decide';mpResetReady();if(!P&&!MP.on)commit();else if(MP.on&&mpAllReady())commit();buildHUD();net()}
 function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio,my=e.clientY*devicePixelRatio;let best=null,bd=40*devicePixelRatio;
   for(const x of alive()){const p=posOf(x);const d=Math.hypot(sx(p.x)-mx,sy(p.y)-my);if(d<bd){bd=d;best=x}}
-  if(!best)return;if(best.team===0&&!best.ai)selectShip(best);else if(best.team===1&&P&&!P.dead){P.target=best;log(`${P.name} targeting ${best.name}`,'dim');buildHUD()}}
+  if(!best)return;if(own(best)&&!best.ai)selectShip(best);else if(!fr(best)&&P&&!P.dead){P.target=best;log(`${P.name} targeting ${best.name}`,'dim');buildHUD()}}
 function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} targeting ${P.target.name}`,'dim');buildHUD()}
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
-  renderBuilder();openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
+  renderBuilder();openFactionPicker(mySlotIdx(),true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';fleet[0].length=0;if(!MP.on)fleet[1].length=0;menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openFactionPicker(0,true)});
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&canEditSlot(i))fleet[i].length=0;forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();lobbyChanged();openFactionPicker(mySlotIdx(),true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
@@ -1629,19 +1669,20 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
   function loop(now){const dt=Math.min(.05,(now-last)/1000);last=now;
     if(phase==='moving'){animT+=dt*1000;if(animT>=ANIM&&msHold>0)msHold-=dt;else if(animT>=ANIM&&MP.role!=='guest'){for(const s of ships)s.ppx=null;for(const m of missiles)m.ppx=null;phase='post';afterMove()}}
     if(phase==='resolving'&&MP.role!=='guest'){resolveT-=dt;if(resolveT<=0)finishResolve()}
-    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&x.team===0&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
+    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&own(x)&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
     for(const s of ships){if(s.flash)s.flash=Math.max(0,s.flash-dt);if(s.burnFx)s.burnFx=Math.max(0,s.burnFx-dt*1.2)}
     updateCam(dt);render();requestAnimationFrame(loop)}
   requestAnimationFrame(loop)}
 
 // =====================================================================
-//  ONLINE TWO-PLAYER (PeerJS, browser-to-browser)
-//  Host = player 1 (team 0). The host's browser runs the whole simulation.
-//  Guest = player 2 (team 1). The guest's browser shows snapshots the host sends,
-//  and sends back its orders at every impulse. On the guest's screen the teams are
-//  swapped, so each player sees their own fleet as "yours".
+//  ONLINE PLAY, up to 8 players (PeerJS, browser-to-browser; Nov 21, David)
+//  Host = player 1 (ME = 0). The host's browser runs the whole simulation and the lobby.
+//  Each guest connects to the host, gets a player id (1–7) and a fleet slot, builds his own fleet;
+//  the host builds the AI fleets and assigns every fleet to a team (A–H). Same team = allies.
+//  In battle the host sends each guest a snapshot filtered for that guest's team, and every
+//  impulse resolves once all human players with ships have sent their orders.
 // =====================================================================
-let netLog=[],netSfx=[],mpLastFleet='',mpSent=false;
+let netLog=[],netSfx=[],mpSent=false,mpLastSlot='';
 function mpPeerOpts(){const u=new URLSearchParams(location.search);const h=u.get('peerhost');
   return h?{host:h,port:+(u.get('peerport')||9000),path:u.get('peerpath')||'/',secure:u.get('peersecure')==='1',debug:1}:{debug:1}}
 function mpCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<5;i++)c+=a[Math.floor(Math.random()*a.length)];return c}
@@ -1649,58 +1690,83 @@ function mpStatus(html,cls){const el=$('mpstatus');if(el){el.innerHTML=html;el.c
 function mpBanner(text){let el=$('mpbanner');if(!el){el=document.createElement('div');el.id='mpbanner';document.body.appendChild(el)}el.textContent=text||'';el.style.display=text?'block':'none'}
 
 function mpInit(){
-  // record log lines and sounds on the host so the guest gets them too
+  // record log lines and sounds on the host so the guests get them too
   const rawLog=log;log=function(t,c,i){rawLog(t,c,i);if(MP.role==='host')netLog.push([t,c||'',i||null])};
   const rawSfx=sfxRaw;sfx=function(...a){rawSfx(...a);if(MP.role==='host')netSfx.push(a)};
   const box=$('mp');if(!box)return;
   if(typeof Peer==='undefined'){box.style.display='none';return}
-  box.innerHTML=`<b style="color:var(--warn)">ONLINE TWO-PLAYER</b>
+  box.innerHTML=`<b style="color:var(--warn)">ONLINE — up to 8 players</b>
     <button class="btn" id="mphost">Host an online game</button>
     <span class="dim">or join:</span> <input id="mpcode" maxlength="5" placeholder="CODE" style="width:70px;text-transform:uppercase;background:#0b1520;color:var(--txt);border:1px solid #2a4258;padding:4px 6px;font-family:inherit">
     <button class="btn" id="mpjoin">Join</button>
-    <div id="mpstatus" class="dim" style="margin-top:6px">Play against a friend on another computer: one of you hosts and shares the code.</div>`;
+    <div id="mpstatus" class="dim" style="margin-top:6px">Play with friends on other computers — together against AI fleets, against each other, or both. One of you hosts and shares the code.</div>`;
   $('mphost').onclick=mpHost;$('mpjoin').onclick=()=>{const c=$('mpcode').value.trim().toUpperCase();if(c.length>=4)mpJoin(c)};
   $('mpcode').addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')$('mpjoin').click()});
 }
-function mpReset(){try{MP.conn&&MP.conn.close()}catch(e){}try{MP.peer&&MP.peer.destroy()}catch(e){}MP.conn=MP.peer=null}
-function mpHost(){mpReset();const code=mpCode();mpStatus('Opening a connection…');
-  MP.peer=new Peer('shxb-'+code,mpPeerOpts());
-  MP.peer.on('open',()=>mpStatus(`Your game code: <b style="color:var(--warn);font-size:15px;letter-spacing:2px">${code}</b> — send it to your opponent. Waiting for them to join…`));
-  MP.peer.on('connection',c=>{if(MP.conn&&MP.conn.open){c.on('open',()=>{c.send({t:'full'});setTimeout(()=>c.close(),500)});return}MP.conn=c;MP.role='host';MP.on=true;mpWire(c)});
+function mpReset(){for(const x of MP.conns||[])try{x.c.close()}catch(e){}try{MP.conn&&MP.conn.close()}catch(e){}try{MP.peer&&MP.peer.destroy()}catch(e){}MP.conns=[];MP.conn=MP.peer=null;MP.on=false;MP.role=null;ME=0}
+const mpPlayers=()=>1+(MP.conns||[]).length;
+function mpLobbyStatus(){if(MP.role!=='host')return;const code=MP.code;
+  mpStatus(`Game code: <b style="color:var(--warn);font-size:15px;letter-spacing:2px">${code}</b> — share it. <span class="good">${mpPlayers()}/8 players connected.</span> Set teams, add AI fleets, then Launch.`)}
+function mpHost(){mpReset();const code=mpCode();MP.code=code;mpStatus('Opening a connection…');
+  MP.peer=new Peer('shxb-'+code,mpPeerOpts());MP.role='host';MP.on=true;ME=0;
+  MP.peer.on('open',()=>{mpLobbyStatus();renderBuilder()});
+  MP.peer.on('connection',c=>{
+    c.on('open',()=>{const inLobby=$('start').style.display!=='none';const used=new Set([0,...MP.conns.map(x=>x.pid)]);let pid=1;while(used.has(pid))pid++;const si=SLOTS.findIndex(x=>!x);
+      if(!inLobby||pid>7||si<0){c.send({t:'full',why:!inLobby?'The battle has already started.':'That game is full (8 fleets / 8 players).'});setTimeout(()=>c.close(),500);return}
+      MP.conns.push({c,pid});const myT=(SLOTS[mySlotIdx()]||{team:0}).team;
+      SLOTS[si]={kind:'human',owner:pid,team:myT,name:'Player '+(pid+1)};fleet[si]=[];fleetFaction[si]='Martian';fleetTL[si]=4;fleetForm[si]='line';startSpeed[si]=4;   // joins the host's team by default (co-op); the host can change it
+      c.send({t:'welcome',pid});log(`Player ${pid+1} joined`,'good');mpLobbyStatus();renderBuilder();mpBroadcastLobby()});
+    c.on('data',m=>mpOnMsg(m,c));c.on('close',()=>mpDrop(c));c.on('error',e=>mpStatus('Connection problem: '+(e.type||e),'bad'))});
   MP.peer.on('error',e=>mpStatus('Connection problem: '+(e.type||e),'bad'))}
-function mpJoin(code){mpReset();mpStatus('Connecting to game '+code+'…');
+function mpDrop(c){const x=MP.conns.find(y=>y.c===c);if(!x)return;MP.conns=MP.conns.filter(y=>y!==x);
+  if($('start').style.display!=='none'){const si=SLOTS.findIndex(s=>s&&s.kind==='human'&&s.owner===x.pid);if(si>=0){SLOTS[si]=null;fleet[si]=[]}renderBuilder();mpBroadcastLobby();mpLobbyStatus()}
+  else{for(const s of ships)if(s.owner===x.pid&&!s.dead)s.ai=true;log(`Player ${x.pid+1} disconnected — the AI takes over their ships`,'warn');delete MP.ready[x.pid];if(phase==='decide')mpTryCommit()}}
+function mpJoin(code){const i0=mySlotIdx();const pre={fac:fleetFaction[i0],tl:fleetTL[i0],fleet:mpFleetOut(i0),form:fleetForm[i0],sp:startSpeed[i0]};mpReset();MP.pre=pre;mpStatus('Connecting to game '+code+'…');
   MP.peer=new Peer(mpPeerOpts());
-  MP.peer.on('open',()=>{const c=MP.peer.connect('shxb-'+code,{reliable:true});MP.conn=c;MP.role='guest';MP.on=true;mpWire(c)});
+  MP.peer.on('open',()=>{const c=MP.peer.connect('shxb-'+code,{reliable:true});MP.conn=c;MP.role='guest';MP.on=true;
+    c.on('open',()=>mpStatus('<span class="good">Connected</span> — waiting for the host…'));
+    c.on('data',m=>mpOnMsg(m,c));
+    c.on('close',()=>{mpBanner('The host disconnected.');mpStatus('Host disconnected.','bad');MP.on=false;MP.role=null;MP.conn=null;ME=0;SLOTS=[{kind:'human',owner:0,team:0,name:'You'},{kind:'ai',owner:null,team:1,name:''},null,null,null,null,null,null];if($('start').style.display!=='none')renderBuilder()});
+    c.on('error',e=>mpStatus('Connection problem: '+(e.type||e),'bad'))});
   MP.peer.on('error',e=>mpStatus(e.type==='peer-unavailable'?'No game found with that code. Check it and try again.':'Connection problem: '+(e.type||e),'bad'))}
-function mpWire(c){
-  c.on('open',()=>{mpStatus(MP.role==='host'?'<span class="good">Opponent connected!</span> You are Player 1. Build your fleet; your opponent builds theirs. You press Launch.':'<span class="good">Connected!</span> You are Player 2. Build your fleet; the host launches the battle.');
-    mpLastFleet='';fleet[1]=[];renderBuilder()});
-  c.on('data',mpOnMsg);
-  c.on('close',()=>{mpBanner('Your opponent disconnected.');mpStatus('Opponent disconnected.','bad');MP.on=false;MP.role=null;MP.conn=null;if($('start').style.display!=='none')renderBuilder()});
-  c.on('error',e=>mpStatus('Connection problem: '+(e.type||e),'bad'))}
-function mpSend(m){if(MP.conn&&MP.conn.open)MP.conn.send(m)}
-function mpSendFleet(){const m={t:'fleet',fleet:fleet[0].map(x=>({key:x.key,ai:!!x.ai})),form:fleetForm[0],faction:fleetFaction[0],startMode,chargeMode,speed:startSpeed[0]};const j=JSON.stringify(m);if(j===mpLastFleet)return;mpLastFleet=j;mpSend(m)}
-function mpOppSide(){const o=MP.opp.fleet.slice().sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);
-  return `<div class="fleetcol"><h3 style="color:${TEAMCOL[1]}">Opponent's fleet <span class="dim" style="font-weight:normal;font-size:11px">${o.length}/${MAXSHIPS}</span></h3>
-   <div class="fl-list">${o.map(x=>{const d=SHIPS[x.key];return `<div class="fl" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}${x.ai?' · AI':''}</span></div>`}).join('')||'<div class="dim">(opponent has no ships yet)</div>'}</div>
-   <div class="dim" style="margin-top:8px">${MP.conn&&MP.conn.open?'Formation: '+(FORMS[MP.opp.form]||'Line abreast'):'Waiting for an opponent to connect…'}</div></div>`}
+function mpSend(m){if(MP.role==='guest'){if(MP.conn&&MP.conn.open)MP.conn.send(m)}else for(const x of MP.conns)if(x.c.open)x.c.send(m)}
 
-// ---- host → guest snapshots ----
-function serShip(s){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k==='hist'||k==='fireChoice')continue;o[k]=s[k]}
-  o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.team===1?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
-  if(s.team===0){o.queue=[]}   // never reveal the host's orders
+// ---- lobby ----
+const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai}));
+function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode})}
+function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);const keep=mi>=0?{f:fleet[mi],fac:fleetFaction[mi],tl:fleetTL[mi],form:fleetForm[mi],sp:startSpeed[mi]}:null;
+  SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;
+  for(let i=0;i<MAXSLOTS;i++){fleet[i]=(m.fleets[i]||[]).map(x=>({...x}));fleetFaction[i]=m.fac[i];fleetTL[i]=m.tl[i];fleetForm[i]=m.form[i];startSpeed[i]=m.speed[i]}
+  const ni=mySlotIdx();if(keep&&ni===mi&&mpLastSlot){fleet[ni]=keep.f;fleetFaction[ni]=keep.fac;fleetTL[ni]=keep.tl;fleetForm[ni]=keep.form;startSpeed[ni]=keep.sp}   // my own slot: keep my local edits (the host echoes them back)
+  if(MP.pre&&SLOTS[ni]&&SLOTS[ni].owner===ME){const q=MP.pre;MP.pre=null;fleetFaction[ni]=q.fac;fleetTL[ni]=q.tl;fleet[ni]=q.fleet;fleetForm[ni]=q.form;startSpeed[ni]=q.sp;setTimeout(mpSendMySlot,0)}   // keep the faction (and ships) picked before joining
+  const myT=SLOTS[ni]?SLOTS[ni].team:0;mpStatus(`<span class="good">Connected</span> as Player ${ME+1} · Team ${TLET[myT]}. Build your fleet; the host sets teams and launches.`);
+  if($('start').style.display!=='none')renderBuilder()}
+function mpSendMySlot(){const i=mySlotIdx();const m={t:'myslot',fleet:mpFleetOut(i),fac:fleetFaction[i],tl:fleetTL[i],form:fleetForm[i],speed:startSpeed[i]};const j=JSON.stringify(m);if(j===mpLastSlot)return;mpLastSlot=j;mpSend(m)}
+function mpApplySlot(pid,m){const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===pid);if(i<0)return;
+  fleet[i]=(m.fleet||[]).slice(0,MAXSHIPS).filter(x=>SHIPS[x.key]).map(x=>({key:x.key,ai:!!x.ai}));if(FACTIONS[m.fac])fleetFaction[i]=m.fac;fleetTL[i]=m.tl;fleetForm[i]=m.form;startSpeed[i]=m.speed;
+  if($('start').style.display!=='none')renderBuilder();mpBroadcastLobby()}
+
+// ---- host → guest snapshots (each guest gets its own view) ----
+const teamOfPid=pid=>{const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===pid);if(s)return s.team;const sh=ships.find(x=>x.owner===pid);return sh?sh.team:-1};
+function serShip(s,pid){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k==='hist'||k==='fireChoice')continue;o[k]=s[k]}
+  o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.owner===pid?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
+  if(s.owner!==pid)o.queue=[];   // never reveal anyone else's orders
   return o}
 function serMissile(m,_,L){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:L.indexOf(m.target)},claim:m.claim?L.indexOf(m.claim):-1}}
-function mpSendState(){if(!MP.conn||!MP.conn.open)return;
-  const newFx=fx.filter(f=>!f._n);newFx.forEach(f=>f._n=1);
-  mpSend({t:'state',T,phase,ff:forfeitTeam,anim:ANIM,ships:ships.map(serShip),missiles:missiles.filter(m=>mslSpotted(m,1)).map(serMissile),fx:newFx.map(f=>({...f,_n:undefined})),sfx:netSfx,log:netLog,ready:{h:MP.hostReady,g:MP.guestReady}});netSfx=[];netLog=[]}
+function mpSendState(){if(!MP.conns.length)return;
+  const newFx=fx.filter(f=>!f._n);newFx.forEach(f=>f._n=1);const fxo=newFx.map(f=>({...f,_n:undefined}));
+  for(const x of MP.conns){if(!x.c.open)continue;const tm=teamOfPid(x.pid);
+    x.c.send({t:'state',T,phase,ff:forfeited,ht:MYTEAM,me:x.pid,myteam:tm,anim:ANIM,ships:ships.map(s=>serShip(s,x.pid)),missiles:missiles.filter(m=>mslSpotted(m,tm)).map(serMissile),fx:fxo,sfx:netSfx,log:netLog,ready:MP.ready})}
+  netSfx=[];netLog=[]}
 function mpTryCommit(){if(phase!=='decide')return;
-  if(MP.hostReady&&MP.guestReady){mpBanner('');commit()}
-  else{mpBanner(MP.hostReady?'Waiting for your opponent\'s orders…':(MP.guestReady&&P?'Your opponent is ready — give your orders and press Continue (Enter)':''));mpSend({t:'wait',h:MP.hostReady,g:MP.guestReady});buildHUD()}}
+  if(mpAllReady()){mpBanner('');commit()}
+  else{const wait=Object.entries(MP.ready).filter(([k,v])=>!v).map(([k])=>+k);
+    mpBanner(MP.ready[ME]?`Waiting for ${wait.map(p=>'Player '+(p+1)).join(', ')}…`:(wait.length===1&&wait[0]===ME&&P?'Everyone else is ready — give your orders and press Continue (Enter)':''));
+    mpSend({t:'wait',ready:MP.ready});buildHUD()}}
 
 // ---- guest side ----
-function mpApplyState(m){forfeitTeam=m.ff==null?null:1-m.ff;const first=$('start').style.display!=='none'||!ships.length;const old=ships,pi=old.indexOf(P);
-  ships=m.ships.map(o=>{const s={...o};s.d=SHIPS[o.key];s.weapons=o.weapons.map(w=>({...w,T:WT[w.t]}));s.fireSel=new Set(o.fireSel);s.team=1-o.team;s.isPlayer=s.team===0;s.hist=[];
+function mpApplyState(m){ME=m.me;MYTEAM=m.myteam;forfeited=m.ff||[];const first=$('start').style.display!=='none'||!ships.length;const old=ships,pi=old.indexOf(P);
+  ships=m.ships.map(o=>{const s={...o};s.d=SHIPS[o.key];s.weapons=o.weapons.map(w=>({...w,T:WT[w.t]}));s.fireSel=new Set(o.fireSel);s.isPlayer=s.owner===ME;s.hist=[];
     const prev=old.find(x=>x.name===o.name&&x.key===o.key&&x.team===s.team);if(prev)s.drawAng=prev.drawAng;return s});
   ships.forEach((s,i)=>{const ti=m.ships[i].target;s.target=ti>=0?ships[ti]:null});
   for(const s of ships){s.damaged=s.damaged||[];s.dc=(s.dc||[]).map(j=>({...j,box:s.damaged.find(b=>b.id===j.box.id)||j.box}))}
@@ -1708,35 +1774,39 @@ function mpApplyState(m){forfeitTeam=m.ff==null?null:1-m.ff;const first=$('start
   missiles.forEach((x,i)=>{const o=m.missiles[i];x.target=o.target.s!=null?ships[o.target.s]:missiles[o.target.m];x.claim=o.claim>=0?missiles[o.claim]:null});
   missiles=missiles.filter(x=>x.target&&x.owner);
   for(const f of m.fx)fx.push(f);for(const a of m.sfx)sfxRaw(...a);
-  for(const [t,c,i] of m.log)log(t,c==='good'?'bad':c==='bad'?'good':c,i||undefined);
+  const flip=m.ht!==MYTEAM;for(const [t,c,i] of m.log)log(t,flip?(c==='good'?'bad':c==='bad'?'good':c):c,i||undefined);   // the host's log is written from the host's side
   const newImp=m.T!==T||m.phase!==phase;T=m.T;ANIM=m.anim;
   if(m.phase==='moving'&&newImp)animT=0;phase=m.phase;
-  P=(pi>=0&&ships[pi]&&ships[pi].team===0&&!ships[pi].dead&&!ships[pi].ai)?ships[pi]:(mine()[0]||null);
+  P=(pi>=0&&ships[pi]&&own(ships[pi])&&!ships[pi].dead&&!ships[pi].ai)?ships[pi]:(mine()[0]||null);
   if(first){$('start').style.display='none';$('end').style.display='none';initAudio();startMusic();const C=camShip();if(C){cam.x=C.px.x;cam.y=C.px.y}cam.base=null;cam.snap=true;pan.x=pan.y=0;zoomMul=1}
   if(phase==='decide'&&newImp){mpSent=false;mpBanner('')}
   if(phase!=='decide'&&phase!=='over')mpBanner('');
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
-  mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
-function mpApplyOrders(orders){if(phase!=='decide')return;
-  for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>own(s)&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
+  mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the other players…');buildHUD()}
+function mpApplyOrders(orders,pid){if(phase!=='decide')return;
+  for(const o of orders){const s=ships[o.i];if(!s||s.owner!==pid||s.dead)continue;
     s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
-  MP.guestReady=true;mpTryCommit()}
+  MP.ready[pid]=true;mpTryCommit()}
 
-function mpOnMsg(m){if(!m||!m.t)return;
-  if(m.t==='full'){mpStatus('That game already has two players.','bad');return}
-  if(m.t==='fleet'){MP.opp={fleet:m.fleet||[],form:m.form||'line',faction:m.faction,speed:m.speed??4};if(MP.role==='guest'&&m.startMode){startMode=m.startMode}if(MP.role==='guest'&&m.chargeMode){chargeMode=m.chargeMode}if($('start').style.display!=='none')renderBuilder();return}
+function mpOnMsg(m,c){if(!m||!m.t)return;
   if(MP.role==='guest'){
+    if(m.t==='full'){mpStatus(m.why||'That game is full.','bad');return}
+    if(m.t==='welcome'){ME=m.pid;mpStatus(`<span class="good">Connected</span> as Player ${ME+1}.`);return}
+    if(m.t==='lobby'){mpApplyLobby(m);return}
     if(m.t==='state')mpApplyState(m);
-    else if(m.t==='wait'){if(phase==='decide')mpBanner(m.g&&!m.h?'Orders sent — waiting for the host…':(!m.g&&m.h?'The host is ready — give your orders and press Continue (Enter)':''))}}
-  else if(MP.role==='host'){
-    if(m.t==='orders')mpApplyOrders(m.orders);
-    if(m.t==='forfeit')doForfeit(1);
-    if(m.t==='getrec')mpSend({t:'rec',txt:recText()})}
-  if(m.t==='rec'&&MP.role==='guest'){mpBanner('');if(m.txt)recDownload(m.txt);else alertBox('The host has no battle record yet.')}}
+    else if(m.t==='wait'){if(phase==='decide'){const r=m.ready||{};const wait=Object.entries(r).filter(([k,v])=>!v).map(([k])=>+k);
+      mpBanner(r[ME]?(wait.length?`Orders sent — waiting for ${wait.map(p=>p===0?'the host':'Player '+(p+1)).join(', ')}…`:''):(wait.length===1&&wait[0]===ME?'Everyone else is ready — give your orders and press Continue (Enter)':''))}}
+    if(m.t==='rec'){mpBanner('');if(m.txt)recDownload(m.txt);else alertBox('The host has no battle record yet.')}
+    return}
+  if(MP.role==='host'){const x=MP.conns.find(y=>y.c===c);if(!x)return;
+    if(m.t==='myslot')mpApplySlot(x.pid,m);
+    if(m.t==='orders')mpApplyOrders(m.orders,x.pid);
+    if(m.t==='forfeit')doForfeit(x.pid);
+    if(m.t==='getrec')c.send({t:'rec',txt:recText()})}}
 
 // ---------- sound (synthesized, Web Audio) ----------
 let AC=null,master=null,sfxOn=true,sfxVol=.6,noiseBuf=null;const lastPlay={};
