@@ -178,7 +178,7 @@ const WT={
   HC:{name:'Heavy Coilgun',ab:'CG(h)',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
   XC:{name:'Superheavy Coilgun',ab:'CG(sh)',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},
   TC:{name:'Titan Coilgun',ab:'CG(t)',grp:'coils',kind:'slug',acc:'coil',dmg:22,cost:11},   // one more step: 22 dmg / 11 energy   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
-  MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:14,cost:0,mag:4},
+  MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:4},
   ST:{name:'Small Energy Torpedo',ab:'ET(s)',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'ET(m)',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
   HT:{name:'Heavy Energy Torpedo',ab:'ET(h)',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
@@ -621,9 +621,11 @@ function recShow(txt,name,ok){let el=$('recBox');if(!el){el=document.createEleme
 const alertBox=t=>recShow(t,'',false);
 function commit(){
   if(phase==='over')return;initAudio();recImpulse();
+  /* Nov 21 (David): fire happens with the facing the ship had when it gave its orders — pivoting away this impulse no longer cancels shots that were in arc */
+  const preArc=new Map();for(const s of alive()){const t=tgt(s);if(!t)continue;const sel=isAI(s)?(s.fireChoice||[]):[...s.fireSel];preArc.set(s,new Set(sel.filter(k=>canFireMount(s,k,t))))}
   for(const s of alive())applyQueue(s);
   const shots=[];
-  const collect=(s,t,sel)=>{for(const key of sel){if(!canFireMount(s,key,t))continue;
+  const collect=(s,t,sel)=>{for(const key of sel){if(!canFireMount(s,key,t)&&!(preArc.get(s)&&preArc.get(s).has(key)))continue;
     if(!(key[0]==='w'&&s.weapons[+key.slice(1)].T.kind==='missile'))s.darkFiredT=T;
     if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
