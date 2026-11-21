@@ -337,7 +337,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -894,6 +894,11 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(run&&s.d.doctrine==='kite'&&!(s.evadeCool>T)){s.evadeUntil=T+6;s.evadeCool=T+18}   // break away briefly, then re-engage
     if(s.evadeUntil>T){want={range:d+5,radial:1.2,orbit:2};face=a+side*110*D2R;prio=['lasers','coils']}
     else{want={range:s.d.prefRange||6,radial:.6,orbit:1};face=a;prio=['lasers','coils']}}
+  // hang back (Nov 20, from David's record): a crippled Dogahr doesn't dive into an intact enemy — it holds at range and fights with what it has left (missiles, long shots)
+  {const guns=x=>x.weapons.filter(w=>w.T.kind!=='missile'),frac=x=>{const g=guns(x);return g.length?g.filter(w=>w.alive).length/g.length:1};
+   const cripS=s.reactor<=s.reactor0*.6||s.hull<=s.d.hull*.5||frac(s)<=.5,healthyT=t.hull>=t.d.hull*.7&&frac(t)>=.6&&t.reactor>=t.reactor0*.7;
+   s.hangBack=AIV.hangback&&s.d.faction==='Dogahr'&&cripS&&healthyT;
+   if(s.hangBack){want={range:13,radial:1.1,orbit:.6,maxClose:8};if(s.mode==='hunt'||s.mode==='dive')s.mode='standoff'}}
   // kill shot (Nov 18): target's shields gone and hull low — close in and shoot everything with a real chance
   s.killing=AIV.kill&&t.shield+reinfAmt(t)<6&&(t.hull<=Math.max(30,t.d.hull*.3)||t.reactor<=t.reactor0*.3)&&s.mode!=='brace';
   if(s.killing&&s.d.doctrine!=='alpha'){const tHot=torpHot(s,t)&&t.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=3);
