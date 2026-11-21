@@ -433,11 +433,13 @@ function turnWarn(s,dir,cost){const m=turnPen(s,dir);if(m)toast(`⚠ ${thrName(d
 // ---- movement actions ----
 const BURNS={F:{c:'burn',burn:1},TL:{c:'burn',burn:1,turn:-2,kind:'turn'},TR:{c:'burn',burn:1,turn:2,kind:'turn'},TL3:{c:'burn',burn:1,turn:-1,kind:'turn'},TR3:{c:'burn',burn:1,turn:1,kind:'turn'},R:{c:'reverse',burn:-1}};
 function burnResult(s,a,f0){const A=BURNS[a];let f=f0??s.f;if(A.turn)f=(f+A.turn+NF)%NF;const v=fdir(A.slip?f+A.slip:f);return{f,dq:v[0]*A.burn,dr:v[1]*A.burn}}
-// small ships: a turn can't follow a turn, a slip can't follow a slip. Cruisers: turns and slips share one limit — after either, the next burn must be straight.
+// Nov 21 (David): turn-burns are limited by time, not by the next burn — frigates/corvettes every impulse, medium ships (destroyers, cruisers) every other impulse, the large Dreadnought every 3rd
+const turnGap=s=>s.d.turnGap??(s.d.pivotMax===1||s.d.cls==='Dreadnought'?3:/Frigate|Corvette/.test(s.d.cls)?1:2);
+const turnReady=s=>T-(s.lastTurnT??-99)>=turnGap(s);
 function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return false;   // main engine out: only reverse (retro) thrust
   if(a==='R'&&(s.dmgThrF||0)>=3)return false;   // fore thrusters out: no reverse burn
   if(A.turn<0&&(s.dmgThrS||0)>=3||A.turn>0&&(s.dmgThrP||0)>=3)return false;
-  if(!A.kind)return true;if(bigMove(s))return !(s.lastAdj==='turn'||s.lastAdj==='slip');return s.lastAdj!==A.kind}
+  if(A.kind==='turn')return turnReady(s);return true}
 
 // ---- queue of spending actions for the current decision point ----
 const pdC=s=>s.d.pdKind==='chain'?0:1;   // chain-gun PD (TL1) is free to load
@@ -463,7 +465,7 @@ function canQueue(s,act){
 function queue(s,act){if(act.type==='pd'&&s.d.pdKind==='chain')act.cost=0;if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'||drains(s.weapons[act.i])))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;s.E-=a.cost;
-    if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';s.burnFx=1}
+    if(a.type==='burn'){const b=burnResult(s,a.a);s.f=b.f;s.vq+=b.dq;s.vr+=b.dr;s.lastAdj=BURNS[a.a].kind||'burn';if(BURNS[a.a].kind==='turn')s.lastTurnT=T;s.burnFx=1}
     else if(a.type==='pivot'){s.f=(s.f+a.dir+NF)%NF}
     else if(a.type==='gen'){const on=genLvl(s)>0;s.gen={lvl:a.lvl,from:on&&a.lvl>0?s.gen.from:T+1};s.genLvl=a.lvl;if(a.lvl<1){s.shield=Math.min(s.shield,s.d.shield*a.lvl);s.reinf=[]}}   // renewing while running extends seamlessly
     else if(a.type==='reinf'){s.reinf.push({amt:a.n,exp:T+IMP});if(s.shTurn!==turnOf(T)){s.shTurn=turnOf(T);s.shUsed=0}s.shUsed+=a.n}
@@ -1252,7 +1254,7 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='hold')queue(s,{type:'hold',i:+v,cost:0});
   else if(k==='pausew')queue(s,{type:'pausew',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
-  else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?(s.d.big?'Cruisers: after a turn, the next burn must be straight':'A turn can\'t follow a turn'):(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
+  else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?`${s.name} can turn-burn every ${turnGap(s)>1?turnGap(s)===2?'other impulse':turnGap(s)+'rd impulse':'impulse'} — next at ${when((s.lastTurnT??-99)+turnGap(s))}`:(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
   else if(k==='dgmode')dgMode=v;
   else if(k==='disarm')s.fireSel.clear();
   else if(k==='wclick')smartW(s,+v);
