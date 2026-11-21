@@ -353,6 +353,8 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 // weapons, PD mounts and missile launchers 1 box each; main engine 3; port thrusters 3; starboard thrusters 3; reactor 10 (−10% output each); sensors 5 (−2 hexes scan range each)
 // Nov 21 (David): all shield values halved (rounded to whole points); reinforcement and base-shield repair now 1 energy per point
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
+// Nov 21 (David): every reactor 2 lower — energy allocation should matter more
+for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
   for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<10;i++)b.push({k:'rea'});for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
