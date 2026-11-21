@@ -1722,6 +1722,13 @@ function menuMusicKick(){const st=document.getElementById('start');if(!st||getCo
 addEventListener('pointerdown',menuMusicKick,true);addEventListener('keydown',menuMusicKick,true);
 {const _sm=startMusic;startMusic=function(){stopMenuMusic();return _sm.apply(this,arguments)}}
 {const _sg=setMusicGain;setMusicGain=function(){_sg();if(menuGain&&AC)menuGain.gain.setTargetAtTime(musicOn?musicVol:0,AC.currentTime,.1)}}
+musicVol=.4;   /* Nov 21 (David): default music volume 80% of the old 0.5 */
+/* music on/off button on the selection screens (fixed top-right, above the faction picker) */
+{const mb=document.createElement('button');mb.id='musicbtn';mb.className='btn';mb.style.cssText='position:fixed;top:10px;right:12px;z-index:95;font-size:13px;padding:6px 10px';
+  const lab=()=>{mb.textContent=musicOn?'♫ Music: On':'♫ Music: Off';mb.classList.toggle('aion',musicOn)};lab();
+  mb.addEventListener('click',e=>{e.stopPropagation();if(!AC)initAudio();toggleMusic();if(musicOn)startMenuMusic();lab()});
+  document.body.appendChild(mb);
+  setInterval(()=>{const st=document.getElementById('start');const on=!!st&&getComputedStyle(st).display!=='none';mb.style.display=on?'':'none';lab()},300)}
 
 function toggleMusic(){musicOn=!musicOn;const st=document.getElementById('start');if(!(st&&getComputedStyle(st).display!=='none'))startMusic();setMusicGain()}
 init();
