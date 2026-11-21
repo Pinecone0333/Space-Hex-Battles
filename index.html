@@ -354,7 +354,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -516,6 +516,7 @@ function upkeep(s){
   if(s.dark){const c=genCost(s)/IMP;if(!s.d.runDark||genLvl(s)<1-1e-9||s.E<c-1e-9){s.dark=false;if(s.team===0)log(`${s.name}: Run Dark dropped (${genLvl(s)<1-1e-9?'generator not at 100%':'no energy'})`,'bad')}else s.E-=c}
   if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
+  for(const w of s.weapons){if(!w.alive||w.T.kind!=='torp'||!w.holding||w.stages<=0||w.charging)continue;const c=torpStored(w)/6/IMP;if(s.E>=c-1e-9){s.E-=c;w.holdPaid=T}else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}   /* Nov 21: held torpedoes are paid first — a stalled charge just pauses, a lost hold throws the charge away */
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
     if((K==='ap'||drains(w))&&w.charging){const N=K==='ap'?AP_IMP:cycleImp(s,w),c=w.T.cost/N;const me=!isAI(s)&&(s.team===0||typeof MP!=='undefined'&&MP.on);   // short of energy: charging pauses, progress kept
       if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;if(w.paid>=N){w.charging=false;w.paid=0;w.state='ready';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab}`);if(me&&K==='ap')torpNote(s,`${w.T.ab} charged (${w.T.dmg} dmg)`,'good')}}
@@ -528,7 +529,7 @@ function upkeep(s){
             if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(me)torpNote(s,`${w.T.ab} fully charged (${torpDmg(w)} dmg) — now holding`,'good')}
             else{if(s.team===0&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`);if(me)torpNote(s,`${w.T.ab} reached stage ${w.stages} (${torpDmg(w)} dmg) — keep charging or Hold`,'warn')}}}
         else{w.charging=false;w.paid=0;if(w.stages>0){w.holding=true;w.state='holding'}else w.state='idle';if(me)torpNote(s,`not enough energy to keep charging ${w.T.ab} — ${w.stages?`holding at ${torpDmg(w)} dmg`:'charge lost'}`,'bad')}}
-      if(w.holding&&w.stages>0){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
+      if(w.holding&&w.stages>0&&w.holdPaid!==T){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
     else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(s.team===0&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
   for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(2,p.shots+1);return false}return true})}
 }
@@ -635,9 +636,9 @@ function commit(){
     for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
     if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',s.team===0?1:.65);if(s.team===0)log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
   for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
-  for(const s of alive()){if(s.msMode!=='def')continue;
+  for(const s of alive()){const DL=defLaunchers(s);if(!DL.length)continue;
     const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead));   /* Nov 21 (David): Defend launches the moment a missile aimed at the ship appears, at any range (was within 16 hexes) */
-    for(const th of thr){const w=s.weapons.find(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0);if(!w)break;
+    for(const th of thr){const w=DL.find(w=>w.state==='ready'&&w.ammo>0);if(!w)break;
       w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
@@ -702,10 +703,12 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
 }
 
 // ---- weapons ----
+/* Nov 21 (David): launchers held back for defense — all of them in Defend mode, or the first N working launchers when Attack mode has N set aside (s.msDef) */
+function defLaunchers(s){const L=s.weapons.filter(w=>w.alive&&w.T.kind==='missile');if(s.msMode==='def')return L;if(s.msMode==='off'&&s.msDef>0)return L.slice(0,s.msDef);return []}
 function canFireMount(s,key,t){if(!t||t.dead)return false;
   if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];return p.alive&&p.shots>0&&inArc(s,p.arc,t)}
   const w=s.weapons[+key.slice(1)];if(!w.alive)return false;const K=w.T.kind;
-  if(K==='missile')return s.msMode==='off'&&w.state==='ready'&&w.ammo>0;
+  if(K==='missile')return s.msMode==='off'&&!defLaunchers(s).includes(w)&&w.state==='ready'&&w.ammo>0;
   if(K==='torp')return w.stages>=1&&inArc(s,w.arc,t);
   return w.state==='ready'&&inArc(s,w.arc,t)}
 const accK=(s,k)=>s.d.tl===5&&ACC[k+'5']?k+'5':k;   // TL5 ships read the stretched 14-hex tables
@@ -939,7 +942,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       if(weak)s.dove=true;s.mode=(s.dove||spent&&d<=14)&&!t.dead?'dive':'snipe';
       if(s.mode==='dive'){want={range:2,radial:1.2,orbit:.3,chase:true,maxClose:14};face=a;prio=['lances','lasers']}
       else{want={range:s.d.standRange||11,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lances','lasers']}}   // load the lance first (holding is free), lasers with what's left
-    else if(s.mode==='brace'){want={range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   // can't outrun it: face it, reinforce, shoot
+    else if(s.mode==='brace'){want=AIV.r6?{range:11,radial:.7,orbit:7,maxClose:10}:{range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   /* Nov 21: can't out-brake a fast torpedo charge (reverse only every other impulse) — slide sideways off its nose line instead, keep shooting */   // can't outrun it: face it, reinforce, shoot
     else if(hot&&!AIV.dStand){want={range:10,radial:1,orbit:2};face=a;prio=['lasers','coils']}
     else if(hot){want={range:6,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
     else if(AIV.r5&&(s.d.faction==='Hunibler'||s.d.faction==='Hunifer')){   // nimble raiders: dive in when the spinal punch is ready, pull out to ~9 while it reloads
@@ -1000,7 +1003,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;const Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4;
+  const urgent=AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4;
   const pen0=posPen(V,s.f);const navOK=!starved||d<3;
   if(navOK&&(em>=(urgent?.75:1.5)||pen0>.35)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent||pen0>.6?0:Math.min(8,s.reactor/4))){let best=null,bv=em+pen0;
     // Nov 20: agile ships can pivot first and then burn along the new facing (all within the ship's rotation limit per impulse)
@@ -1051,7 +1054,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     let lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='beam'&&canFireMount(s,k,t));if(!s.weapons.some(w=>w.alive&&w.T.kind==='beam'))lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='slug'&&canFireMount(s,k,t));
     const ref=torps.length?tk:lk;const best=ref.reduce((m,k)=>Math.max(m,hitP(s,k,t)),0);
     const pen=s.d.accPen||0;const hurt=AIV.mhold&&(s.shield+reinfAmt(s))<s.d.shield*.3&&s.hull<s.d.hull*.8;
-    const trig=s.killing&&best>=.15||best>=.85-pen-1e-6||AIV.trig65&&best>=.65-pen-1e-6&&d<=7||best>=.65-pen-1e-6&&sepRate>.25||s.holdImp>=8&&best>=.75-pen-1e-6||(s.holdImp>=14||hurt)&&best>=.65-pen-1e-6;   // the longer it's held off (or the more it's hurt), the lower the bar
+    const trig=s.killing&&best>=.15||AIV.r6&&best>=.65-pen-1e-6||best>=.85-pen-1e-6||AIV.trig65&&best>=.65-pen-1e-6&&d<=7||best>=.65-pen-1e-6&&sepRate>.25||s.holdImp>=8&&best>=.75-pen-1e-6||(s.holdImp>=14||hurt)&&best>=.65-pen-1e-6;   // the longer it's held off (or the more it's hurt), the lower the bar
     if(s.mode==='brawl'){keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
         if(K==='missile'){if(d<=16)fire.push(key);return}
         if(K==='torp'){if(w.stages>=1&&pp>=.65-pen-1e-6)fire.push(key);return}
@@ -1061,7 +1064,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const strip=trig&&d>2&&t.shield+reinfAmt(t)>t.d.shield*.5&&keys.some((k,i)=>s.weapons[i].alive&&(s.weapons[i].T.kind==='beam'||s.weapons[i].T.kind==='slug')&&canFireMount(s,k,t));   // shields up: lasers/coilguns knock them down, torpedoes follow next impulse
     keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind;
       if(K==='missile'){if(d<=16)fire.push(key);return}
-      if(K==='torp'){if(w.stages>=3&&trig&&!(AIV.strip&&strip)){fire.push(key);s.alphaDone=true}return}
+      if(K==='torp'){if(w.stages>=3&&trig&&!(AIV.strip&&!AIV.r6&&strip)){fire.push(key);s.alphaDone=true}return}   /* Nov 21 (David): fire the moment there's a good shot — no waiting for shields to drop */
       if(trig||selfDef&&hitP(s,key,t)>=(s.killing?.1:.5-pen-1e-6))fire.push(key)});
     const q=s.queue;s.queue=[];return{queue:q,fire}}
   const msReady=[];
@@ -1087,12 +1090,13 @@ function bar(v,max,cls){return `<div class="bar ${cls||''}"><i style="width:${ma
 const btn=(id,label,ok,title)=>`<button class="btn" data-act="${id}" ${ok?'':'disabled'} ${title?`title="${title}"`:''}>${label}</button>`;
 const TEAMCOL=['#4fd8ff','#ff8a3d'];
 // grouped missile launchers: one row of status chips + launch/cycle buttons
-function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireSel.has('w'+i);const c=!w.alive?'<span class="bad">✖</span>':armed?'<span class="warn">◉</span>':w.state==='ready'?'<span class="good">●</span>':w.state==='cycling'?'<span class="dim">◔</span>':w.state==='reloading'?'<span class="dim">↻</span>':'<span class="dim">○</span>';
+function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireSel.has('w'+i);const c=!w.alive?'<span class="bad">✖</span>':defLaunchers(s).includes(w)&&s.msMode==='off'?`<span class="good" title="held for defense">⛨</span>`:armed?'<span class="warn">◉</span>':w.state==='ready'?'<span class="good">●</span>':w.state==='cycling'?'<span class="dim">◔</span>':w.state==='reloading'?'<span class="dim">↻</span>':'<span class="dim">○</span>';
     return `<span title="${w.arc} launcher: ${!w.alive?'destroyed':w.state}${w.alive?' · '+w.ammo+'/4 missiles'+(w.state!=='ready'&&w.state!=='idle'?' · ready '+when(w.readyT):''):''}">${c}</span>`}).join('');
   const rdy=ws.filter(({w})=>w.alive&&w.state==='ready').length,ammo=ws.reduce((a,{w})=>a+(w.alive?w.ammo:0),0);
   const fire=t?ws.filter(({i})=>canFireMount(s,'w'+i,t)):[];const armed=ws.filter(({i})=>s.fireSel.has('w'+i)).length;
   const idle=ws.filter(({w,i})=>canQueue(s,{type:'start',i,cost:0})).length;let ctl='';
   if(sd){if(idle)ctl+=btn('mslcyc','Cycle '+idle,true,'Start every idle launcher cycling (free)');
+    {const nL=ws.filter(({w})=>w.alive).length;if(s.msMode==='off'&&nL)ctl+=`<span class="chip" title="Launchers set aside for defense: they fire interceptors the moment a missile aimed at this ship appears; the rest launch offensively">🛡${btn('msdef:-1','−',(s.msDef||0)>0)}<b>${Math.min(s.msDef||0,nL)}</b>/${nL}${btn('msdef:1','+',(s.msDef||0)<nL)}</span>`}
     ctl+=`<button class="btn${s.msDeploy?' aion':''}" data-act="msdeploy" title="Fire: missiles light at once and home on the target. Deploy: missiles leave the rack dark, coasting at your velocity with the engine off (no countdown, unseen outside enemy sensor range) until you light them.">${s.msDeploy?'Deploy':'Fire'}</button>`;
     if(fire.length){ctl+=btn('mslone',armed?`${s.msDeploy?'Deploy':'Launch'} ${armed}+1`:(s.msDeploy?'Deploy 1':'Launch 1'),armed<fire.length);ctl+=btn('mslall','All '+fire.length,armed<fire.length);if(armed)ctl+=btn('mslclr','✕',true,'Cancel launches')}
     const dn=missiles.filter(m=>!m.dead&&m.dorm&&m.owner===s).length;if(dn)ctl+=`<button class="btn${s.mslLight?' aion':''}" data-act="mslight" title="Light every deployed missile this impulse: they ignite and home on your current target (3-turn countdown starts now)">${s.mslLight?'Lighting ':'Light '}${dn}</button>`}
@@ -1350,6 +1354,7 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='submode')s.subMode=!s.subMode;
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
   else if(k==='msdeploy')s.msDeploy=!s.msDeploy;
+  else if(k==='msdef'){const nL=s.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;s.msDef=clamp((s.msDef||0)+(+v),0,nL);for(const w of defLaunchers(s))s.fireSel.delete('w'+s.weapons.indexOf(w))}
   else if(k==='mslight')s.mslLight=!s.mslLight;
   else if(k==='rundark'){if(!s.dark&&genLvl(s)<1-1e-9){log('Run Dark needs the shield generator at 100%','bad')}else s.dark=!s.dark}
   else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:0});
@@ -1573,7 +1578,7 @@ function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;con
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
   renderBuilder();openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openFactionPicker(0,true)});
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';fleet[0].length=0;if(!MP.on)fleet[1].length=0;menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openFactionPicker(0,true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
@@ -1678,11 +1683,11 @@ function mpApplyState(m){forfeitTeam=m.ff==null?null:1-m.ff;const first=$('start
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
 function mpApplyOrders(orders){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
-    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
   MP.guestReady=true;mpTryCommit()}
 
