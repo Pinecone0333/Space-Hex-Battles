@@ -1734,7 +1734,7 @@ try{const v=localStorage.getItem('shtMusicVol');if(v!=null&&isFinite(+v))musicVo
   const mb=document.createElement('button');mb.id='musicbtn';mb.className='btn';mb.style.cssText='font-size:13px;padding:5px 9px';
   const sl=document.createElement('input');sl.type='range';sl.min=0;sl.max=100;sl.step=1;sl.id='musicvol';sl.title='Music volume';sl.style.cssText='width:110px;accent-color:#5ad18c;cursor:pointer';
   const pc=document.createElement('span');pc.className='dim';pc.style.cssText='font-size:12px;min-width:34px;text-align:right';
-  const lab=()=>{mb.textContent=musicOn?'♫ Music: On':'♫ Music: Off';mb.classList.toggle('aion',musicOn);if(document.activeElement!==sl)sl.value=Math.round(musicVol*100);pc.textContent=Math.round(musicVol*100)+'%'};lab();
+  const lab=()=>{mb.textContent=!musicOn?'♫ Music: Off':(!AC||AC.state!=='running')?'♫ Click for music':'♫ Music: On';mb.classList.toggle('aion',musicOn);if(document.activeElement!==sl)sl.value=Math.round(musicVol*100);pc.textContent=Math.round(musicVol*100)+'%'};lab();
   mb.addEventListener('click',e=>{e.stopPropagation();if(!AC)initAudio();toggleMusic();if(musicOn)startMenuMusic();lab()});
   sl.addEventListener('input',()=>{musicVol=+sl.value/100;if(!musicOn&&musicVol>0){musicOn=true}if(!AC)initAudio();startMenuMusic();setMusicGain();try{localStorage.setItem('shtMusicVol',musicVol)}catch(e){}lab()});
   ['pointerdown','click','keydown'].forEach(ev=>sl.addEventListener(ev,e=>e.stopPropagation()));
@@ -1751,6 +1751,12 @@ try{const v=localStorage.getItem('shtMusicVol');if(v!=null&&isFinite(+v))musicVo
 function audibleSpan(buf){const d=buf.getChannelData(0),n=d.length,th=.003;let a=0,b=n-1;while(a<n&&Math.abs(d[a])<th)a++;while(b>a&&Math.abs(d[b])<th)b--;return[Math.max(0,a/buf.sampleRate-.01),Math.min(buf.duration,(b+1)/buf.sampleRate+.05)]}
 function fitLoop(src){if(!src||src._fit||!src.buffer)return;src._fit=1;const buf=src.buffer;const sp=buf._sp||(buf._sp=audibleSpan(buf));if(sp[1]-sp[0]>2){src.loopStart=sp[0];src.loopEnd=sp[1]}}
 setInterval(()=>{fitLoop(musicSrc);fitLoop(menuSrc)},250);
+
+/* Nov 21 (David): try to start the menu music the moment the page loads. Browsers allow this only if the site
+   is already trusted for sound (e.g. visited and played before); otherwise it starts on the first click/key. */
+function menuAutostart(){try{if(!AC)initAudio();if(!AC)return;startMenuMusic();setTimeout(preloadBattleMusic,1500);
+  if(AC.state!=='running')AC.resume().catch(()=>{})}catch(e){}}
+if(document.readyState==='loading')addEventListener('DOMContentLoaded',menuAutostart);else setTimeout(menuAutostart,0);
 
 function toggleMusic(){musicOn=!musicOn;const st=document.getElementById('start');if(!(st&&getComputedStyle(st).display!=='none'))startMusic();setMusicGain()}
 init();
