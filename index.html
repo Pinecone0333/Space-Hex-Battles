@@ -354,7 +354,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -886,7 +886,39 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);return r}
+function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);return r}
+/* AI round 7 (Nov 21, from David's records): keep point defense fed.
+   (a) never start more charge-over-time drain than the reactor can carry (keeps ~0.75/impulse spare);
+   (b) while enemy missiles are inbound or an enemy launcher with ammo is within 30 hexes, keep enough energy to refill every PD mount;
+   (c) then top up PD with what's left. Planned burns/pivots/loads that would break the reserve are dropped (a burn goes with its pivots). */
+function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
+  const threat=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24)||enemiesOf(s).some(e=>hexDist(e,s)<=30&&e.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0));
+  const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,2-p.shots-p.pending.length):0),0):0;
+  let rate=upkeepCost(s);const cap=income(s)-.75;let E=s.E;const out=[];let dropBurn=false;
+  for(const x of q){
+    if(x.type==='start'){const w=s.weapons[x.i];const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/(w.T.kind==='ap'?AP_IMP:cycleImp(s,w)):w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
+      if(dr){if(rate+dr>cap+1e-9)continue;rate+=dr;out.push(x);continue}}
+    if(x.type==='pd'||x.type==='gen'||x.type==='dc'||x.type==='dccancel'||x.type==='hold'){out.push(x);E-=x.cost||0;continue}
+    const c=x.cost||0;
+    if(x.type==='burn'&&dropBurn){dropBurn=false;continue}
+    if(c>0&&E-c<pdNeed-1e-9){if(x.type==='pivot')dropBurn=true;continue}
+    if(x.type==='burn')dropBurn=false;
+    out.push(x);E-=c}
+  r.queue=out;
+  if(threat&&!s.d.pdKind){s.queue=r.queue;s.pd.forEach((p,i)=>{let n=0;while(n++<2&&s.E-qCost(s)-genReserve(s)>=1&&queue(s,{type:'pd',i,cost:1})){}});r.queue=s.queue;s.queue=[]}}
+/* Dogahr missile waves (r7): launch when the target's defense is down or can be saturated; at long range against a full defense, only a 2-missile probe now and then */
+function dogWave(s,t,n,d){if(!n)return 0;const seen=scanWeapons(t,s.team);
+  const pdShots=t.pd.reduce((a,p)=>a+(p.alive?(seen?p.shots:2):0),0)*(t.d.pdKind==='chain'?.6:1);
+  const ic=(seen?defLaunchers(t).filter(w=>w.state==='ready'&&w.ammo>0).length:t.weapons.filter(w=>w.alive&&w.T.kind==='missile').length*(t.msMode==='def'?1:0));
+  const wave=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
+  const allyReady=ships.filter(o=>o!==s&&!o.dead&&o.team===s.team&&tgt(o)===t).reduce((a,o)=>a+o.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0).length,0);
+  const def=pdShots*.75+ic*.7;
+  if(d<=10)return n;                                  // close in: no time to react — everything, with the guns
+  if(n+allyReady+wave>=def+3)return n;                  // saturation
+  if(seen&&pdShots<=1)return n;                         // its PD is empty or reloading
+  if(wave>0&&wave<def)return 0;               // let the probe draw fire first
+  if(wave===0&&(!s.probeT||T-s.probeT>=IMP)){s.probeT=T;return Math.min(2,n)}   // probe: draws interceptors and PD shots
+  return 0}
 /* Golthan AI (Nov 21): run dark while the enemy is off the bow and the guns are quiet; deploy missiles at range, light them close in */
 function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.target:null;s.msDeploy=false;s.mslLight=false;if(!t){s.dark=false;return}const d=hexDist(s,t);
   const firing=(r.fire||[]).some(k=>!(k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='missile'));
@@ -1074,7 +1106,8 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(AIV.r5&&K==='ap'&&!s.killing&&pp<.65&&!(s.hull<s.d.hull*.35))return;   // antiproton lances (2-turn recharge): only good shots
     if(pp>=(s.killing?.1:.35))fire.push(key)});
   if(msReady.length){let n=msReady.length;
-    if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
+    if(AIV.r7&&DDOC(s))n=dogWave(s,t,n,d);
+    else if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
       if(s.salvo&&s.salvo.t===t&&T-s.salvo.T<6){n=T-s.salvo.T>=2?n:0}            // second half follows 2 impulses after the first
       else if(own>0)n=T%2?0:n;                                                   // allies' wave already in the air: join it
       else{n=Math.ceil(n/2);s.salvo={t,T}}}                                       // open with half to draw out the PD
