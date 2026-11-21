@@ -1144,6 +1144,26 @@ const dgJob=(s,b)=>(s.dc||[]).some(j=>j.box===b)||s.queue.some(q=>q.type==='dc'&
 const SYSN={eng:'Main engine',thrF:'Fore thrusters',thrP:'Port thrusters',thrS:'Starboard thrusters',rea:'Reactor',sen:'Sensors'};
 const SYSMAX={eng:3,thrF:3,thrP:3,thrS:3,rea:10,sen:5};
 const sysDmg=(s,k)=>({eng:s.dmgEng,thrF:s.dmgThrF,thrP:s.dmgThrP,thrS:s.dmgThrS,rea:s.dmgRea,sen:s.dmgSen}[k]||0);
+/* Nov 21 (David): damage-control diagram — only green (working) / red (damaged, click to repair), clear names, no charge states */
+function dcDiagram(s){const L=dgLayout(s),sd=phase==='decide'&&!s.ai;const poly=pts=>pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+  const G='#4cff7a',GF='#12301b',Rr='#ff4d4d',RF='#3a1010';
+  let g=L.hull.map(h=>`<polygon points="${poly(h)}" fill="${s.color}10" stroke="${s.color}77" stroke-width="1.1"/>`).join('');
+  for(const it of L.items){let body='',tip='',act='';
+    const tag=(lab,ok,job,fs=7.5,minW=22)=>{const wd=Math.max(minW,lab.length*fs*.62+8);return `<rect x="${-wd/2}" y="-7" width="${wd}" height="14" rx="3" fill="${ok?GF:RF}" stroke="${ok?G:Rr}" stroke-width="1.4"/><text y="3" font-size="${fs}" font-family="monospace" text-anchor="middle" fill="${ok?'#c8ffd8':'#ffd0d0'}">${job?'🔧':''}${lab}</text>`};
+    if(it.t==='w'){const w=s.weapons[it.i],box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===it.i),job=box&&dgJob(s,box),ok=w.alive;
+      if(w.T.kind==='missile'){body=`<rect x="-5" y="-5" width="10" height="10" rx="1.5" fill="${ok?GF:RF}" stroke="${ok?G:Rr}" stroke-width="1.3"/>${job?'<text y="3" font-size="7" text-anchor="middle">🔧</text>':''}`;tip=`Missile launcher`}
+      else{body=`<text y="-9" font-size="6.5" font-family="monospace" text-anchor="middle" fill="#8b98a6">${w.arc==='ALL'?'360':w.arc}</text>`+tag(w.T.ab,ok,job);tip=`${w.T.name} (${w.arc==='ALL'?'360°':w.arc})`}
+      tip+=ok?' — working':job?' — DESTROYED · repair team working (click to recall)':' — DESTROYED · click to send a repair team';if(!ok&&sd)act=`wclick:${it.i}`}
+    else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),ok=p.alive;
+      body=`<circle r="7" fill="${ok?GF:RF}" stroke="${ok?G:Rr}" stroke-width="1.3"/><text y="2.5" font-size="${job?6:5.5}" font-family="monospace" text-anchor="middle" fill="${ok?'#c8ffd8':'#ffd0d0'}">${job?'🔧':'PD'}</text>`;
+      tip=`Point defense (${p.arc==='ALL'?'360°':p.arc})${ok?' — working':job?' — DESTROYED · repair team working (click to recall)':' — DESTROYED · click to send a repair team'}`;if(!ok&&sd)act=`pdclick:${it.i}`}
+    else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],jobs=(s.damaged||[]).filter(b=>b.k===k&&dgJob(s,b)).length,ok=!n;
+      const nm={eng:'ENGINE',thrF:'FWD THR',thrP:'PORT THR',thrS:'STBD THR',rea:'REACTOR',sen:'SENSORS'}[k];
+      const lab=ok?nm:k==='rea'?`${nm} ${100-10*n}%`:`${nm} ${n}/${mx}`;body=tag(lab,ok,jobs,6.2,30);
+      tip=`${SYSN[k]}${ok?' — working':` — ${n}/${mx} hits`+(k==='rea'?` (output ${100-10*n}%)`:k==='sen'?` (scan range ${sensRange(s)} hexes)`:n>=mx?' (out)':` (+${Math.min(n,2)*50}% cost)`)+(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a repair team')}`;
+      if(!ok&&sd)act=`sysclick:${k}`}
+    g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${body}</g>`}
+  return `<svg class="dgm m-repair" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}</svg>`}
 // mode: 'own' (clickable) or 'enemy' (read-only; weapon states only when scanned)
 function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phase==='decide'&&!s.ai,seeW=own||scanWeapons(s),seeS=own||scanStatus(s);
   const poly=pts=>pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
@@ -1281,7 +1301,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
         h+=`<div class="wrow"><span class="arc ${bears?'bears':''}">${w.arc}</span><span class="wn" style="color:${GC[G.id]}">${w.T.ab}</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`}}
     s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1}))ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit')}
       h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''}">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'CHN':'PD'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
-    }else{dgMode='repair';h+=shipDiagram(s,'own',t)+`<div class="row sm">${dmgLine(s).replace(/<\/?div[^>]*>/g,'')}</div>`}
+    }else{dgMode='repair';h+=dcDiagram(s)+`<div class="sm dim" style="margin:3px 0"><span style="color:#4cff7a">■</span> working &nbsp;·&nbsp; <span style="color:#ff4d4d">■</span> damaged — click to repair &nbsp;·&nbsp; 🔧 team on it</div>`+(dcPanel(s,sd,false)||`<div class="row sm good">No damage.</div>`)}
     h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
   else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
