@@ -1240,8 +1240,7 @@ function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(p
   ctx.strokeStyle=s.color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of s.d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of s.d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
   if(s.burnFx>0){ctx.fillStyle=`rgba(255,180,90,${s.burnFx})`;ctx.beginPath();ctx.moveTo(-36,-5);ctx.lineTo(-52-Math.random()*8,0);ctx.lineTo(-36,5);ctx.closePath();ctx.fill()}
   ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=TEAMCOL[s.team];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(s.team===0?(s.ai?' (AI)':''):''),ly=Y+48*sc+8*dpr;
-    if(s.team!==0){const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle='#ffd24d';ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}
-    else ctx.fillText(nm,X,ly)}if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
+    {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=s.team!==0?'#ffd24d':'#8fe3ff';ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
 
 // ---- flow: fleet builder ----
 const fleet=[[],[]];const MAXSHIPS=20;
