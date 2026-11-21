@@ -302,8 +302,8 @@ SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnou
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
-FACTIONS.Golthan={color:'#a0703c',blurb:'Armored broadside cruisers: front armor, laser batteries, missiles; sluggish'};
-SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,armor:25,moveMul:1.5,big:true,reactor:47.5,doctrine:'hunt',broadside:true,
+FACTIONS.Golthan={color:'#a0703c',blurb:'Stealth broadside cruisers: Run Dark from the bow, laser batteries, deployed missiles'};
+SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:47.5,doctrine:'hunt',broadside:true,
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
@@ -401,6 +401,13 @@ function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
 const sensRange=s=>Math.max(0,10-2*(s.dmgSen||0));
+/* Nov 21 (David): Golthan Run Dark. Costs the full generator drain again, needs the generator at 100% and shields up. Halves direct-fire hit chance from attackers within 60 deg of the bow. Firing breaks it for the next 4 impulses. */
+const darkBroken=s=>s.darkFiredT!=null&&T>s.darkFiredT&&T<=s.darkFiredT+4;
+const darkOn=s=>!!(s.dark&&s.d.runDark&&!s.dead&&genLvl(s)>=1-1e-9&&s.shield+reinfAmt(s)>0&&!darkBroken(s));
+const inBow=(t,a)=>Math.abs(norm(Math.atan2(a.px.y-t.px.y,a.px.x-t.px.x)-fAng(t.f)))<=Math.PI/3+1e-6;
+const darkCovers=(t,a)=>darkOn(t)&&inBow(t,a);
+/* deployed (dark) missiles: visible to the enemy only inside the sensor range of one of its ships */
+const mslSpotted=(m,team)=>!m.dorm||m.owner.team===team||ships.some(x=>!x.dead&&x.team===team&&Math.hypot(m.px.x-x.px.x,m.px.y-x.px.y)/HS<=sensRange(x));
 const scanWeapons=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
 const scanStatus=(e,team=0)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0);
 function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
@@ -431,7 +438,7 @@ const shieldCap=s=>s.d.shield*genLvl(s);
 const reinfAmt=s=>s.reinf.reduce((a,x)=>a+x.amt,0);
 const torpStored=w=>w.stages*w.T.perTurn;
 // ---- ongoing energy drains, paid every impulse: generator 1/8 of its per-turn cost, charging torpedoes 1/8 of a stage, held torpedoes 1/6 of the stored charge per turn ----
-function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0);if(!s.d.noShield&&g>0)out.push({lab:'Gen',c:genCost(s)*g/IMP});
+function upkeepList(s){const out=[];const g=genLvl(s)||(s.gen.from>T?s.gen.lvl:0);if(!s.d.noShield&&g>0)out.push({lab:'Gen',c:genCost(s)*g/IMP});if(s.dark&&s.d.runDark)out.push({lab:'Dark',c:genCost(s)/IMP});
   for(const w of s.weapons){if(w.alive&&w.T.kind==='ap'&&w.charging)out.push({lab:w.T.ab+'▷',c:w.T.cost/AP_IMP});if(w.alive&&drains(w)&&w.charging)out.push({lab:w.T.ab+'▷',c:w.T.cost/cycleImp(s,w)});if(!w.alive||w.T.kind!=='torp')continue;if(w.charging)out.push({lab:w.T.ab+'▷',c:w.T.perTurn/IMP});else if(w.holding&&w.stages>0)out.push({lab:w.T.ab+' hold',c:torpStored(w)/6/IMP})}
   return out}
 const upkeepCost=s=>upkeepList(s).reduce((a,x)=>a+x.c,0);
@@ -505,6 +512,7 @@ function upkeep(s){
   s.E=Math.min(s.reactor,s.E+income(s));
   s.reinf=s.reinf.filter(x=>x.exp>T&&x.amt>0);
   if(!s.d.noShield&&genLvl(s)>0){const c=genCost(s)*genLvl(s)/IMP;if(s.E>=c-1e-9)s.E-=c;else{s.gen={lvl:0,from:0};s.genLvl=0;if(s.team===0||s.isPlayer)log(`${s.name}: not enough energy to run the shield generator — it shut down`,'bad')}}
+  if(s.dark){const c=genCost(s)/IMP;if(!s.d.runDark||genLvl(s)<1-1e-9||s.E<c-1e-9){s.dark=false;if(s.team===0)log(`${s.name}: Run Dark dropped (${genLvl(s)<1-1e-9?'generator not at 100%':'no energy'})`,'bad')}else s.E-=c}
   if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||s.team===0)log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
   for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
@@ -559,7 +567,7 @@ function shouldStop(){
   const opp=fireOppCount();
   const newOpp=opp>lastFireOpp;lastFireOpp=opp;
   if(STOP.fire&&newOpp)return 'Firing opportunity';
-  if(STOP.missile){const own=mine();const inc=missiles.filter(m=>!m.dead&&!m.intercept&&own.includes(m.target)&&!seenMissiles.has(m)&&Math.hypot(m.px.x-m.target.px.x,m.px.y-m.target.px.y)/HS<=12);
+  if(STOP.missile){const own=mine();const inc=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&own.includes(m.target)&&!seenMissiles.has(m)&&Math.hypot(m.px.x-m.target.px.x,m.px.y-m.target.px.y)/HS<=12);
     if(inc.length){inc.forEach(m=>seenMissiles.add(m));return `${inc.length} missile${inc.length>1?'s':''} inbound`}}
   return true}
 // ---- battle record: every impulse's orders and ship state, for review after the battle ----
@@ -614,18 +622,23 @@ function commit(){
   for(const s of alive())applyQueue(s);
   const shots=[];
   const collect=(s,t,sel)=>{for(const key of sel){if(!canFireMount(s,key,t))continue;
+    if(!(key[0]==='w'&&s.weapons[+key.slice(1)].T.kind==='missile'))s.darkFiredT=T;
     if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
     if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
-      fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',s.team===0?1:.65);continue}
+      if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true}));if(s.team===0)sfx('missile',.35);continue}
+      s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',s.team===0?1:.65);continue}
     let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else w.state='idle';
     fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,fx:w.T.fx,dmg,hit:Math.random()<hitP(s,key,t)})}};
+  for(const s of alive()){if(!s.mslLight)continue;s.mslLight=false;const t=tgt(s);if(!t)continue;let n=0;
+    for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
+    if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',s.team===0?1:.65);if(s.team===0)log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
   for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
   for(const s of alive()){if(s.msMode!=='def')continue;
-    const thr=missiles.filter(m=>!m.dead&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead)&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=R.defRange);
+    const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead)&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=R.defRange);
     for(const th of thr){const w=s.weapons.find(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0);if(!w)break;
       w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
-      const ic=newMissile(s,th,{intercept:true});th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
+      const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
     const d=Math.min(i*.14,1.6),vol=sh.s.team===0?1:.65;let f;
     if(sh.kind==='lance'||sh.kind==='ap')f={type:'lance',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.85,max:.85,color:sh.kind==='ap'?'#f2e8ff':sh.s.d.torp,w:4+sh.dmg/8,snd:['rail',vol]};   // plasma lance: a spear of plasma thrust out to the target, not a ball
@@ -656,10 +669,11 @@ function finishResolve(){
 // ---- missiles (continuous Newtonian) ----
 const MST={l:0,h:0,pd:0,ally:0,hd:{}};
 function newMissile(s,t,o){if(!(o&&o.intercept))MST.l++;const ld0=t&&t.q!=null?hexDist(s,t):0;const A=hp(s.pq,s.pr),V=hp(s.vq,s.vr);const B=t.px||hp(t.q,t.r);const a=Math.atan2(B.y-A.y,B.x-A.x);
-  return Object.assign({px:{x:A.x,y:A.y},ppx:null,vx:V.x+Math.cos(a)*HS,vy:V.y+Math.sin(a)*HS,h:a,owner:s,target:t,age:0,ld:ld0},o)}
+  return Object.assign({px:{x:A.x,y:A.y},ppx:null,vx:V.x+(o&&o.dorm?0:Math.cos(a)*HS),vy:V.y+(o&&o.dorm?0:Math.sin(a)*HS),h:a,owner:s,target:t,age:0,ld:ld0},o)}
 function tgtVel(tg){if(tg.vx!=null&&tg.px&&tg.age!=null)return{x:tg.vx,y:tg.vy};return hp(tg.vq||0,tg.vr||0)}
 function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,at=()=>(last=base+(ev++)*.3);   // missile events play one after another once the move animation ends
   for(const m of missiles){if(m.dead)continue;const tg=m.target;
+    if(m.dorm){if(m.owner.dead){m.dead=true;continue}m.ppx={...m.px};m.px={x:m.px.x+m.vx*dt,y:m.px.y+m.vy*dt};continue}   /* deployed: coasting, engine off, no countdown */
     if(tg.dead){if(m.intercept){m.dead=true;continue}else{m.dead=true;MST.td=(MST.td||0)+1;continue}}   // Nov 20 (David): an interceptor whose missile is already gone self-destructs; it never picks a new target
     const tp=m.target.px,tv=tgtVel(m.target);const lx=tp.x-m.px.x,ly=tp.y-m.px.y,ld=Math.hypot(lx,ly)||1;
     m.h=Math.atan2(tv.y+ly/ld*R.msClose*HS-m.vy,tv.x+lx/ld*R.msClose*HS-m.vx);
@@ -676,13 +690,13 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
   for(const s of ships){if(s.dead)continue;
     for(const p of s.pd){if(!p.alive)continue;
       while(p.shots>0){let best=null,bk=1e9,bp=null;
-        for(const m of missiles){if(m.dead||m.intercept||claimed.has(m)||m.target.dead||m.target.team!==s.team||!m.ppx)continue;
+        for(const m of missiles){if(m.dead||m.intercept||claimed.has(m)||!m.ppx)continue;if(m.dorm){if(m.owner.team===s.team||!mslSpotted(m,s.team))continue}else if(m.target.dead||m.target.team!==s.team)continue;
           const c=segD(m,s.px);if(c.d>R.pdRange+.01)continue;const mh=pixToHex(c.x,c.y);if(!inArc(s,p.arc,mh))continue;
-          const k=(m.target===s?0:100)+c.d;if(k<bk){bk=k;best=m;bp=c}}
-        if(!best)break;claimed.add(best);p.shots--;if(best.target===s){const q=inPt(best,rnd(1.2,1.8));bp={...bp,x:q.x,y:q.y}}/* own defense: kill just outside the hull; covering an ally: kill at the point on the missile's path nearest this ship (within PD range) */const hit=Math.random()<R.pdHit-(s.d.pdKind==='chain'?.15:0)+.05*((s.d.tl||4)-((best.owner&&best.owner.d.tl)||4));FXD=at();sfxAt('pd',s.isPlayer?.6:.4);
+          const k=(m.dorm?200:m.target===s?0:100)+c.d;if(k<bk){bk=k;best=m;bp=c}}
+        if(!best)break;claimed.add(best);p.shots--;if(!best.dorm&&best.target===s){const q=inPt(best,rnd(1.2,1.8));bp={...bp,x:q.x,y:q.y}}/* own defense: kill just outside the hull; covering an ally: kill at the point on the missile's path nearest this ship (within PD range) */const hit=Math.random()<R.pdHit+(best.dorm?.15:0)-(s.d.pdKind==='chain'?.15:0)+.05*((s.d.tl||4)-((best.owner&&best.owner.d.tl)||4));FXD=at();sfxAt('pd',s.isPlayer?.6:.4);
         fx.push({type:s.d.pdKind==='chain'?'chain':'beam',x1:s.px.x,y1:s.px.y,x2:bp.x+(hit?0:rnd(-12,12)),y2:bp.y+(hit?0:rnd(-12,12)),t:s.d.pdKind==='chain'?.45:.35,max:s.d.pdKind==='chain'?.45:.35,color:s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff',w:1.5,d:FXD});
-        if(hit){MST.pd++;if(best.target!==s)MST.ally++;best.dead=true;ghost(best,bp.x,bp.y,FXD);burst({x:bp.x,y:bp.y},14,'#c7a6ff');ring({x:bp.x,y:bp.y},18,'#c7a6ff');sfxAt('mslPop',.6);if(best.target!==s&&s.isPlayer)log(`${s.name} PD shot down a missile aimed at ${best.target.name}`,'good')}FXD=0}}}
-  for(const m of missiles){if(m.dead||m.intercept)continue;if(m.closest<=HX){MST.h++;const hb=Math.min(24,Math.floor((m.ld||0)/4)*4);(MST.hd||(MST.hd={}))[hb]=(MST.hd[hb]||0)+1;m.dead=true;FXD=at();const g=inPt(m,1),hp_=inPt(m,.35);ghost(m,g.x,g.y,FXD);applyDamage(m.target,m.dmg,m.owner,m.ppx||m.px);burst(hp_,26,'#ffb36b',true);ring(hp_,40,'#ffb36b',true);sfxAt('boom',.5);FXD=0}}
+        if(hit){MST.pd++;if(!best.dorm&&best.target!==s)MST.ally++;best.dead=true;ghost(best,bp.x,bp.y,FXD);burst({x:bp.x,y:bp.y},14,'#c7a6ff');ring({x:bp.x,y:bp.y},18,'#c7a6ff');sfxAt('mslPop',.6);if(s.isPlayer&&(best.dorm||best.target!==s))log(best.dorm?`${s.name} PD destroyed a dark missile`:`${s.name} PD shot down a missile aimed at ${best.target.name}`,'good')}FXD=0}}}
+  for(const m of missiles){if(m.dead||m.dorm||m.intercept)continue;if(m.closest<=HX){MST.h++;const hb=Math.min(24,Math.floor((m.ld||0)/4)*4);(MST.hd||(MST.hd={}))[hb]=(MST.hd[hb]||0)+1;m.dead=true;FXD=at();const g=inPt(m,1),hp_=inPt(m,.35);ghost(m,g.x,g.y,FXD);applyDamage(m.target,m.dmg,m.owner,m.ppx||m.px);burst(hp_,26,'#ffb36b',true);ring(hp_,40,'#ffb36b',true);sfxAt('boom',.5);FXD=0}}
   missiles=missiles.filter(m=>!m.dead);msHold=ev?Math.max(0,last+.45-ANIM/1000):0;
 }
 
@@ -694,7 +708,8 @@ function canFireMount(s,key,t){if(!t||t.dead)return false;
   if(K==='torp')return w.stages>=1&&inArc(s,w.arc,t);
   return w.state==='ready'&&inArc(s,w.arc,t)}
 const accK=(s,k)=>s.d.tl===5&&ACC[k+'5']?k+'5':k;   // TL5 ships read the stretched 14-hex tables
-function hitP(s,key,t){const d=hexDist(s,t),ev=t.d.evade||0;if(key.startsWith('pd'))return Math.max(0,accAt(accK(s,'laser'),d)-(s.d.pdKind==='chain'?.15:0)-ev);const T_=s.weapons[+key.slice(1)].T;return T_.acc?Math.max(0,accAt(accK(s,T_.acc),d)-ev):1}   // evade: sleek hulls (Hunibler) are 5% harder to hit
+function hitP(s,key,t){return (darkCovers(t,s)?.5:1)*hitP0(s,key,t)}
+function hitP0(s,key,t){const d=hexDist(s,t),ev=t.d.evade||0;if(key.startsWith('pd'))return Math.max(0,accAt(accK(s,'laser'),d)-(s.d.pdKind==='chain'?.15:0)-ev);const T_=s.weapons[+key.slice(1)].T;return T_.acc?Math.max(0,accAt(accK(s,T_.acc),d)-ev):1}   // evade: sleek hulls (Hunibler) are 5% harder to hit
 
 // ---- damage ----
 function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
@@ -752,9 +767,9 @@ const AI_E=['gen','start','hold','pd','reinf','repair'],AI_DC=['dc','dccancel'];
 function autoPD(s){if(!s||s.dead||s.ai||!s.aiPD||s.aiE)return;   // Nov 20 (David): auto-reload PD — top up every mount whenever energy allows (generator upkeep protected)
   s.pd.forEach((p,i)=>{let n=0;while(n++<4&&s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}})}
 function aiAssist(s){autoPD(s);if(!s||s.dead||s.ai||!(s.aiE||s.aiDC))return;
-  const keep=s.queue.slice(),sv={target:s.target,msMode:s.msMode,subMode:s.subMode,fireSel:s.fireSel};
+  const keep=s.queue.slice(),sv={target:s.target,msMode:s.msMode,subMode:s.subMode,fireSel:s.fireSel,dark:s.dark,msDeploy:s.msDeploy,mslLight:s.mslLight};
   let r;try{r=aiDecide(s)}catch(e){r={queue:[]}}
-  s.target=sv.target;s.msMode=sv.msMode;s.subMode=sv.subMode;s.fireSel=sv.fireSel;s.queue=keep;
+  s.target=sv.target;s.msMode=sv.msMode;s.subMode=sv.subMode;s.fireSel=sv.fireSel;s.dark=sv.dark;s.msDeploy=sv.msDeploy;s.mslLight=sv.mslLight;s.queue=keep;
   for(const x of r.queue||[])if(s.aiE&&AI_E.includes(x.type)||s.aiDC&&AI_DC.includes(x.type))queue(s,x)}
 function chargeAll(s){let n=0;
   s.weapons.forEach((w,i)=>{if(!w.alive)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?w.T.cost/2:drains(w)?0:w.T.cost;if(queue(s,{type:'start',i,cost:c}))n++});
@@ -830,7 +845,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-1>=reserve&&queue(s,{type:'pd',i,cost:1})){}});
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
-  {const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
+  {const inbound=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
     const idleGuns=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
     if(inbound||(d<=10&&!idleGuns)){const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*.4-reinfAmt(s)));const n=Math.floor(room);
       if(n>=1&&s.E-qCost(s)-genReserve(s)-n*REINF_COST>=(s.mode==='charge'?6:s.d.faction==='Dogahr'?4:2))queue(s,{type:'reinf',n,cost:n*REINF_COST})}}
@@ -864,7 +879,15 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});return r}
+function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);return r}
+/* Golthan AI (Nov 21): run dark while the enemy is off the bow and the guns are quiet; deploy missiles at range, light them close in */
+function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.target:null;s.msDeploy=false;s.mslLight=false;if(!t){s.dark=false;return}const d=hexDist(s,t);
+  const firing=(r.fire||[]).some(k=>!(k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='missile'));
+  s.dark=genLvl(s)>=1-1e-9&&d<=18&&inBow(s,t)&&!firing&&!darkBroken(s)&&s.E-upkeepCost(s)>=genCost(s)/IMP*2;
+  const dm=missiles.filter(m=>!m.dead&&m.dorm&&m.owner===s),nf=(r.fire||[]).filter(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='missile').length;
+  s.msDeploy=!dm.length&&d>7?Math.floor(nf/2):0;   /* keep half of a salvo back as a dark reserve */
+  const wave=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner===s&&m.target===t&&Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=4);
+  s.mslLight=dm.length>0&&(d<=7||wave||s.hull<s.d.hull*.4||dm.some(m=>Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=6))}   /* light the reserve as the first wave arrives (PD busy), up close, or before dying */
 // AI round 5 (Nov 21, David): doctrine families. Martian doctrine: Martians and Earthlings. Dogahr doctrine (torpedo stand-off, nose avoidance,
 // liberal reinforcement): Dogahr and, for now, Golthan. Everyone else hunts without the Dogahr's torpedo-shyness and reinforces only when it matters.
 const MDOC=s=>s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>s.d.faction==='Dogahr'||s.d.faction==='Golthan';
@@ -950,7 +973,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   if(AIV.triage&&!armedNow&&cheapGun<99)for(const g of prio||[])s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g||s.queue.some(x=>x.type==='start'))return;const c=gc(w);
     if(s.E-qCost(s)-c-genReserve(s)>=0)queue(s,{type:'start',i,cost:c})});
   // missiles inbound: reload point defence before anything else
-  const inbN=missiles.filter(m=>!m.dead&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20&&(!AIV.pdBudget||m.target===s||!m.target.dead&&hexDist(m.target,s)<=3)).length;
+  const inbN=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20&&(!AIV.pdBudget||m.target===s||!m.target.dead&&hexDist(m.target,s)<=3)).length;
   if(AIV.pdFirst&&inbN){const need=AIV.pdBudget?Math.ceil(inbN*1.25):99;const have=()=>s.pd.reduce((a,p)=>a+(p.alive?p.shots+p.pending.length:0),0)+s.queue.filter(x=>x.type==='pd').length;
     s.pd.forEach((pp,i)=>{while(have()<need&&s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}})}
   // weapons before manoeuvre when the target is in range and guns sit empty (an energy-starved ship otherwise spends everything on burns)
@@ -997,10 +1020,10 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'||desperate||AIV.apfix&&g==='aplances'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
-  {const msIn=AIV.pdFirst&&missiles.some(m=>!m.dead&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20);
+  {const msIn=AIV.pdFirst&&missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20);
    if(!(starved&&!msIn))s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-pdC(s)>=(msIn&&!AIV.pdBudget?0:AIV.pdBudget?Math.max(reserve,msIn?2:8):reserve)&&queue(s,{type:'pd',i,cost:1})){}})}
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
-  {const inbound=missiles.some(m=>!m.dead&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
+  {const inbound=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=12);
     const idleGuns=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
     const brace=s.mode==='brace',dog=AIV.r5?DDOC(s):s.d.faction!=='Martian',mid=AIV.r5&&!DDOC(s)&&!MDOC(s);
     // Dogahr (Nov 18, David): reinforce liberally whenever an enemy is within 15 hexes, layer up to the full base shield (the 2× cap);
@@ -1044,7 +1067,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(AIV.r5&&K==='ap'&&!s.killing&&pp<.65&&!(s.hull<s.d.hull*.35))return;   // antiproton lances (2-turn recharge): only good shots
     if(pp>=(s.killing?.1:.35))fire.push(key)});
   if(msReady.length){let n=msReady.length;
-    if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
+    if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
       if(s.salvo&&s.salvo.t===t&&T-s.salvo.T<6){n=T-s.salvo.T>=2?n:0}            // second half follows 2 impulses after the first
       else if(own>0)n=T%2?0:n;                                                   // allies' wave already in the air: join it
       else{n=Math.ceil(n/2);s.salvo={t,T}}}                                       // open with half to draw out the PD
@@ -1066,7 +1089,9 @@ function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireS
   const fire=t?ws.filter(({i})=>canFireMount(s,'w'+i,t)):[];const armed=ws.filter(({i})=>s.fireSel.has('w'+i)).length;
   const idle=ws.filter(({w,i})=>canQueue(s,{type:'start',i,cost:0})).length;let ctl='';
   if(sd){if(idle)ctl+=btn('mslcyc','Cycle '+idle,true,'Start every idle launcher cycling (free)');
-    if(fire.length){ctl+=btn('mslone',armed?`Launch ${armed}+1`:'Launch 1',armed<fire.length);ctl+=btn('mslall','All '+fire.length,armed<fire.length);if(armed)ctl+=btn('mslclr','✕',true,'Cancel launches')}}
+    ctl+=`<button class="btn${s.msDeploy?' aion':''}" data-act="msdeploy" title="Fire: missiles light at once and home on the target. Deploy: missiles leave the rack dark, coasting at your velocity with the engine off (no countdown, unseen outside enemy sensor range) until you light them.">${s.msDeploy?'Deploy':'Fire'}</button>`;
+    if(fire.length){ctl+=btn('mslone',armed?`${s.msDeploy?'Deploy':'Launch'} ${armed}+1`:(s.msDeploy?'Deploy 1':'Launch 1'),armed<fire.length);ctl+=btn('mslall','All '+fire.length,armed<fire.length);if(armed)ctl+=btn('mslclr','✕',true,'Cancel launches')}
+    const dn=missiles.filter(m=>!m.dead&&m.dorm&&m.owner===s).length;if(dn)ctl+=`<button class="btn${s.mslLight?' aion':''}" data-act="mslight" title="Light every deployed missile this impulse: they ignite and home on your current target (3-turn countdown starts now)">${s.mslLight?'Lighting ':'Light '}${dn}</button>`}
   return `<div class="wrow"><span class="arc">×${ws.length}</span><span class="wn" style="color:${col}">MSL</span><span class="ws"><span class="chips">${ch}</span> <span class="dim">${rdy} rdy · ${ammo}</span></span><span class="wc">${ctl}</span></div>`}
 // target scan: shields/hull need working sensors; weapon status needs a friendly ship within its sensor range
 function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> ✕</h2></div>`;
@@ -1223,6 +1248,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
      ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>${upkeepRow(s)}`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[0,.25,.5,.75,1].map(l=>btn('gen:'+l,l?Math.round(l*100)+'%':'Off',canQueue(s,{type:'gen',lvl:l,cost:0}),!l?'Turn the generator off: no drain, but shields collapse to 0.':(gc*l)+' energy per turn, drained '+(+(gc*l/IMP).toFixed(3))+' each impulse. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}</div>
      ${upkeepRow(s)}
+     ${s.d.runDark?`<div class="row"><span class="lab">Run Dark</span><b class="${darkOn(s)?'good':s.dark?'warn':'dim'}">${darkOn(s)?'ACTIVE':s.dark?(darkBroken(s)?'broken by fire → '+when(s.darkFiredT+5):'no shields'):'off'}</b>${sd?`<button class="btn${s.dark?' aion':''}" data-act="rundark" ${s.dark||genLvl(s)>=1-1e-9?'':'disabled'} title="Costs ${genCost(s)} energy per turn (${+(genCost(s)/IMP).toFixed(3)} each impulse) on top of the generator; needs the generator at 100% and shields up. Halves the hit chance of direct fire (not missiles) from ships within 60° of the bow. Firing any weapon or lighting missiles cancels the effect for 4 impulses.">${s.dark?'Go light':'Run dark'}</button>`:''}</div>`:''}
      <div class="row dim sm">${s.gen.from>T?`online ${when(s.gen.from)} · `:''}${g?`cap ${Math.round(shieldCap(s))} · `:''}regen <b class="txt">+${regenRate(s).toFixed(1)}</b>/turn <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>
      ${sd?`<div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`:''}`}
@@ -1297,6 +1323,9 @@ function doAct0(a){const [k,v]=a.split(':');
   if(k==='undo')s.queue.pop();
   else if(k==='submode')s.subMode=!s.subMode;
   else if(k==='msmode'){const o=['off','def','hold'];s.msMode=o[(o.indexOf(s.msMode)+1)%3]}
+  else if(k==='msdeploy')s.msDeploy=!s.msDeploy;
+  else if(k==='mslight')s.mslLight=!s.mslLight;
+  else if(k==='rundark'){if(!s.dark&&genLvl(s)<1-1e-9){log('Run Dark needs the shield generator at 100%','bad')}else s.dark=!s.dark}
   else if(k==='gen')queue(s,{type:'gen',lvl:+v,cost:0});
   else if(k==='reinf')queue(s,{type:'reinf',n:+v,cost:+v*REINF_COST});
   else if(k==='repair')queue(s,{type:'repair',n:+v,cost:+v*REPAIR_COST});
@@ -1370,9 +1399,14 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
     if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},s.team!==0?'#ffd24dcc':s.color+(s===P&&phase==='decide'?'cc':'66'),s.team!==0?[6,4]:[3,5])}}
   const PT=P&&!P.dead?tgt(P):null;if(PT){const a=posOf(P),b=posOf(PT);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(P,PT)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
+  for(const s of ships)if(!s.dead&&s.team===0&&s.dark&&s.d.runDark){const p=posOf(s),R0=12*HS,a0=s.drawAng==null?fAng(s.f):s.drawAng,on=darkOn(s);   /* Run Dark: bow wedge (±60°), enemies inside marked green, outside red */
+    ctx.save();ctx.fillStyle=on?'rgba(90,220,140,.07)':'rgba(200,200,120,.05)';ctx.strokeStyle=on?'rgba(90,220,140,.45)':'rgba(200,200,120,.35)';ctx.setLineDash([5,5]);ctx.lineWidth=devicePixelRatio;
+    ctx.beginPath();ctx.moveTo(sx(p.x),sy(p.y));ctx.arc(sx(p.x),sy(p.y),R0*cam.s,a0-Math.PI/3,a0+Math.PI/3);ctx.closePath();ctx.fill();ctx.stroke();ctx.setLineDash([]);
+    for(const e of ships){if(e.dead||e.team===s.team)continue;const q=posOf(e),inn=Math.abs(norm(Math.atan2(q.y-p.y,q.x-p.x)-a0))<=Math.PI/3+1e-6;ctx.strokeStyle=inn?'rgba(90,230,140,.9)':'rgba(255,90,90,.9)';ctx.lineWidth=2*devicePixelRatio;ctx.beginPath();ctx.arc(sx(q.x),sy(q.y),16*devicePixelRatio,0,Math.PI*2);ctx.stroke()}
+    ctx.restore()}
   for(const s of ships)if(!s.dead){let f=s.f;if(s.team===0&&phase==='decide'){for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn')f=burnResult(s,x.a,f).f}}
     s.drawAng=s.drawAng==null?fAng(f):s.drawAng+norm(fAng(f)-s.drawAng)*.25;drawShip(s,posOf(s),s.drawAng,1)}
-  for(const m of missiles){const p=posOf(m);drawMissile(p.x,p.y,m.h||0,m.owner.d.laser,m.intercept)}
+  for(const m of missiles){if(m.dorm&&!mslSpotted(m,0))continue;const p=posOf(m);if(m.dorm){ctx.save();ctx.globalAlpha=m.owner.team===0?.45:.7}drawMissile(p.x,p.y,m.h||0,m.owner.d.laser,m.intercept);if(m.dorm){ctx.strokeStyle=m.owner.team===0?'rgba(199,166,255,.5)':'rgba(255,120,120,.8)';ctx.setLineDash([2,3]);ctx.lineWidth=devicePixelRatio;ctx.beginPath();ctx.arc(sx(p.x),sy(p.y),7*devicePixelRatio,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);ctx.restore()}}
   for(const f of fx){if(f.d>0)continue;const a=clamp(f.t/f.max,0,1);
     if(f.type==='lance'){const k=1-f.t/f.max,ext=Math.min(1,k/.22),fade=k<.22?1:Math.max(0,1-(k-.22)/.78);   // thrust out fast, then burn and fade
       const x1=sx(f.x1),y1=sy(f.y1),x2=sx(f.x1+(f.x2-f.x1)*ext),y2=sy(f.y1+(f.y2-f.y1)*ext),dx=x2-x1,dy=y2-y1,L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L,w=f.w*dpr*(.6+.4*fade);
@@ -1447,7 +1481,7 @@ function shipTipHTML(k){const d=SHIPS[k],fc=FACTIONS[d.faction].color,g={};
     const cost=w.kind==='torp'?`${w.perTurn}/turn ×3`:w.kind==='ap'?`${w.cost} over 2 turns`:w.kind==='missile'?'free':`${w.cost}`;
     return `<tr><td><b>${arcs.length}× ${w.ab}</b></td><td class="dim">${w.name}</td><td>${Object.entries(cnt).map(([a,n])=>(n>1?n+' ':'')+a).join(' · ')}</td><td class="num">${dmg} dmg</td><td class="num dim">${cost} E</td></tr>`}).join('');
   const ms=d.weapons.filter(([wk])=>WT[wk].kind==='missile').length;const pdc={};d.pd.forEach(a=>pdc[arcName(a)]=(pdc[arcName(a)]||0)+1);
-  const traits=[d.noShield?'no shields':'',d.armor?`front armor ${d.armor}`:'',d.evade?`${Math.round(d.evade*100)}% harder to hit`:'',d.moveMul?`maneuvers ×${d.moveMul}`:'',d.pdKind==='chain'?'chain-gun PD (free)':''].filter(Boolean).join(' · ');
+  const traits=[d.noShield?'no shields':'',d.armor?`front armor ${d.armor}`:'',d.evade?`${Math.round(d.evade*100)}% harder to hit`:'',d.moveMul?`maneuvers ×${d.moveMul}`:'',d.runDark?'Run Dark (halves direct fire from the bow arc)':'',d.pdKind==='chain'?'chain-gun PD (free)':''].filter(Boolean).join(' · ');
   return `<div class="tip-h"><span style="color:${fc}">${d.name}</span> <span class="dim">TL${d.tl||4}</span></div>
    <div class="tip-b"><div class="tip-s">${shipSVG(d,120,150)}</div><div class="tip-w">
    <div class="dim" style="margin-bottom:4px">Shields <b>${d.noShield?'—':d.shield}</b> · Hull <b>${d.hull}</b> · Reactor <b>${d.reactor}</b>${d.genCost&&!d.noShield?` · Generator ${d.genCost}`:''}</div>
@@ -1590,10 +1624,10 @@ function serShip(s){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k===
   o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.team===1?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
   if(s.team===0){o.queue=[]}   // never reveal the host's orders
   return o}
-function serMissile(m){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:missiles.indexOf(m.target)},claim:m.claim?missiles.indexOf(m.claim):-1}}
+function serMissile(m,_,L){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:L.indexOf(m.target)},claim:m.claim?L.indexOf(m.claim):-1}}
 function mpSendState(){if(!MP.conn||!MP.conn.open)return;
   const newFx=fx.filter(f=>!f._n);newFx.forEach(f=>f._n=1);
-  mpSend({t:'state',T,phase,anim:ANIM,ships:ships.map(serShip),missiles:missiles.map(serMissile),fx:newFx.map(f=>({...f,_n:undefined})),sfx:netSfx,log:netLog,ready:{h:MP.hostReady,g:MP.guestReady}});netSfx=[];netLog=[]}
+  mpSend({t:'state',T,phase,anim:ANIM,ships:ships.map(serShip),missiles:missiles.filter(m=>mslSpotted(m,1)).map(serMissile),fx:newFx.map(f=>({...f,_n:undefined})),sfx:netSfx,log:netLog,ready:{h:MP.hostReady,g:MP.guestReady}});netSfx=[];netLog=[]}
 function mpTryCommit(){if(phase!=='decide')return;
   if(MP.hostReady&&MP.guestReady){mpBanner('');commit()}
   else{mpBanner(MP.hostReady?'Waiting for your opponent\'s orders…':(MP.guestReady&&P?'Your opponent is ready — give your orders and press Continue (Enter)':''));mpSend({t:'wait',h:MP.hostReady,g:MP.guestReady});buildHUD()}}
@@ -1618,11 +1652,11 @@ function mpApplyState(m){const first=$('start').style.display!=='none'||!ships.l
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>s.team===0&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the host…');buildHUD()}
 function mpApplyOrders(orders){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.team!==1||s.dead)continue;
-    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
   MP.guestReady=true;mpTryCommit()}
 
