@@ -144,7 +144,7 @@ const MP={on:false,role:null,conn:null,peer:null,hostReady:false,guestReady:fals
 const isAI=s=>s.ai||(s.team===1&&!MP.on);
 function net(){if(MP.role==='host'&&typeof mpSendState==='function')mpSendState()}
 const R={reactor:42, burn:2, reverse:4, pivot:2, genCost:10, genRegen:4, shieldRepairPerImp:2, startDist:20,
-  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.75, magReloadTurns:3};
+  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.75, magReloadTurns:1};
 const income=s=>s.reactor/IMP;
 const genCost=s=>s.d.noShield?0:(s.d.genCost||R.genCost), genRegen=s=>s.d.genRegen||R.genRegen;
 
