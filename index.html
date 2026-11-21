@@ -81,6 +81,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .aiw .btn{white-space:nowrap;padding:2px 5px}
 .dgm{display:block;margin:3px auto 4px;background:#0a1017;border:1px solid #1d2935;border-radius:5px}.dgm g[data-act]:hover rect,.dgm g[data-act]:hover circle{filter:brightness(1.6)}
 .firestrip{display:flex;flex-wrap:wrap;gap:3px;align-items:center}.firestrip .wrow.msl{flex-basis:100%;margin:0}
+.modes{gap:4px;align-items:center}.btn.mfire{background:#3a2410;border-color:#ff9a3d;color:#ffd6a8}.btn.mrep{background:#10253a;border-color:#5ab0ff;color:#cfe6ff}.dgm.m-fire{border-color:#7a4a1c}.dgm.m-repair{border-color:#2a5a8a}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -88,7 +89,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 <div id="rside"></div>
 <div id="dcAlert"></div>
 <div id="bar"></div>
-<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
+<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">Q</span><span class="k">E</span> turn 60° · <span class="k">1</span><span class="k">3</span> turn 30° · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> pivot 30° · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/repair mode · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1>SPACE HEX TACTICS</h1>
  <div class="dim">Assemble both fleets. You command every ship on your side unless you hand it to the AI.</div>
@@ -1049,7 +1050,7 @@ function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span s
   h+=fireHist(t);
   return h+`</div>`}
 // ---- Ship diagrams (Nov 21, David): your ship and the enemy as clickable top-down sprites, mounts placed by firing arc ----
-const DG={W:300,H:232};
+const DG={W:300,H:232};let dgMode='fire';   // Nov 21 (David): the diagram's click mode — 'fire' (arm to fire / reload) or 'repair' (damage control)
 function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
   const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
   const L=x1-x0||1,Wd=y1-y0||1,xc=(x0+x1)/2,yc=(y0+y1)/2,sc=Math.min((DG.W-30)/Wd,(DG.H-24)/L);
@@ -1105,11 +1106,13 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
       if(own&&sd)act=`wclick:${it.i}`;
       if(it.r<8){body=`<rect x="${-it.r}" y="${-it.r}" width="${2*it.r}" height="${2*it.r}" rx="1.5" fill="${fill}" stroke="${stroke}" stroke-width="1.3"/>${!w.alive?`<text y="3" font-size="8" text-anchor="middle" fill="${col}">${lab}</text>`:''}`}
       else{const wd=Math.max(24,lab.length*5.2+6),ht=13,arcL=w.arc==='ALL'?'360':w.arc;body=`<text y="-9" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${bears?'#cfe8ff':'#6f7d8c'}">${arcL}</text><rect x="${-wd/2}" y="${-ht/2}" width="${wd}" height="${ht}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${bears?2:1.3}" ${dash?`stroke-dasharray="${dash}"`:''}/>${frac>0&&frac<1?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*frac}" height="2" fill="#ffc04d"/>`:''}${K==='torp'&&seeW&&w.alive?`<rect x="${-wd/2+1}" y="${ht/2-3}" width="${(wd-2)*w.stages/3}" height="2" fill="${w.stages>=3?(own?'#4cff7a':'#ff7a3d'):'#ffc04d'}"/>`:''}<text y="3" font-size="8" font-family="monospace" text-anchor="middle" fill="${col}">${lab}</text>`}
-      if(armed)ring=`<circle r="${it.r+3}" fill="none" stroke="#fff" stroke-width="1.2"/>`}
+      if(own&&t&&w.alive&&dgMode==='fire'&&canFireMount(s,'w'+it.i,t))body+=`<text y="${it.r<8?it.r+7:15}" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${armed?'#fff':'#ffd24d'}">${sixths(hitP(s,'w'+it.i,t))}</text>`;
+      if(armed)ring=it.r<8?`<rect x="${-it.r-2.5}" y="${-it.r-2.5}" width="${2*it.r+5}" height="${2*it.r+5}" rx="2" fill="none" stroke="#fff" stroke-width="1.4"/>`:`<rect x="${-Math.max(24,lab.length*5.2+6)/2-2.5}" y="-9" width="${Math.max(24,lab.length*5.2+6)+5}" height="18" rx="4" fill="none" stroke="#fff" stroke-width="1.6"/>`}
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
       const shots=p.alive&&seeW?p.shots:0;const fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots>=2?'#16384a':shots?'#132a36':'#1a2230',stroke=!p.alive?(job?'#5ab0ff':'#ff4d4d'):!seeW?'#3a4452':shots?'#7fd8ff':'#55606e';
       body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?(job?'#9fd0ff':'#ff6b6b'):'#9fdcff'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;
       tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
+      if(own&&s.fireSel&&s.fireSel.has('pd'+it.i))ring=`<circle r="${it.r+2.5}" fill="none" stroke="#fff" stroke-width="1.3"/>`;
       if(own&&sd)act=`pdclick:${it.i}`}
     else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
       const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n>=mx?'#ff4d4d':n?'#ffc04d':'#4cff7a';
@@ -1117,20 +1120,28 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
       const val=k==='rea'?`${100-10*n}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
       body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
       tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${100-10*n}% (${n}/10 hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
-      if(own&&sd&&n)act=`sysclick:${k}`}
+      if(own&&sd&&n&&dgMode==='repair')act=`sysclick:${k}`}
+    if(own&&sd)tip+=dgMode==='fire'?(it.t==='sys'?'':' · [Fire mode: click to arm/disarm if it can fire, otherwise load/pause/resume]'):' · [Repair mode: click a damaged system to send or recall a team]';
     g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${ring}${body}</g>`}
   const note=!own&&!seeW?`<text x="${DG.W/2}" y="${DG.H-4}" font-size="9" text-anchor="middle" fill="#7a8796">weapons not scanned</text>`:'';
-  return `<svg class="dgm" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}${note}</svg>`}
+  return `<svg class="dgm ${own&&sd?'m-'+dgMode:''}" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}${note}</svg>`}
 // smart clicks on your own diagram (no firing — that stays on the Fire buttons)
 function dcToggle(s,box){const job=(s.dc||[]).find(j=>j.box===box);if(job)return queue(s,{type:'dccancel',id:box.id,cost:0});
   const qi=s.queue.findIndex(q=>q.type==='dc'&&q.id===box.id);if(qi>=0){s.queue.splice(qi,1);return true}
   if(dcFree(s)<=0){log(`${s.name}: no free damage-control team`,'dim');return false}return queue(s,{type:'dc',id:box.id,cost:0})}
-function smartW(s,i){const w=s.weapons[i],box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===i);if(!w.alive){if(box)dcToggle(s,box);return}
+function smartW(s,i){const w=s.weapons[i],box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===i);
+  if(dgMode==='repair'){if(box)dcToggle(s,box);else log(`${w.T.ab} isn't damaged`,'dim');return}
+  if(!w.alive){log(`${w.T.ab} is destroyed — switch to Repair mode to send a team`,'dim');return}
+  const t=tgt(s),key='w'+i;if(t&&(s.fireSel.has(key)||canFireMount(s,key,t))){s.fireSel.has(key)?s.fireSel.delete(key):s.fireSel.add(key);return}   // ready and bearing: arm / disarm
   const K=w.T.kind;const q=s.queue.findIndex(x=>(x.type==='start'||x.type==='hold'||x.type==='pausew')&&x.i===i);if(q>=0){s.queue.splice(q,1);return}   // click again to undo
   if(K==='torp'){if(w.charging)queue(s,{type:'hold',i,cost:0});else queue(s,{type:'start',i,cost:0});return}
   if(w.charging&&(K==='ap'||drains(w))){queue(s,{type:'pausew',i,cost:0});return}
   if(!queue(s,{type:'start',i,cost:K==='ap'||drains(w)?0:w.T.cost})&&w.state==='idle')log(`${s.name}: not enough energy to load ${w.T.ab}`,'dim')}
-function smartPD(s,i){const p=s.pd[i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===i);if(!p.alive){if(box)dcToggle(s,box);return}
+function smartPD(s,i){const p=s.pd[i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===i);
+  if(dgMode==='repair'){if(box)dcToggle(s,box);else log('That PD mount isn\'t damaged','dim');return}
+  if(!p.alive){log('PD mount destroyed — switch to Repair mode to send a team','dim');return}
+  const key='pd'+i,t=tgt(s);if(s.fireSel.has(key)){s.fireSel.delete(key);return}
+  if(queue(s,{type:'pd',i,cost:1}))return;if(t&&canFireMount(s,key,t)){s.fireSel.add(key);return}   // full: arm it for offensive fire
   if(!queue(s,{type:'pd',i,cost:1}))log(`${s.name}: PD mount is full (2 shots) or not enough energy`,'dim')}
 function smartSys(s,k){const boxes=(s.damaged||[]).filter(b=>b.k===k);const free=boxes.find(b=>!dgJob(s,b));
   if(free&&dcFree(s)>0){queue(s,{type:'dc',id:free.id,cost:0});return}const busy=boxes.find(b=>dgJob(s,b));if(busy){dcToggle(s,busy);return}
@@ -1173,7 +1184,8 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button><button class="btn" data-act="msmode" ${sd?'':'disabled'} title="Missile launchers: offense / defensive interceptors / hold">Msl: ${{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]}</button></span></h2>`;
-    h+=shipDiagram(s,'own',t)+fireStrip(s,t,sd);
+    if(sd){const nA=s.fireSel.size;h+=`<div class="row modes"><button class="btn ${dgMode==='fire'?'mfire':''}" data-act="dgmode:fire" title="Fire mode (F): click a weapon that bears to arm or disarm it; click an empty or charging weapon to load, pause or resume; click PD to load a shot">🎯 Fire</button><button class="btn ${dgMode==='repair'?'mrep':''}" data-act="dgmode:repair" title="Repair mode (F): click a damaged or destroyed system to send a damage-control team, click again to recall">🔧 Repair</button><span class="dim sm" style="white-space:nowrap">${dgMode==='fire'?(nA?`<b class="warn">${nA} armed</b>`:'nothing armed'):`${dcFree(s)}/${dcTeams(s)} teams free`}</span>${nA&&dgMode==='fire'?btn('disarm','Clear',true,'Disarm everything'):''}</div>`}
+    h+=shipDiagram(s,'own',t);
     h+=`</div>`}
   else h+=`<div class="panel dim">${own.every(x=>x.dead)?'Your fleet is destroyed.':'All your ships are under AI command.'}</div>`;
   {const av=own.filter(dcAvail);const key=av.map(x=>x.name+dcFree(x)+':'+dcOpen(x)).join('|');const el=$('dcAlert');
@@ -1225,6 +1237,8 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='pausew')queue(s,{type:'pausew',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
   else if(k==='burn'){if(queue(s,{type:'burn',a:v,cost:burnCost(s,v)})){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(qHas(s,'burn')?'Only one burn per impulse':(!burnAllowed(s,v)?(s.d.big?'Cruisers: after a turn, the next burn must be straight':'A turn can\'t follow a turn'):(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
+  else if(k==='dgmode')dgMode=v;
+  else if(k==='disarm')s.fireSel.clear();
   else if(k==='wclick')smartW(s,+v);
   else if(k==='pdclick')smartPD(s,+v);
   else if(k==='sysclick')smartSys(s,v);
@@ -1400,7 +1414,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(k==='tab'){e.preventDefault();cycleSel();return}
     if(k==='t'){cycleTarget();return}
     if(phase==='decide'){const km={q:'TL',w:'F',e:'TR',s:'R','1':'TL3','3':'TR3'};if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('burn:R');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='backspace'){e.preventDefault();doAct('undo')}}
-    if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
+    if(k==='f'&&phase==='decide'){dgMode=dgMode==='fire'?'repair':'fire';buildHUD()}if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{if(e.button===2)mouse.pan=true;if(e.button===0)clickMap(e)});addEventListener('mouseup',e=>{if(e.button===2)mouse.pan=false});
   canvas.addEventListener('mousemove',e=>{const nx=e.clientX*devicePixelRatio,ny=e.clientY*devicePixelRatio;if(mouse.pan&&mouse.x!=null){pan.x-=(nx-mouse.x)/cam.s;pan.y-=(ny-mouse.y)/cam.s}mouse.x=nx;mouse.y=ny});
   canvas.addEventListener('wheel',e=>{e.preventDefault();zoomMul=clamp(zoomMul*(e.deltaY>0?.9:1.1),.2,4)},{passive:false});
