@@ -1716,13 +1716,17 @@ function startMenuMusic(){menuWant=true;if(!AC||menuSrc||menuLoading||musicSrc)r
   if(menuBuf)return play();
   menuLoading=true;try{const b=atob(document.getElementById('menuMusicData').textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
     AC.decodeAudioData(u.buffer,buf=>{menuBuf=buf;menuLoading=false;play()},()=>{menuLoading=false})}catch(e){menuLoading=false}}
-function stopMenuMusic(){menuWant=false;if(!menuSrc||!AC)return;const src=menuSrc;menuSrc=null;{const g=menuGain.gain,n=AC.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(g.value,n);g.linearRampToValueAtTime(0,n+2.5)}setTimeout(()=>{try{src.stop()}catch(e){}},2700)}
+function stopMenuMusic(){menuWant=false;if(!menuSrc||!AC)return;const src=menuSrc;menuSrc=null;{const g=menuGain.gain,n=AC.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(g.value,n);g.linearRampToValueAtTime(0,n+1.5)}setTimeout(()=>{try{src.stop()}catch(e){}},1700)}
 /* browsers only allow sound after a click or key press: start the menu loop on the first one while the setup screen is up */
 function menuMusicKick(){const st=document.getElementById('start');if(!st||getComputedStyle(st).display==='none')return;if(!AC)initAudio();if(AC&&AC.state==='suspended')AC.resume();if(menuWant&&!musicSrc)startMenuMusic();setTimeout(preloadBattleMusic,1500)}
 addEventListener('pointerdown',menuMusicKick,true);addEventListener('keydown',menuMusicKick,true);
 let battlePending=false;
-{const _sm=startMusic;startMusic=function(){if(musicLoading&&!musicSrc)battlePending=true;const was=!!musicSrc;stopMenuMusic();const r=_sm.apply(this,arguments);
-  if(!was&&musicGain&&AC){const g=musicGain.gain,n=AC.currentTime;g.cancelScheduledValues(n);g.setValueAtTime(0,n);g.setValueAtTime(0,n+.8);g.linearRampToValueAtTime(musicOn?musicVol:0,n+3.8)}return r}}   /* crossfade: menu fades out over 2.5 s while the battle track fades in over 3 s */
+let battleDelay=null;
+{const _sm=startMusic;const go=()=>{battleDelay=null;if(musicGain&&AC){const g=musicGain.gain;g.cancelScheduledValues(AC.currentTime);g.value=musicOn?musicVol:0}return _sm()};
+  startMusic=function(){if(musicLoading&&!musicSrc)battlePending=true;if(musicSrc||battleDelay)return;
+    const fading=!!menuSrc;stopMenuMusic();
+    if(fading){battleDelay=setTimeout(go,1600);return}   /* Nov 21 (David): menu fades out first, then the battle track starts from its first note at full volume */
+    return go()}}
 /* decode the battle track early (on the first click) so the crossfade starts on time */
 function preloadBattleMusic(){if(!AC||musicBuf||musicLoading)return;musicLoading=true;try{const b=atob(document.getElementById('musicData').textContent.trim());const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);
   AC.decodeAudioData(u.buffer,buf=>{musicBuf=buf;musicLoading=false;if(battlePending){battlePending=false;startMusic()}},()=>{musicLoading=false})}catch(e){musicLoading=false}}
