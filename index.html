@@ -599,7 +599,7 @@ function renderHistory(){const el=$('pastBattles');if(!el)return;const L=histLoa
     return `<div class="row sm" style="gap:10px;border-bottom:1px solid var(--line);padding:2px 0"><span class="dim" style="width:120px">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</span><span style="flex:1">${x.title}</span><span class="${x.res.startsWith('won')?'good':x.res.startsWith('lost')?'bad':'dim'}">${x.res}</span><button class="btn" data-hist="${i}">Save record</button></div>`}).join('')}</div></details>`;
   el.querySelectorAll('[data-hist]').forEach(b=>b.onclick=()=>{const x=histLoad()[+b.dataset.hist];if(x)recDownload(x.txt)})}
 function recEnd(){if(!REC||REC.result)return;const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);
-  REC.result={at:when(T),winner:a0&&!a1?'team 0':a1&&!a0?'team 1':'none',final:ships.map((s,i)=>recShip(s,i,false))};histSave()}
+  REC.result={at:when(T),winner:forfeitTeam!=null?'team '+(1-forfeitTeam):a0&&!a1?'team 0':a1&&!a0?'team 1':'none',forfeit:forfeitTeam!=null?'team '+forfeitTeam:undefined,final:ships.map((s,i)=>recShip(s,i,false))};histSave()}
 function recText(){const R0=REC;if(!R0)return '';const head={...R0,imp:undefined,log:undefined};
   return '{\n"header":'+JSON.stringify(head)+',\n"impulses":[\n'+R0.imp.map(x=>JSON.stringify(x)).join(',\n')+'\n],\n"log":[\n'+R0.log.map(x=>JSON.stringify(x)).join(',\n')+'\n]}\n'}
 function saveRecord(){if(MP.role==='guest'){mpSend({t:'getrec'});mpBanner('Asking the host for the battle record…');return}
@@ -754,9 +754,12 @@ const inPt=(m,k)=>{const tp=m.target.px,o=m.ppx||m.px;let dx=o.x-tp.x,dy=o.y-tp.
 const ghost=(m,x,y,life)=>fx.push({type:'ghost',x,y,h:m.h||0,col:m.owner.d.laser,ic:!!m.intercept,t:life,max:life});
 function stopMusic(){if(!musicSrc||!AC)return;const src=musicSrc;musicSrc=null;musicGain.gain.setTargetAtTime(0,AC.currentTime,.5);setTimeout(()=>{try{src.stop()}catch(e){}if(!musicSrc)musicGain.gain.value=musicOn?musicVol:0},2500)}
 function checkEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);if(a0&&a1)return false;phase='over';recEnd();stopMusic();net();showEnd();buildHUD();return true}
-function showEnd(){const a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);
+/* Nov 21 (David): forfeit. forfeitTeam = team (in this browser's numbering) that gave up; the other side wins. */
+let forfeitTeam=null,ffArm=0;
+function doForfeit(team){if(phase==='over'||!ships.length)return;forfeitTeam=team;phase='over';log(team===0?'You forfeited the battle':'The enemy forfeited the battle',team===0?'bad':'good');recEnd();stopMusic();net();showEnd();buildHUD()}
+function showEnd(){let a0=ships.some(s=>s.team===0&&!s.dead),a1=ships.some(s=>s.team===1&&!s.dead);if(forfeitTeam!=null){a0=forfeitTeam!==0;a1=forfeitTeam===0}
   setTimeout(()=>{const win=a0&&!a1,draw=!a0&&!a1;const t=$('endTitle');t.textContent=draw?'MUTUAL DESTRUCTION':win?'VICTORY':'DEFEAT';t.style.color=draw?'var(--warn)':win?'var(--good)':'var(--bad)';
-    const lost=ships.filter(s=>s.dead);$('endSub').textContent=`${when(T)}. Lost: ${lost.filter(s=>s.team===0).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>s.team===1).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
+    const lost=ships.filter(s=>s.dead);$('endSub').textContent=`${forfeitTeam===0?'You forfeited. ':forfeitTeam===1?'The enemy forfeited. ':''}${when(T)}. Lost: ${lost.filter(s=>s.team===0).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>s.team===1).map(s=>s.name).join(', ')||'none'}`;$('end').style.display='flex'},1800)}
 
 // ---- automation (player standing orders + AI helpers) ----
 function autoQueue(s){aiAssist(s)}
@@ -1235,7 +1238,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   const qPanel=s&&!s.dead&&s.queue.length&&!s.ai?`<div class="panel"><h2>Queued for ${s.name} <button class="btn" data-act="undo" style="float:right">Undo ⌫</button></h2><div class="dim">${s.queue.map(x=>qLabel(s,x)).join(' · ')}</div></div>`:'';
   rh+=`<div class="panel" id="log"></div>`;
   // ---- left panel: your fleet, your ship, its orders (Nov 21, David: your side on the left, the enemy on the right) ----
-  h+=`<div class="panel"><h2>Fleet command</h2>
+  h+=`<div class="panel"><h2 style="display:flex;align-items:center">Fleet command<button class="btn" data-act="forfeit" style="margin-left:auto;color:var(--bad);font-size:11px;padding:2px 7px;text-transform:none;letter-spacing:0" title="Give up this battle: the enemy wins. Click twice to confirm.">${Date.now()-ffArm<4000?'Confirm forfeit?':'🏳 Forfeit'}</button></h2>
    <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
    ${own.length>1||(own[0]&&own[0].ai)?`<div class="tabs scroll" style="max-height:150px">${own.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
@@ -1307,6 +1310,8 @@ function selectShip(x){if(x&&x.team===0&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
 function doAct(a){doAct0(a)}
 function doAct0(a){const [k,v]=a.split(':');
+  if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
+    if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(0);return}
   if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.hostReady=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
@@ -1535,7 +1540,7 @@ function start(){if(MP.role==='guest')return;if(MP.role==='host'){fleet[1]=MP.op
   for(const sh of ships)sh.target=nearestEnemy(sh);
   if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
   for(const sh of ships){const v=startSpeed[sh.team]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
-  P=mine()[0]||null;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
+  P=mine()[0]||null;forfeitTeam=null;ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
   const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;
   $('start').style.display='none';$('end').style.display='none';log(`${fleet[0].length} vs ${fleet[1].length} at ${R.startDist} hexes. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}; starting speed ${MP.on?`host ${startSpeed[0]} / guest ${startSpeed[1]}`:`yours ${startSpeed[0]} / enemy ${startSpeed[1]}`} hex/turn.`,'warn');
   for(const sh of alive()){if(isAI(sh)){const a=aiDecide(sh);sh.queue=a.queue;sh.fireChoice=a.fire}else autoQueue(sh)}
@@ -1627,13 +1632,13 @@ function serShip(s){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k===
 function serMissile(m,_,L){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:L.indexOf(m.target)},claim:m.claim?L.indexOf(m.claim):-1}}
 function mpSendState(){if(!MP.conn||!MP.conn.open)return;
   const newFx=fx.filter(f=>!f._n);newFx.forEach(f=>f._n=1);
-  mpSend({t:'state',T,phase,anim:ANIM,ships:ships.map(serShip),missiles:missiles.filter(m=>mslSpotted(m,1)).map(serMissile),fx:newFx.map(f=>({...f,_n:undefined})),sfx:netSfx,log:netLog,ready:{h:MP.hostReady,g:MP.guestReady}});netSfx=[];netLog=[]}
+  mpSend({t:'state',T,phase,ff:forfeitTeam,anim:ANIM,ships:ships.map(serShip),missiles:missiles.filter(m=>mslSpotted(m,1)).map(serMissile),fx:newFx.map(f=>({...f,_n:undefined})),sfx:netSfx,log:netLog,ready:{h:MP.hostReady,g:MP.guestReady}});netSfx=[];netLog=[]}
 function mpTryCommit(){if(phase!=='decide')return;
   if(MP.hostReady&&MP.guestReady){mpBanner('');commit()}
   else{mpBanner(MP.hostReady?'Waiting for your opponent\'s orders…':(MP.guestReady&&P?'Your opponent is ready — give your orders and press Continue (Enter)':''));mpSend({t:'wait',h:MP.hostReady,g:MP.guestReady});buildHUD()}}
 
 // ---- guest side ----
-function mpApplyState(m){const first=$('start').style.display!=='none'||!ships.length;const old=ships,pi=old.indexOf(P);
+function mpApplyState(m){forfeitTeam=m.ff==null?null:1-m.ff;const first=$('start').style.display!=='none'||!ships.length;const old=ships,pi=old.indexOf(P);
   ships=m.ships.map(o=>{const s={...o};s.d=SHIPS[o.key];s.weapons=o.weapons.map(w=>({...w,T:WT[w.t]}));s.fireSel=new Set(o.fireSel);s.team=1-o.team;s.isPlayer=s.team===0;s.hist=[];
     const prev=old.find(x=>x.name===o.name&&x.key===o.key&&x.team===s.team);if(prev)s.drawAng=prev.drawAng;return s});
   ships.forEach((s,i)=>{const ti=m.ships[i].target;s.target=ti>=0?ships[ti]:null});
@@ -1668,6 +1673,7 @@ function mpOnMsg(m){if(!m||!m.t)return;
     else if(m.t==='wait'){if(phase==='decide')mpBanner(m.g&&!m.h?'Orders sent — waiting for the host…':(!m.g&&m.h?'The host is ready — give your orders and press Continue (Enter)':''))}}
   else if(MP.role==='host'){
     if(m.t==='orders')mpApplyOrders(m.orders);
+    if(m.t==='forfeit')doForfeit(1);
     if(m.t==='getrec')mpSend({t:'rec',txt:recText()})}
   if(m.t==='rec'&&MP.role==='guest'){mpBanner('');if(m.txt)recDownload(m.txt);else alertBox('The host has no battle record yet.')}}
 
