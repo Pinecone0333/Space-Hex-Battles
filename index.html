@@ -94,6 +94,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .faccard{display:flex;gap:10px;align-items:center;text-align:left;background:#0e1823;border:1px solid #223244;border-left:4px solid var(--fc);border-radius:8px;padding:8px;color:inherit;cursor:pointer;font:inherit}
 .faccard:hover{background:#13212f;border-color:var(--fc)}.faccard.on{box-shadow:0 0 0 2px var(--fc) inset}
 .fc-s{flex:none;background:#070c12;border-radius:6px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
+.facpick.first{background:#05080cf2}.facpick.first .fp-in{border-color:#3a5674}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -1457,12 +1458,12 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
   root.querySelectorAll('[data-tipship]').forEach(el=>{el.addEventListener('mouseenter',()=>{tip.innerHTML=shipTipHTML(el.dataset.tipship);tip.style.display='block';const r=el.getBoundingClientRect(),W=tip.offsetWidth,H=tip.offsetHeight;
       let x=r.right+8;if(x+W>innerWidth-6)x=r.left-W-8;if(x<6)x=Math.max(6,Math.min(innerWidth-W-6,r.left));let y=Math.min(innerHeight-H-6,Math.max(6,r.top-10));tip.style.left=x+'px';tip.style.top=y+'px'});
     el.addEventListener('mouseleave',()=>{tip.style.display='none'})})}
-function openFactionPicker(t){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick';
+function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
   const cards=Object.entries(FACTIONS).map(([f,F])=>{const ships=Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||'')));if(!ships.length)return '';
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a);
     return `<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${f}</b><span class="dim">${F.blurb}</span>
       <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}</span></div></button>`}).join('');
-  el.innerHTML=`<div class="fp-in"><div class="fp-h"><b>Choose a faction</b> <span class="dim">for ${t?'the enemy fleet':'your fleet'}</span><button class="btn" data-fpclose>✕</button></div><div class="fp-g">${cards}</div></div>`;
+  el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${t?'the enemy fleet':'your fleet'}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
   el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;
     const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder()})}
@@ -1510,9 +1511,9 @@ function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio
   if(!best)return;if(best.team===0&&!best.ai)selectShip(best);else if(best.team===1&&P&&!P.dead){P.target=best;log(`${P.name} targeting ${best.name}`,'dim');buildHUD()}}
 function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} targeting ${P.target.name}`,'dim');buildHUD()}
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
-  renderBuilder();$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
+  renderBuilder();if(!MP.on)openFactionPicker(0,true);$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';renderBuilder()});
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';renderBuilder();if(!MP.on)openFactionPicker(0,true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
