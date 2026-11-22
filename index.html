@@ -325,7 +325,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 /* Nov 22 (David): Dogahr Corvette — the TL4 corvette benchmark, one size below a light frigate (11 / 52 / 17). Stats are Claude's picks on the class ladder. */
-SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:15.5,genCost:5,genRegen:2,frigate:true,
+SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:16,genCost:5,genRegen:2,frigate:true,
   shape:SHIPS.dfrigate.shape.map(([x,y])=>[x*.75,y*.75]),lines:SHIPS.dfrigate.lines.map(l=>l.map(v=>v*.75)),dots:SHIPS.dfrigate.dots.map(([x,y])=>[x*.75,y*.75]),
   weapons:[['SC','S'],['SL','LS'],['SL','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL']};   // Nov 22 (David): 2 missile launchers; about half a frigate's size, so half a frigate's durability (12/55 → 6/28)
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
