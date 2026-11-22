@@ -380,7 +380,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -1182,6 +1182,21 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       else if(own>0)n=T%2?0:n;                                                   // allies' wave already in the air: join it
       else{n=Math.ceil(n/2);s.salvo={t,T}}}                                       // open with half to draw out the PD
     fire.push(...msReady.slice(0,n))}
+  /* r10 (Nov 22, David): evasive maneuvers. (1) Brace: when the expected damage coming in this impulse from enemies within 9 hexes (ready guns that bear, plus hot torpedoes/lances whose nose is within 40° of us) is at least 20 and more than the ship's own expected damage out, it jinks — dropping this impulse's pivots and burns if it must. (2) Low tech closing: a ship outclassed in tech by nearby enemies, not shooting this impulse and not pivoting, jinks while it closes. */
+  if(AIV.evade&&!qHas(s,'evade')){const c=evadeCost(s);
+    const expD=(x,key,y)=>{if(key[0]==='p'){const p=x.pd[+key.slice(2)];return p?p.shots*hitP(x,key,y):0}const w=x.weapons[+key.slice(1)];if(!w||!w.alive)return 0;const K=w.T.kind;if(K==='missile')return 0;
+      const dm=K==='lance'?lanceDmg(w.T,hexDist(x,y)):K==='torp'?(w.stages>=1?torpDmg(w):0):w.T.dmg;return dm*hitP(x,key,y)};
+    const out=fire.reduce((a,k)=>a+expD(s,k,t),0);
+    const known=e=>!DDOC(s)||hexDist(e,s)<=sensRange(s)||torpHot(s,e);
+    let inc=0;for(const e of enemiesOf(s)){if(hexDist(e,s)>9||e.dead)continue;const nose=Math.abs(relBearing(e,s))<=Math.PI*40/180;
+      e.weapons.forEach((w,k)=>{if(!w.alive||w.T.kind==='missile')return;const key='w'+k,big=w.T.kind==='torp'||w.T.kind==='lance'||w.T.kind==='ap';
+        const rdy=w.T.kind==='torp'?w.stages>=1&&known(e):w.state==='ready';if(!rdy)return;if(canFireMount(e,key,s)||big&&nose)inc+=expD(e,key,s)})}
+    const piv=qHas(s,'pivot');
+    if(inc>=20&&inc>out&&isFinite(c)){if(piv)s.queue=s.queue.filter(x=>x.type!=='pivot'&&x.type!=='burn');if(s.E-qCost(s)>=c)queue(s,{type:'evade',cost:c})}
+    else if(!piv&&isFinite(c)&&s.E-qCost(s)-c>=Math.min(3,s.reactor0/10)){
+      const gunsOut=fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind!=='missile');
+      const tlHi=enemiesOf(s).filter(e=>hexDist(e,s)<=14).reduce((m,e)=>Math.max(m,e.d.tl||4),0);
+      if((s.d.tl||4)<tlHi&&d>4&&!gunsOut&&enemiesOf(s).some(e=>hexDist(e,s)<=12&&e.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&w.state==='ready')))queue(s,{type:'evade',cost:c})}}
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
 // ---- UI ----
