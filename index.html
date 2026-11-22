@@ -325,7 +325,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 /* Nov 22 (David): Dogahr Corvette — the TL4 corvette benchmark, one size below a light frigate (11 / 52 / 17). Stats are Claude's picks on the class ladder. */
-SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:18,genCost:5,genRegen:2,frigate:true,
+SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:9.5,genCost:5,genRegen:2,frigate:true,
   shape:SHIPS.dfrigate.shape.map(([x,y])=>[x*.75,y*.75]),lines:SHIPS.dfrigate.lines.map(l=>l.map(v=>v*.75)),dots:SHIPS.dfrigate.dots.map(([x,y])=>[x*.75,y*.75]),
   weapons:[['SC','S'],['SL','LS'],['SL','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL']};   // Nov 22 (David): 2 missile launchers; about half a frigate's size, so half a frigate's durability (12/55 → 6/28)
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
@@ -419,6 +419,8 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  for(const f of ['freighter','mfreighter']){const r3=SHIPS[f+'3'].reactor;SHIPS[f+'2'].reactor=h(r3*.85);SHIPS[f+'1'].reactor=h(r3*.7)}
  const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'peregrine3',earlyffl:'peregrine3',earlyeff:'peregrine3'};   // class: heavy cruiser, medium cruiser, heavy frigate
  for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7)}
+/* Nov 22 (David): reactor scales with hull from the heavy-cruiser benchmark (150 hull: TL4 40, TL3 30). Applied so far to the Dogahr Corvette only. */
+SHIPS.dcorvette3.reactor=Math.round(30*SHIPS.dcorvette3.hull/150*2)/2;
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
 const REA_N=s=>s.reaN0||reaBoxes(s.d);
