@@ -97,6 +97,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .fc-s{flex:none;background:#070c12;border-radius:6px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
 .facpick.first{background:#05080cf2}.facpick.first .fp-in{border-color:#3a5674}
 .slotc{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;background:#08121b;cursor:default}.slotc[data-slotsel]{cursor:pointer}.slotc.sel{background:#102236;border-color:#3b6a8f}.slotc select{background:#0b1520;color:var(--txt);border:1px solid #2a4258;font-family:inherit;font-size:11px}
+.mslrow .chips{display:inline-flex;flex-wrap:wrap;max-width:100%;letter-spacing:1px}.mslrow .ws{min-width:0}.mslctl{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;padding:2px 0 3px}.mslctl .chip{display:inline-flex;align-items:center;gap:2px}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -1149,7 +1150,7 @@ function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireS
     ctl+=`<button class="btn${s.msDeploy?' aion':''}" data-act="msdeploy" title="Fire: missiles light at once and home on the target. Deploy: missiles leave the rack dark, coasting at your velocity with the engine off (no countdown, unseen outside enemy sensor range) until you light them.">${s.msDeploy?'Deploy':'Fire'}</button>`;
     if(fire.length){ctl+=btn('mslone',armed?`${s.msDeploy?'Deploy':'Launch'} ${armed}+1`:(s.msDeploy?'Deploy 1':'Launch 1'),armed<fire.length);ctl+=btn('mslall','All '+fire.length,armed<fire.length);if(armed)ctl+=btn('mslclr','✕',true,'Cancel launches')}
     const dn=missiles.filter(m=>!m.dead&&m.dorm&&m.owner===s).length;if(dn)ctl+=`<button class="btn${s.mslLight?' aion':''}" data-act="mslight" title="Light every deployed missile this impulse: they ignite and home on your current target (3-turn countdown starts now)">${s.mslLight?'Lighting ':'Light '}${dn}</button>`}
-  return `<div class="wrow"><span class="arc">×${ws.length}</span><span class="wn" style="color:${col}">MSL</span><span class="ws"><span class="chips">${ch}</span> <span class="dim">${rdy} rdy · ${ammo}</span></span><span class="wc">${ctl}</span></div>`}
+  return `<div class="wrow mslrow"><span class="arc">×${ws.length}</span><span class="wn" style="color:${col}">MSL</span><span class="ws"><span class="chips">${ch}</span> <span class="dim" style="white-space:nowrap">${rdy} rdy · ${ammo}</span></span><span></span>${ctl?`<div class="mslctl">${ctl}</div>`:''}</div>`}   /* Nov 21: controls on their own wrapping line so big launcher banks (Dreadnought 16) stay on screen */
 // target scan: shields/hull need working sensors; weapon status needs a friendly ship within its sensor range
 function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> ✕</h2></div>`;
   const d=hexDist(s,t),stOK=scanStatus(t),wOK=scanWeapons(t),best=Math.max(0,...ships.filter(o=>fr(o)&&!o.dead).map(sensRange));
