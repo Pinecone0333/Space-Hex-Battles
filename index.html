@@ -381,8 +381,9 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
 const REA_N=s=>s.reaN0||reaBoxes(s.d);
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
-  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});s.reaN0=Math.max(1,Math.min(reaBoxes(s.d),s.d.hull-b.length-5));for(let i=0;i<s.reaN0;i++)b.push({k:'rea'});   /* ships too small to hold them all (Corvettes) get fewer reactor boxes, so systems never exceed hull (the 5 = sensor boxes added next) */
-  for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
+  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});s.reaN0=reaBoxes(s.d);for(let i=0;i<s.reaN0;i++)b.push({k:'rea'});
+  /* Nov 21 (David): a ship too small to hold every system box (Corvettes) gets fewer SENSOR boxes (min 2) so systems never exceed hull; its scan range still runs 10 → 0, in bigger steps */
+  s.senN0=Math.max(2,Math.min(5,s.d.hull-b.length));for(let i=0;i<s.senN0;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
 function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));   // <0 port half, >0 starboard half
@@ -422,7 +423,7 @@ const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&own(s)&&dcFree(s)>0&&dcOpen(s)>0;
 function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrF'?'Fore thrusters':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
-const sensRange=s=>Math.max(0,10-2*(s.dmgSen||0));
+const sensRange=s=>Math.max(0,Math.round(10-10*(s.dmgSen||0)/(s.senN0||5)));
 /* Nov 21 (David): Golthan Run Dark. Costs the full generator drain again, needs the generator at 100% and shields up. Halves direct-fire hit chance from attackers within 60 deg of the bow. Firing breaks it for the next 4 impulses. */
 const darkBroken=s=>s.darkFiredT!=null&&T>s.darkFiredT&&T<=s.darkFiredT+4;
 const darkOn=s=>!!(s.dark&&s.d.runDark&&!s.dead&&genLvl(s)>=1-1e-9&&s.shield+reinfAmt(s)>0&&!darkBroken(s));
@@ -1235,7 +1236,7 @@ function dcDiagram(s){const L=dgLayout(s),sd=phase==='decide'&&!s.ai;const poly=
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),ok=p.alive;
       body=`<circle r="7" fill="${ok?GF:RF}" stroke="${ok?G:Rr}" stroke-width="1.3"/><text y="2.5" font-size="${job?6:5.5}" font-family="monospace" text-anchor="middle" fill="${ok?'#c8ffd8':'#ffd0d0'}">${job?'🔧':'PD'}</text>`;
       tip=`Point defense (${p.arc==='ALL'?'360°':p.arc})${ok?' — working':job?' — DESTROYED · repair team working (click to recall)':' — DESTROYED · click to send a repair team'}`;if(!ok&&sd)act=`pdclick:${it.i}`}
-    else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],jobs=(s.damaged||[]).filter(b=>b.k===k&&dgJob(s,b)).length,ok=!n;
+    else{const k=it.k,n=sysDmg(s,k),mx=k==='sen'?(s.senN0||5):k==='rea'?REA_N(s):SYSMAX[k],jobs=(s.damaged||[]).filter(b=>b.k===k&&dgJob(s,b)).length,ok=!n;
       const nm={eng:'ENGINE',thrF:'FWD THR',thrP:'PORT THR',thrS:'STBD THR',rea:'REACTOR',sen:'SENSORS'}[k];
       const lab=ok?nm:k==='rea'?`${nm} ${reaPct(s)}%`:`${nm} ${n}/${mx}`;body=tag(lab,ok,jobs,6.2,30);
       tip=`${SYSN[k]}${ok?' — working':(k==='rea'?` — ${n}/${REA_N(s)} hits (output ${reaPct(s)}%; each repair restores ${Math.round(100*reaPer(s)/REA_N(s))}%)`:` — ${n}/${mx} hits`)+(k==='rea'?'':k==='sen'?` (scan range ${sensRange(s)} hexes)`:n>=mx?' (out)':` (+${Math.min(n,2)*50}% cost)`)+(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a repair team')}`;
@@ -1272,12 +1273,12 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
       tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
       if(own&&s.fireSel&&s.fireSel.has('pd'+it.i))ring=`<circle r="${it.r+2.5}" fill="none" stroke="#fff" stroke-width="1.3"/>`;
       if(own&&sd)act=`pdclick:${it.i}`}
-    else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
+    else{const k=it.k,n=sysDmg(s,k),mx=k==='sen'?(s.senN0||5):k==='rea'?REA_N(s):SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
       const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n?'#ff4d4d':'#4cff7a';
       const short={eng:'ENG',thrF:'FT',thrP:'PT',thrS:'ST',rea:'R',sen:'S'}[k];
       const val=k==='rea'?`${reaPct(s)}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
       body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs&&own?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
-      tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${reaPct(s)}% (${n}/${REA_N(s)} hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
+      tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${reaPct(s)}% (${n}/${REA_N(s)} hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/${s.senN0||5} hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
       if(own&&sd&&n&&dgMode==='repair')act=`sysclick:${k}`}
     if(own&&sd)tip+=dgMode==='fire'?(it.t==='sys'?'':' · [Fire mode: click to arm/disarm if it can fire, otherwise load/pause/resume]'):' · [Repair mode: click a damaged system to send or recall a team]';
     g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${ring}${body}</g>`}
