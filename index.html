@@ -26,6 +26,7 @@ h2{margin:0 0 3px;font-size:12px;letter-spacing:.05em;text-transform:uppercase}
 .wrow .btn{padding:1px 6px}
 .arc{color:var(--dim);border:1px solid var(--line);text-align:center;border-radius:3px;font-size:10px}
 .arc.bears{color:var(--good);border-color:var(--good)}
+.arc[data-act]{cursor:pointer}.arc.sel{background:#2a4a66;color:#fff}
 .wc label{cursor:pointer;white-space:nowrap}
 select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inherit;font-size:11px}
 input[type=range]{flex:1;accent-color:#58b8ff}
@@ -320,7 +321,7 @@ SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnou
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
 FACTIONS.Golthan={color:'#a0703c',blurb:'Stealth broadside cruisers: Run Dark from the bow, laser batteries, deployed missiles'};
-SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:47.5,doctrine:'hunt',broadside:true,
+SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:42,doctrine:'hunt',broadside:true,
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
@@ -396,7 +397,7 @@ const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
-const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
+const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
 const STOP={turn:true,first:true,ready:true,full:true,fire:true,missile:true,every:true};let readyEvt=[];
 const turnOf=t=>Math.floor((Math.max(t,1)-1)/IMP)+1, impOf=t=>((Math.max(t,1)-1)%IMP)+1;
 const when=t=>`T${turnOf(t)}·${impOf(t)}`;
@@ -1417,7 +1418,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button>${(()=>{const hasMs=s.weapons.some(w=>w.alive&&w.T.kind==='missile');return `<button class="btn" data-act="msmode" ${sd&&hasMs?'':'disabled'} title="${hasMs?'Missile launchers: offense / defensive interceptors / hold':s.weapons.some(w=>w.T.kind==='missile')?'All missile launchers destroyed':'This ship carries no missiles'}">Msl: ${hasMs?{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]:'none'}</button>`})()}</span></h2>`;
-    {const nDmg=(s.damaged||[]).filter(b=>b.k!=='rea').length+((s.damaged||[]).some(b=>b.k==='rea')?1:0);h+=`<div class="row tabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire control</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage control${nDmg?` <b class="warn">${nDmg}</b>`:''}</button></div>`}
+    {const nDmg=(s.damaged||[]).filter(b=>b.k!=='rea').length+((s.damaged||[]).some(b=>b.k==='rea')?1:0);h+=`<div class="row tabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire control</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage control${nDmg?` <b class="warn">${nDmg}</b>`:''}</button>${dgTab==='fire'?`<button class="btn ${showArcs?'mfire':''}" data-act="arcs" title="Show every weapon's firing arc on the map, out to its targeting-computer range (V). Bright inner part = 50%+ to hit. Click a weapon's arc label to show just that mount.">◔ Arcs${showArcs?': on':''}</button>`:''}</div>`}
     if(dgTab==='fire'){
     const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff',lances:s.d.torp,aplances:'#f2e8ff'};
     for(const G of GROUPS){const ws=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.grp===G.id);if(!ws.length)continue;
@@ -1436,9 +1437,9 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
           if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
         if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):''),K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'')}
         const bears=w.alive&&t&&inArc(s,w.arc,t);
-        h+=`<div class="wrow"><span class="arc ${bears?'bears':''}">${w.arc}</span><span class="wn" style="color:${GC[G.id]}">${w.T.ab}</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`}}
+        h+=`<div class="wrow"><span class="arc ${bears?'bears':''} ${arcSel==='w'+i?'sel':''}" data-act="arcone:w${i}" title="Show this mount's firing arc on the map (click again to hide)">${w.arc}</span><span class="wn" style="color:${GC[G.id]}">${w.T.ab}</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`}}
     s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1}))ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit')}
-      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''}">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'CHN':'PD'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
+      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''} ${arcSel==='pd'+i?'sel':''}" data-act="arcone:pd${i}" title="Show this mount's firing arc on the map (click again to hide)">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'CHN':'PD'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
     }else{dgMode='repair';h+=dcDiagram(s)+`<div class="sm dim" style="margin:3px 0"><span style="color:#4cff7a">■</span> working &nbsp;·&nbsp; <span style="color:#ff4d4d">■</span> damaged — click to repair &nbsp;·&nbsp; 🔧 team on it</div>`+(dcPanel(s,sd,false)||`<div class="row sm good">No damage.</div>`)}
     h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
@@ -1490,6 +1491,8 @@ function doAct0(a){const [k,v]=a.split(':');
   if(k==='aieall'||k==='aidcall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),f=k==='aieall'?'aiE':'aiDC',on=!L.every(x=>x[f]);
     for(const x of L){x[f]=on;if(phase==='decide'){if(on){if(MP.role!=='guest')aiAssist(x)}else x.queue=x.queue.filter(q=>!(f==='aiE'?AI_E:AI_DC).includes(q.type))}}
     log(`All ships: ${f==='aiE'?'energy':'damage control'} ${on?'handed to the AI':'back under your control'}`,'dim');buildHUD();return}
+  if(k==='arcs'){if(arcSel){arcSel=null;showArcs=true}else showArcs=!showArcs;buildHUD();return}
+  if(k==='arcone'){arcSel=arcSel===v?null:v;if(arcSel)showArcs=false;buildHUD();return}
   const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
   if(k==='undo')s.queue.pop();
   else if(k==='submode')s.subMode=!s.subMode;
@@ -1556,15 +1559,26 @@ function updateCam(dt){const C=camShip();if(!C)return;const dpr=devicePixelRatio
   cam.x+=(cx+pan.x-cam.x)*Math.min(1,dt*6);cam.y+=(cy+pan.y-cam.y)*Math.min(1,dt*6)}}
 function arrow(a,b,col,dash){const dpr=devicePixelRatio;ctx.strokeStyle=col;ctx.lineWidth=1.5*dpr;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
   const an=Math.atan2(b.y-a.y,b.x-a.x);ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(sx(b.x),sy(b.y));ctx.lineTo(sx(b.x)-Math.cos(an-.4)*9*dpr,sy(b.y)-Math.sin(an-.4)*9*dpr);ctx.lineTo(sx(b.x)-Math.cos(an+.4)*9*dpr,sy(b.y)-Math.sin(an+.4)*9*dpr);ctx.closePath();ctx.fill();ctx.lineWidth=1}
+/* Weapon firing arcs on the map (Nov 22, David): wedge out to the targeting-computer range; brighter inside the 50%-to-hit range */
+function tcRange(s,acc,floorP){let last=0;for(let r=0;r<=20;r++)if(accAt(accK(s,acc),r)>floorP+1e-6)last=r;return last}
+function drawArcs(s){const A=posOf(s),a0=s.drawAng==null?fAng(s.f):s.drawAng,dpr=devicePixelRatio,X=sx(A.x),Y=sy(A.y);const seen=new Set();
+  const mounts=[];s.weapons.forEach((w,i)=>{if(w.T.kind==='missile')return;mounts.push({key:'w'+i,arc:w.arc,acc:w.T.acc||'torp',ab:w.T.ab,alive:w.alive,col:w.T.grp==='lasers'?s.d.laser:w.T.grp==='torps'||w.T.grp==='lances'?s.d.torp:w.T.grp==='aplances'?'#f2e8ff':'#ffe066'})});
+  s.pd.forEach((p,i)=>mounts.push({key:'pd'+i,arc:p.arc,acc:'laser',ab:s.d.pdKind==='chain'?'CHN':'PD',alive:p.alive,col:s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff',pd:true}));
+  for(const m of mounts){if(arcSel?m.key!==arcSel:(!m.alive||m.pd))continue;const k=m.ab+m.arc;if(!arcSel&&seen.has(k))continue;seen.add(k);
+    const fl=m.acc.startsWith('laser')?.10:.05,rOut=Math.max(1,tcRange(s,m.acc,fl)),pen=m.pd&&s.d.pdKind==='chain'?.15:0;let r50=0;for(let r=0;r<=rOut;r++)if(accAt(accK(s,m.acc),r)-pen>=.5-1e-6)r50=r;
+    const [c,hw]=ARCS[m.arc],full=hw>=180,st=a0+(c-hw)*D2R,en=a0+(c+hw)*D2R,one=!!arcSel;
+    const wedge=R=>{ctx.beginPath();if(full)ctx.arc(X,Y,R,0,2*Math.PI);else{ctx.moveTo(X,Y);ctx.arc(X,Y,R,st,en);ctx.closePath()}};
+    ctx.save();wedge((rOut+.5)*HS*cam.s);ctx.fillStyle=m.col+(one?'18':'0c');ctx.fill();ctx.strokeStyle=m.col+(one?'aa':'55');ctx.lineWidth=(one?1.5:1)*dpr;ctx.setLineDash([5*dpr,4*dpr]);ctx.stroke();ctx.setLineDash([]);
+    if(r50>0){wedge((r50+.5)*HS*cam.s);ctx.fillStyle=m.col+(one?'26':'12');ctx.fill()}
+    const la=full?a0:a0+c*D2R,lr=(rOut+.5)*HS*cam.s+9*dpr;ctx.fillStyle=m.col+(one?'ff':'bb');ctx.font=`${(one?12:10)*dpr}px monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(one?`${m.ab} ${m.arc==='ALL'?'360':m.arc} · ${rOut} hexes (50%+ to ${r50})`:m.ab,X+Math.cos(la)*lr,Y+Math.sin(la)*lr);ctx.restore()}}
 function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRect(0,0,W,Hh);
   for(const st of stars){ctx.globalAlpha=st.a;ctx.fillStyle='#9fc4e0';ctx.fillRect(st.x,st.y,st.r,st.r)}ctx.globalAlpha=1;if(!ships.length)return;
   const R_=HX*cam.s;if(R_>3.5){const wx0=cam.x-vcx()/cam.s,wx1=cam.x+(W-vcx())/cam.s,wy0=cam.y-vcy()/cam.s,wy1=cam.y+(Hh-vcy())/cam.s;ctx.beginPath();
     const ex=[0,1,2,3].map(i=>[R_*Math.cos(i*Math.PI/3),R_*Math.sin(i*Math.PI/3)]);const q0=Math.floor(wx0/(HX*1.5))-1,q1=Math.ceil(wx1/(HX*1.5))+1;
     for(let q=q0;q<=q1;q++){const r0=Math.floor(wy0/(HX*SQ3)-q/2)-1,r1=Math.ceil(wy1/(HX*SQ3)-q/2)+1;for(let r=r0;r<=r1;r++){const c=hp(q,r);const X=sx(c.x),Y=sy(c.y);ctx.moveTo(X+ex[3][0],Y+ex[3][1]);ctx.lineTo(X+ex[2][0],Y+ex[2][1]);ctx.lineTo(X+ex[1][0],Y+ex[1][1]);ctx.lineTo(X+ex[0][0],Y+ex[0][1])}}
     ctx.strokeStyle=`rgba(70,120,160,${clamp(.08+R_/100,.14,.26)})`;ctx.lineWidth=1;ctx.stroke()}
-  if(showArcs&&P&&!P.dead){const A=posOf(P);const seen=new Set();for(const w of P.weapons){if(!w.alive||!w.T.acc)continue;const key=w.T.grp+w.arc;if(seen.has(key))continue;seen.add(key);
-    const [c,hw]=ARCS[w.arc],rad=TCR[w.T.acc]*HS*cam.s;const col=w.T.grp==='lasers'?P.d.laser:w.T.grp==='torps'?P.d.torp:'#ffe066';
-    ctx.beginPath();ctx.moveTo(sx(A.x),sy(A.y));ctx.arc(sx(A.x),sy(A.y),rad,fAng(P.f)+(c-hw)*D2R,fAng(P.f)+(c+hw)*D2R);ctx.closePath();ctx.fillStyle=col+'10';ctx.fill();ctx.strokeStyle=col+'66';ctx.stroke()}}
+  if((showArcs||arcSel)&&P&&!P.dead)drawArcs(P);
   for(const s of ships){if(s.dead)continue;const c=hp(s.q,s.r);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;const x=sx(c.x)+R_*.98*Math.cos(a),y=sy(c.y)+R_*.98*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle=REL[rel(s)]+(s===P?'':'99');ctx.lineWidth=(s===P?2.5:1.5)*dpr;ctx.stroke();ctx.lineWidth=1}
   // drift arrows: one turn of coasting
   for(const s of ships){if(s.dead)continue;const a=posOf(s);let vq=s.vq,vr=s.vr;
@@ -1842,7 +1856,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(k==='tab'){e.preventDefault();cycleSel();return}
     if(k==='t'){cycleTarget();return}
     if(phase==='decide'){const km={q:'TL',w:'F',e:'TR',s:'R','1':'TL3','3':'TR3'};if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('burn:R');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='j')doAct('evade');if(k==='backspace'){e.preventDefault();doAct('undo')}}
-    if(k==='f'&&phase==='decide'){dgTab=dgTab==='fire'?'dc':'fire';buildHUD()}if(k==='v')showArcs=!showArcs;if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
+    if(k==='f'&&phase==='decide'){dgTab=dgTab==='fire'?'dc':'fire';buildHUD()}if(k==='v'){arcSel=null;showArcs=!showArcs;if(phase==='decide')buildHUD()}if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{if(e.button===2)mouse.pan=true;if(e.button===0)clickMap(e)});addEventListener('mouseup',e=>{if(e.button===2)mouse.pan=false});
   canvas.addEventListener('mousemove',e=>{const nx=e.clientX*devicePixelRatio,ny=e.clientY*devicePixelRatio;if(mouse.pan&&mouse.x!=null){pan.x-=(nx-mouse.x)/cam.s;pan.y-=(ny-mouse.y)/cam.s}mouse.x=nx;mouse.y=ny});
   canvas.addEventListener('wheel',e=>{e.preventDefault();zoomMul=clamp(zoomMul*(e.deltaY>0?.9:1.1),.2,4)},{passive:false});
