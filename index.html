@@ -379,9 +379,9 @@ for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shiel
 for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
-const REA_N=s=>reaBoxes(s.d);
+const REA_N=s=>s.reaN0||reaBoxes(s.d);
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
-  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<REA_N(s);i++)b.push({k:'rea'});
+  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});s.reaN0=Math.max(1,Math.min(reaBoxes(s.d),s.d.hull-b.length-5));for(let i=0;i<s.reaN0;i++)b.push({k:'rea'});   /* ships too small to hold them all (Corvettes) get fewer reactor boxes, so systems never exceed hull (the 5 = sensor boxes added next) */
   for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
