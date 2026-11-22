@@ -348,7 +348,7 @@ const FRS=[[-24,-10],[18,-10],[24,-6],[24,6],[18,10],[-24,10]];
 SHIPS.freighter1={faction:'Earthling',cls:'Freighter',weight:20,name:'Earthling Freighter',short:'Freighter',color:'#8fb8ff',laser:'#ff3b3b',torp:'#ff4d4d',hull:50,shield:0,noShield:true,big:true,dcTeams:1,reaBoxes:10,tl:1,accPen:0,reactor:8,genCost:0,doctrine:'flee',freighter:true,pdKind:'chain',
     shape:FRS,lines:[[-14,-10,-14,10],[-4,-10,-4,10],[6,-10,6,10]],dots:[[20,0]],
     weapons:[['RG','ALL']],pd:['FX','ALL']};
-SHIPS.freighter2={...SHIPS.freighter1,name:'Earthling Freighter (TL2)',short:'Freighter II',tl:2,weight:20.5,weapons:[['SL2','ALL']]};
+SHIPS.freighter2={...SHIPS.freighter1,name:'Earthling Freighter (TL2)',short:'Freighter II',tl:2,weight:20.5,pdKind:undefined,weapons:[['SL2','ALL']]};   /* Nov 22 (David): laser PD from TL2 up; chain guns are TL1 only */
 /* Nov 22 (David): freighters up to TL4 (Claude's extrapolation). TL3: full-strength small laser, laser PD, reactor 10. TL4: adds shields 10 (after halving) with a 5-energy generator, reactor 15 (= TL3 + generator). (All reactors −2 later.) */
 SHIPS.freighter3={...SHIPS.freighter1,name:'Earthling Freighter (TL3)',short:'Freighter III',tl:3,weight:21,reactor:10,pdKind:undefined,weapons:[['SL','ALL']]};
 SHIPS.freighter4={...SHIPS.freighter3,name:'Earthling Freighter (TL4)',short:'Freighter IV',tl:4,weight:21.5,reactor:15,shield:20,noShield:false,genCost:5,genRegen:2};   /* shield 20 before the global halving = 10 */
