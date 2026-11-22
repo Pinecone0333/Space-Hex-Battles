@@ -96,7 +96,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .faccard{display:flex;gap:10px;align-items:center;text-align:left;background:#0e1823;border:1px solid #223244;border-left:4px solid var(--fc);border-radius:8px;padding:8px;color:inherit;cursor:pointer;font:inherit}
 .faccard:hover{background:#13212f;border-color:var(--fc)}.faccard.on{box-shadow:0 0 0 2px var(--fc) inset}
 .fc-s{flex:none;background:#070c12;border-radius:6px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
-.facpick.first{background:#05080cf2}.facpick.first .fp-in{border-color:#3a5674}
+.facpick.first{background:#05080c}.facpick.first .fp-in{border-color:#3a5674}
 .slotc{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;background:#08121b;cursor:default}.slotc[data-slotsel]{cursor:pointer}.slotc.sel{background:#102236;border-color:#3b6a8f}.slotc select{background:#0b1520;color:var(--txt);border:1px solid #2a4258;font-family:inherit;font-size:11px}
 .mslrow .chips{display:inline-flex;flex-wrap:wrap;max-width:100%;letter-spacing:1px}.mslrow .ws{min-width:0}.mslctl{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;padding:2px 0 3px}.mslctl .chip{display:inline-flex;align-items:center;gap:2px}
 #critbox{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:none;align-items:center;justify-content:center}.critcard{background:#1a0f0f;border:2px solid #ff5a3d;border-radius:8px;padding:14px 16px;max-width:380px;color:#f0d8d0;font-size:13px;box-shadow:0 0 24px #ff5a3d66}.crith{color:#ff6a4d;font-weight:bold;font-size:16px;margin-bottom:6px;letter-spacing:1px}.btn.critgo{background:#6a1a10;border-color:#ff5a3d;color:#ffd0c0}
@@ -623,7 +623,8 @@ function upkeep(s){
   if(!genLvl(s)){if(s.shield>0||s.reinf.length){s.shield=0;s.reinf=[];if(s.isPlayer||fr(s))log(`${s.name}: shield generator off — shields collapsed`,'bad')}}   // shields collapse without the generator
   else s.shield=Math.min(shieldCap(s),s.shield+regenRate(s)/IMP);   // below 100% the generator caps shields; excess dissipates
   for(const w of s.weapons){if(!w.alive||w.T.kind!=='torp'||!w.holding||w.stages<=0||w.charging)continue;const c=torpStored(w)/6/IMP;if(s.E>=c-1e-9){s.E-=c;w.holdPaid=T}else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}   /* Nov 21: held torpedoes are paid first — a stalled charge just pauses, a lost hold throws the charge away */
-  for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;
+  /* Nov 22 (David): energy torpedoes are paid first — charging torpedoes before any other charging weapon, so other loads pause before a torpedo stalls */
+  for(const pass of [0,1])for(const w of s.weapons){if(!w.alive)continue;const K=w.T.kind;if((K==='torp')!==(pass===0))continue;
     if((K==='ap'||drains(w))&&w.charging){const N=K==='ap'?AP_IMP:cycleImp(s,w),c=w.T.cost/N;const me=!isAI(s)&&(own(s)||typeof MP!=='undefined'&&MP.on);   // short of energy: charging pauses, progress kept
       if(s.E>=c-1e-9){s.E-=c;w.paid=(w.paid||0)+1;if(w.paid>=N){w.charging=false;w.paid=0;w.state='ready';if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab}`);if(me&&K==='ap')torpNote(s,`${w.T.ab} charged (${w.T.dmg} dmg)`,'good')}}
       else if(!w.apShort){w.apShort=1;if(me)torpNote(s,`not enough energy — ${w.T.ab} charging paused`,'bad')}
@@ -634,7 +635,8 @@ function upkeep(s){
           if(w.paid>=IMP){w.paid=0;w.stages++;
             if(w.stages>=3){w.charging=false;w.holding=true;w.state='holding';if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} full`);if(me)torpNote(s,`${w.T.ab} fully charged (${torpDmg(w)} dmg) — now holding`,'good')}
             else{if(own(s)&&!s.ai)readyEvt.push(`${s.name} ${w.T.ab} stage ${w.stages}`);if(me)torpNote(s,`${w.T.ab} reached stage ${w.stages} (${torpDmg(w)} dmg) — keep charging or Hold`,'warn')}}}
-        else{w.charging=false;w.paid=0;if(w.stages>0){w.holding=true;w.state='holding'}else w.state='idle';if(me)torpNote(s,`not enough energy to keep charging ${w.T.ab} — ${w.stages?`holding at ${torpDmg(w)} dmg`:'charge lost'}`,'bad')}}
+        else if(!w.tShort){w.tShort=1;if(me)torpNote(s,`not enough energy — ${w.T.ab} charging paused (progress kept)`,'bad')}   /* Nov 22: a short impulse pauses the charge instead of throwing it away */
+        if(s.E>=c)w.tShort=0}
       if(w.holding&&w.stages>0&&w.holdPaid!==T){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
     else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(own(s)&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
   for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(2,p.shots+1);return false}return true})}
@@ -884,7 +886,7 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
     for(let n=0;n<left&&t.hull>0;n++){const struct=Math.max(0,t.hull-t.boxes.length);const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));
       const r=Math.random()*(struct+valid.length);let box=null;if(r>=struct&&valid.length)box=valid[Math.floor(r-struct)];else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
       t.hull-=1;if(box){t.boxes.splice(t.boxes.indexOf(box),1);sysHit(t,box)}}
-    if(t.hull<=0){t.hull=0;t.dead=true;t.deadT=T;t.deadBy=src&&src.name?src.name:(src&&src.owner&&src.owner.name?src.owner.name+' (missile)':null);deathQ.push(t);log(`${t.name} destroyed!`,t.isPlayer?'bad':'good')}}}
+    if(t.hull<=0){t.hull=0;t.dead=true;t.deadT=T;t.deadBy=src&&src.name?src.name:(src&&src.owner&&src.owner.name?src.owner.name+' (missile)':null);deathQ.push(t);if(SCEN&&SCEN.cmd===t.name&&!SCEN.cmdLost)cmdLost(t);log(`${t.name} destroyed!`,t.isPlayer?'bad':'good')}}}
 function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).length)return '';
   const teams=dcTeams(s),busy=s.dc.length+s.queue.filter(q=>q.type==='dc').length;
   let h=`<div class="row sm ${dcAvail(s)?'pulse':''}" style="flex-wrap:wrap;gap:3px 5px"><span class="dim" title="Damage control: each team repairs one damaged system; a repair takes two turns. A reactor job brings 10% of full output (rounded up) back online. Cruisers have 2 teams, small ships 1.">DC <b class="txt">${teams-busy}/${teams}</b> free</span>`;
@@ -919,7 +921,7 @@ function doForfeit(pid){if(phase==='over'||!ships.length)return;const L=ships.fi
   log(pid===ME?'You forfeited — your ships withdraw':`Player ${pid+1} forfeited — their ships withdraw`,pid===ME?'bad':'dim');if(P&&P.dead)P=mine()[0]||null;if(!checkEnd()){buildHUD();net();if(typeof mpTryCommit==='function'&&MP.role==='host'){mpResetReadyKeep();mpTryCommit()}}}
 function showEnd(){const AT=teamsAlive();
   setTimeout(()=>{const win=AT.length===1&&AT[0]===MYTEAM,draw=!AT.length;const t=$('endTitle');t.textContent=draw?'MUTUAL DESTRUCTION':win?(ships.some(s=>own(s)&&!s.dead)?'VICTORY':'VICTORY — your team won'):'DEFEAT';t.style.color=draw?'var(--warn)':win?'var(--good)':'var(--bad)';
-    const lost=ships.filter(s=>s.dead);const nT=new Set(ships.map(s=>s.team)).size;$('rematch').style.display=MP.role==='guest'?'none':'';$('rematch').title=MP.role==='host'&&MP.conns.length?'Fight again with the same fleets, teams and settings (everyone still connected joins in)':'Fight again with the same fleets, teams and settings';$('endSub').textContent=`${forfeited.includes(ME)?'You forfeited. ':''}${forfeited.filter(p=>p!==ME).map(p=>'Player '+(p+1)+' forfeited. ').join('')}${!draw&&!win&&AT.length===1&&nT>2?'Team '+TLET[AT[0]]+' won. ':''}${when(T)}. Lost: ${lost.filter(s=>fr(s)).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>!fr(s)).map(s=>s.name).join(', ')||'none'}`;$('again').textContent=SCEN?'Game modes':'Choose ship again';if(SCEN){const S=SCENARIOS[SCEN.id];$('endSub').textContent=`${S.name}${SCEN.camp?' (campaign)':''} — ${S.result()}. `+$('endSub').textContent;if(SCEN.camp&&win)campDone(SCEN.id)}$('casrep').innerHTML=casualtyHTML();$('end').style.display='flex'},1800)}
+    const lost=ships.filter(s=>s.dead);const nT=new Set(ships.map(s=>s.team)).size;$('rematch').style.display=MP.role==='guest'?'none':'';$('rematch').title=MP.role==='host'&&MP.conns.length?'Fight again with the same fleets, teams and settings (everyone still connected joins in)':'Fight again with the same fleets, teams and settings';$('endSub').textContent=`${forfeited.includes(ME)?'You forfeited. ':''}${forfeited.filter(p=>p!==ME).map(p=>'Player '+(p+1)+' forfeited. ').join('')}${!draw&&!win&&AT.length===1&&nT>2?'Team '+TLET[AT[0]]+' won. ':''}${when(T)}. Lost: ${lost.filter(s=>fr(s)).map(s=>s.name).join(', ')||'none'} · Destroyed: ${lost.filter(s=>!fr(s)).map(s=>s.name).join(', ')||'none'}`;$('again').textContent=SCEN?'Game modes':'Choose ship again';if(SCEN){const S=SCENARIOS[SCEN.id];$('endSub').textContent=`${S.name}${SCEN.camp?' (campaign)':''} — ${S.result()}. `+$('endSub').textContent;if(SCEN.failed){t.textContent='MISSION FAILED';t.style.color='var(--bad)';$('endSub').textContent='The command ship was lost — this counts as a defeat for the campaign. '+$('endSub').textContent}if(SCEN.camp&&win&&!SCEN.failed)campDone(SCEN.id)}$('casrep').innerHTML=casualtyHTML();$('end').style.display='flex'},1800)}
 /* Nov 22 (David): casualty report on the end screen — every ship destroyed (or withdrawn), by team, with when and by whom */
 function casualties(){return ships.filter(s=>s.dead).sort((a,b)=>(a.deadT??1e9)-(b.deadT??1e9)).map(s=>({name:s.name,cls:s.d.name,team:TLET[s.team],side:fr(s)?(own(s)?'yours':'ally'):'enemy',at:s.deadT!=null?when(s.deadT):'?',by:s.withdrew?'withdrew (forfeit)':s.deadBy||'',hull:s.d.hull}))}
 function casualtyHTML(){const C=casualties();if(!C.length)return '<div class="dim">Casualties: none</div>';
@@ -1050,7 +1052,15 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
 
 function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);return r}
 /* Blokai AI and the Plasma-charged Coilgun Round: against a target with no shields (and no reinforcement), with the coilgun at 50%+, fire lance + coilgun together — the plasma goes off inside the hull */
-function aiPCR(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)return;pcrPairs(s).forEach((p,i)=>{if(!pcrReady(s,i))return;if(t.shield+reinfAmt(t)>0)return;if(!canFireMount(s,'pcr'+i,t)||hitP(s,'pcr'+i,t)<.5)return;r.fire=r.fire.filter(k=>k!=='w'+p.l&&k!=='w'+p.c);r.fire.push('pcr'+i)})}
+/* Nov 22 (David: 'do what makes the most sense') — Blokai PCCG doctrine:
+   no shields → PCCG (plasma goes off inside); shields up at 7+ hexes → PCCG (sure ⅓ burst beats a faded lance); shields up inside 7 → lance and coilgun separately;
+   hold one impulse when the target's shields+reinforcement are ≤10 and this ship's lasers are firing at it now (they may knock the shields out first). */
+function aiPCR(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)return;const d=hexDist(s,t),sh=t.shield+reinfAmt(t);
+  pcrPairs(s).forEach((p,i)=>{if(!pcrReady(s,i)||!canFireMount(s,'pcr'+i,t))return;const parts=k=>k==='w'+p.l||k==='w'+p.c;
+    if(sh<=0){if(hitP(s,'pcr'+i,t)>=.3||d>=7){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}return}
+    const lasersNow=r.fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='beam');
+    if(sh<=10&&lasersNow){r.fire=r.fire.filter(k=>!parts(k));return}   // hold the mount: shields may be gone next impulse
+    if(d>=7&&pcrBurstP(s,d)>=.5){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}})}
 /* AI round 7 (Nov 21, from David's records): keep point defense fed.
    (a) never start more charge-over-time drain than the reactor can carry (keeps ~0.75/impulse spare);
    (b) while enemy missiles are inbound or an enemy launcher with ammo is within 30 hexes, keep enough energy to refill every PD mount;
@@ -1103,7 +1113,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   const t=foeTgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
-  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=(MDOC(s)&&enemyMs>ownMs||AIV.r8&&!DDOC(s)&&enemyMs>=ownMs*1.5)&&!(AIV.msClose&&d<=8)?'def':'off';   /* r8: every non-Dogahr doctrine goes to Defend when clearly out-launched */
+  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=(enemyMs>ownMs)&&!(AIV.msClose&&d<=8)?'def':'off';   /* Nov 22 (David): every AI goes to Defend when the enemy has more launchers (was: Martian doctrine, or others at 1.5×; Dogahr never) */   /* r8: every non-Dogahr doctrine goes to Defend when clearly out-launched */
   if(!s.d.noShield&&(T===0||impOf(T)===IMP||s.gen.lvl===0)){
     // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
@@ -1477,7 +1487,7 @@ function fireStrip(s,t,sd){if(!t||!sd)return '';const d=hexDist(s,t);let h='';
   const ms=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.kind==='missile');if(ms.length)h+=missileRow(s,ms,t,sd,'#c7a6ff').replace('class="wrow"','class="wrow msl"');
   s.pd.forEach((p,i)=>{const key='pd'+i;if(p.alive&&canFireMount(s,key,t))h+=fireBtn(s,key,`PD ${p.arc==='ALL'?'360':p.arc} ${sixths(hitP(s,key,t))}`,'offensive fire, 1 dmg per hit')});
   return h?`<div class="firestrip">${h}</div>`:`<div class="row dim sm">Nothing can fire at ${t.name} right now</div>`}
-function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',rh='';
+function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))$(id).innerHTML='';return}const dec=phase==='decide';let h='',rh='';
   const ownS=ships.filter(x=>own(x));const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
   const s=P;const ct=s&&!s.dead?tgt(s):null;
@@ -1518,13 +1528,13 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
       for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
         if(!w.alive)st='<span class="bad">destroyed</span>';
         else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
-          if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.holding?'Resume':'Charge',true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
+          if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,(w.holding?'Resume':'Charge')+' '+pim(w.T.perTurn/IMP),true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
         else if(K==='ap'){st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+AP_IMP-(w.paid||0))}">${w.paid||0}/${AP_IMP}→${when(T+AP_IMP-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${AP_IMP}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this charge; progress is kept');
-          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Charge',true,`${w.T.cost} energy over 2 turns (${+(w.T.cost/AP_IMP).toFixed(3)} per impulse); ${w.T.dmg} damage at any range; holds free`)}
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,(w.state==='paused'?'Resume':'Charge')+' '+pim(w.T.cost/AP_IMP),true,`${w.T.cost} energy over 2 turns (${+(w.T.cost/AP_IMP).toFixed(3)} per impulse); ${w.T.dmg} damage at any range; holds free`)}
         else if(drains(w)){const N=cycleImp(s,w);st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+N-(w.paid||0))}">${w.paid||0}/${N}→${when(T+N-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${N}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this reload; progress is kept');
-          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,w.state==='paused'?'Resume':'Load',true,`${w.T.cost} energy drained over ${N} impulses (${+(w.T.cost/N).toFixed(3)} per impulse); pauses if short`)}
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,(w.state==='paused'?'Resume':'Load')+' '+pim(w.T.cost/N),true,`${w.T.cost} energy drained over ${N} impulses (${+(w.T.cost/N).toFixed(3)} per impulse); pauses if short`)}
         else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
         if(sd&&w.alive&&t){const key='w'+i;if(canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):''),K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'')}
@@ -1558,6 +1568,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   else if(!MP.on&&(phase==='moving'||phase==='resolving'||phase==='post'))b=`<button class="btn big" data-act="pause"><span class="k">Space</span> Stop at next impulse</button>`;
   const io=T?impOf(T):0;b=`<div class="clock" title="8 impulses per turn"><div class="ct">TURN ${turnOf(T)}</div><div class="ci">IMPULSE ${io}/${IMP}</div><div class="pips">${Array.from({length:IMP},(_,i)=>`<i class="${i<io?'on':''}"></i>`).join('')}</div><div class="cs">${st}</div></div>`+b;
   $('bar').innerHTML=b;$('bar').style.display=phase==='select'?'none':'flex';wireHUD()}
+const pim=x=>(+x.toFixed(2))+'/imp';   // Nov 22 (David): load buttons show the energy drawn per impulse
 function upkeepRow(s){const L=upkeepList(s);const tot=L.reduce((a,x)=>a+x.c,0),net=income(s)-tot;
   return `<div class="row sm upk" title="Ongoing energy expenses, paid every impulse. Income is +${income(s).toFixed(2)} per impulse."><span class="lab">Upkeep</span><b class="${tot?'warn':'dim'}">−${tot.toFixed(2)}</b><span class="dim">/imp</span>${L.length?' <span class="dim">'+L.map(x=>`${x.lab} ${x.c.toFixed(2)}`).join(' · ')+'</span>':''}<span style="margin-left:auto" class="${net<0?'bad':'good'}">net ${net>=0?'+':''}${net.toFixed(2)}</span></div>`}
 const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+label:label}</button>`;
@@ -1567,7 +1578,16 @@ function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P
 function doAct(a){doAct0(a)}
 let critOK=false;
 /* Nov 22 (David): friendly fire is allowed, but only after a warning and a confirmation */
-let ffOK=false;
+let ffOK=false,tacOK=false,tacShown=null;const tacKey=()=>MP.role==='guest'&&typeof mpBid!=='undefined'?'g'+mpBid:'h'+BID;
+/* Nov 22 (David): Tactical Officer — on the first impulse, if the enemy fields more launchers than your side and you press Continue without your launchers on Defend */
+const teamMs=tm=>ships.filter(x=>!x.dead&&(tm===MYTEAM?x.team===MYTEAM:x.team!==MYTEAM)).reduce((a,x)=>a+x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length,0);
+function tacCheck(){const mineL=mine().filter(x=>x.weapons.some(w=>w.alive&&w.T.kind==='missile')&&x.msMode!=='def');if(!mineL.length)return null;const e=teamMs(-1),o=teamMs(MYTEAM);return e>o?{mineL,e,o}:null}
+function tacPrompt(tp){let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
+  el.innerHTML=`<div class="critcard" style="border-color:#4da6ff;background:#0d1621"><div class="crith" style="color:#8fd0ff">🎖 TACTICAL OFFICER</div><div>Captain, the enemy has <b>${tp.e}</b> missile launchers to our <b>${tp.o}</b>. They'll win a missile exchange — I recommend setting our launchers to <b>Defend</b> so they fire interceptors at incoming missiles.</div><div class="dim" style="margin-top:6px">Not on Defend: ${tp.mineL.map(x=>x.name).join(', ')}</div><div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn" id="tacyes" style="border-color:#4da6ff">Set launchers to Defend and continue (Enter)</button><button class="btn" id="tacno">Keep my orders and continue</button><button class="btn" id="tacback">Back (Esc)</button></div></div>`;
+  el.style.display='flex';const close=()=>{el.style.display='none';removeEventListener('keydown',kh,true)};
+  const go=def=>{close();if(def){for(const x of tp.mineL)x.msMode='def';log('Tactical officer: launchers set to Defend','good')}tacOK=true;doAct('go');tacOK=false};
+  const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close();buildHUD()}else if(ev.key==='Enter'){ev.preventDefault();go(true)}};
+  addEventListener('keydown',kh,true);$('tacyes').onclick=()=>go(true);$('tacno').onclick=()=>go(false);$('tacback').onclick=()=>{close();buildHUD()}}
 function ffPrompt(L){let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
   const lines=L.map(x=>{const t=tgt(x),n=[...x.fireSel].filter(q=>canFireMount(x,q,t)).length;return `<li><b>${x.name}</b> → <b style="color:${own(t)?'var(--good)':'#6fb8ff'}">${t.name}</b> (${own(t)?'your ship':'ally'}) — ${n} weapon${n>1?'s':''} armed</li>`}).join('');
   el.innerHTML=`<div class="critcard"><div class="crith">⚠ FRIENDLY FIRE</div><div>You are about to fire on your own side:</div><ul style="margin:6px 0 8px 18px;padding:0">${lines}</ul><div class="dim">Fire anyway, or stand down (those weapons are disarmed and stay loaded).</div><div class="row" style="margin-top:10px;gap:8px"><button class="btn" id="ffno">Stand down (Esc)</button><button class="btn" id="ffyes" style="border-color:#ff5a3d;color:#ff8a7a">Fire on friendlies (Enter)</button></div></div>`;
@@ -1588,7 +1608,7 @@ function doAct0(a){const [k,v]=a.split(':');
     const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
     if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
-  if(k==='go'){if(phase!=='decide')return;if(!ffOK){const L=mine().filter(x=>{const t=tgt(x);return t&&t.team===x.team&&[...x.fireSel].some(q=>canFireMount(x,q,t))});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
+  if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!ffOK){const L=mine().filter(x=>{const t=tgt(x);return t&&t.team===x.team&&[...x.fireSel].some(q=>canFireMount(x,q,t))});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
   if(k==='aipdall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
@@ -1837,6 +1857,14 @@ function scenarioCtlPrompt(id,side,camp){const S=SCENARIOS[id],ck=S.command&&S.c
    <button class="btn" data-ctl="manual"><b>🎛 Full manual control</b><br><span class="dim">You give orders to every ship yourself, every impulse.</span></button>
    <button class="btn" data-ctl="x" style="text-align:center">Cancel</button></div>`;
   document.body.appendChild(el);el.querySelectorAll('[data-ctl]').forEach(b=>b.onclick=()=>{el.remove();if(b.dataset.ctl!=='x')startScenario(id,side,camp,b.dataset.ctl)})}
+/* Nov 22 (David): losing the command ship — pause and offer another ship to command; in a campaign it's a mission failure even if the battle is won */
+function cmdLost(t){SCEN.cmdLost=true;if(SCEN.camp)SCEN.failed=true;if(SCEN.ctl==='command')pauseReq=true;setTimeout(()=>cmdLostPrompt(t.name),2600)}
+function cmdLostPrompt(nm){if(!SCEN||phase==='over'&&!SCEN.camp)return;let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
+  const cand=ships.filter(x=>own(x)&&!x.dead&&x.ai),fail=SCEN.camp?`<div style="margin:6px 0;color:#ff8a7a"><b>Mission failed.</b> Losing the command ship counts as a defeat for the campaign — you can still play the battle out.</div>`:'';
+  el.innerHTML=`<div class="critcard"><div class="crith">⚠ COMMAND SHIP LOST</div><div>${nm} has been destroyed.</div>${fail}${SCEN.ctl==='command'&&cand.length&&phase!=='over'?`<div style="margin:6px 0">Assume command of another ship? The rest stay on AI.</div><div style="display:flex;flex-direction:column;gap:5px">${cand.map(x=>`<button class="btn" data-cmdtake="${ships.indexOf(x)}" style="text-align:left">⭐ ${x.name} <span class="dim">${x.d.name} · hull ${Math.ceil(x.hull)}/${x.d.hull}</span></button>`).join('')}</div>`:''}<div class="row" style="margin-top:10px"><button class="btn" id="cmdai">${SCEN.ctl==='command'&&cand.length&&phase!=='over'?'Let the AI fight on':'Continue'}</button></div></div>`;
+  el.style.display='flex';const close=()=>{el.style.display='none'};
+  el.querySelectorAll('[data-cmdtake]').forEach(b=>b.onclick=()=>{const x=ships[+b.dataset.cmdtake];close();if(x&&!x.dead){x.ai=false;x.queue=[];P=x;log(`You take command of ${x.name}`,'good');buildHUD()}});
+  $('cmdai').onclick=()=>{close();buildHUD()}}
 function startScenario(id,side,camp,ctl){const S=SCENARIOS[id];if(!S)return;if(!ctl)ctl='manual';
   if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode});
   SCEN={id,side,camp:!!camp,ctl};era=S.era;startMode='stations';
@@ -1846,6 +1874,7 @@ function startScenario(id,side,camp,ctl){const S=SCENARIOS[id];if(!S)return;if(!
   for(let i=S.fleets.length;i<MAXSLOTS;i++)fleet[i]=[];
   const mp=$('modepick');if(mp)mp.remove();const fp=$('facpick');if(fp)fp.remove();
   initAudio();startMusic();start();
+  {const ck=S.command&&S.command[side],c=ck&&ships.find(x=>own(x)&&x.key===ck);SCEN.cmd=c?c.name:null}
   log(`${S.name}${camp?' — '+CAMPAIGNS[S.camp].name+', mission '+S.mission:''}. ${S.goal[side]}`,'warn')}
 function leaveScenario(){SCEN=null;if(skirmBak){const b=JSON.parse(skirmBak);SLOTS=b.SLOTS;for(let i=0;i<MAXSLOTS;i++){fleet[i]=b.fleet[i]||[];fleetFaction[i]=b.fleetFaction[i];fleetTL[i]=b.fleetTL[i];fleetForm[i]=b.fleetForm[i];startSpeed[i]=b.startSpeed[i]}era=b.era;startMode=b.startMode;skirmBak=null}}
 function openModePicker(){for(const id of ['modepick','facpick']){const o=$(id);if(o)o.remove()}const el=document.createElement('div');el.id='modepick';el.className='facpick first';
@@ -1997,7 +2026,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
   renderBuilder();openModePicker();$('tomodes').addEventListener('click',()=>{if(MP.role==='guest')return;openModePicker()});$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
   $('rematch').addEventListener('click',()=>{if(MP.role==='guest')return;forfeited=[];if(SCEN){startScenario(SCEN.id,SCEN.side,SCEN.camp,SCEN.ctl);return}initAudio();startMusic();start()});   /* Nov 21 (David): rematch — same fleets, teams and settings */
-  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';if(SCEN){leaveScenario();forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openModePicker();return}forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();lobbyChanged()});   /* Nov 22 (David): back to the fleet screen with the same ships still picked (each side has a Clear all button) */
+  $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';ships=[];missiles=[];fx=[];P=null;phase='select';buildHUD();   /* Nov 22 (David): clear the finished battle so nothing of it shows behind the menus */if(SCEN){leaveScenario();forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openModePicker();return}forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();lobbyChanged()});   /* Nov 22 (David): back to the fleet screen with the same ships still picked (each side has a Clear all button) */
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;if(k==='escape'&&pcrPick){pcrPick=null;arcSel=null;buildHUD();return}
     if(k==='enter'){e.preventDefault();doAct('go');return}
     if(k===' '){e.preventDefault();if(phase!=='decide')doAct('pause');return}
