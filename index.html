@@ -324,6 +324,10 @@ FACTIONS.Golthan={color:'#a0703c',blurb:'Stealth broadside cruisers: Run Dark fr
 SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:42,doctrine:'hunt',broadside:true,
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
+/* Nov 22 (David): Dogahr Corvette — the TL4 corvette benchmark, one size below a light frigate (11 / 52 / 17). Stats are Claude's picks on the class ladder. */
+SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:46,shield:20,reactor:18,genCost:5,genRegen:2,frigate:true,
+  shape:SHIPS.dfrigate.shape.map(([x,y])=>[x*.75,y*.75]),lines:SHIPS.dfrigate.lines.map(l=>l.map(v=>v*.75)),dots:SHIPS.dfrigate.dots.map(([x,y])=>[x*.75,y*.75]),
+  weapons:[['SC','S'],['SL','LS'],['SL','RS']],pd:['FX','ALL']};
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -363,10 +367,10 @@ for(const n of [1,2,3,4]){const E=SHIPS['freighter'+n];SHIPS['mfreighter'+n]={..
   weapons:[E.weapons[0],E.weapons[0],['MR','ALL'],['MR','ALL']]}}
 SHIPS.freighter4.name='Earthling Freighter';SHIPS.freighter1.name='Earthling Freighter (TL1)';SHIPS.mfreighter1.short='M. Freighter';}
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
-SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+SHIPS.corvette={faction:'Martian',cls:'Light Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
     weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
-SHIPS.corvette2i={...SHIPS.corvette,cls:'Improved Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8};
+SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8};
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',blurb:'Heavy shields, plasma lances, long-range targeting'};
 SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:150,shield:75,big:true,tl:5,
