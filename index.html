@@ -323,6 +323,7 @@ for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R
   if(d.faction==='Martian'||d.faction==='Earthling')SHIPS[k+'2']=   /* Nov 21 (David): Earthlings get TL2 too */{...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
 
+delete SHIPS.condor2;   /* Nov 22 (David): the Condor does not exist below TL3 */
 // ---- Martian TL1 (Nov 19, David). Early Frigate: no shields, chain-gun PD, railgun turrets. Placeholder outline (smaller, plainer Peregrine) until David's sprite ----
 SHIPS.earlyff={faction:'Martian',cls:'Early Frigate',weight:40,name:'Martian Early Frigate',short:'Early FF',color:'#ff5a46',laser:'#46ff6e',torp:'#5dff7a',hull:40,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:10,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-20,-18],[-14,-18],[-10,-9],[22,-9],[22,9],[-10,9],[-14,18],[-20,18]],lines:[[-18,0,22,0]],dots:[[4,-9],[4,9],[-2,0]],
@@ -1615,30 +1616,46 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
       let x=r.right+8;if(x+W>innerWidth-6)x=r.left-W-8;if(x<6)x=Math.max(6,Math.min(innerWidth-W-6,r.left));let y=Math.min(innerHeight-H-6,Math.max(6,r.top-10));tip.style.left=x+'px';tip.style.top=y+'px'});
     el.addEventListener('mouseleave',()=>{tip.style.display='none'})})}
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
-  const cards=Object.entries(FACTIONS).map(([f,F])=>{const ships=Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||'')));if(!ships.length)return '';
-    const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a);
+  const cards=Object.entries(FACTIONS).map(([f,F])=>{if(!facOK(f))return '';const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
+    const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=era==='open'?[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a):facTLs(f);
     return `<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${f}</b><span class="dim">${F.blurb}</span>
       <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}</span></div></button>`}).join('');
   el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${slotLabel(t)==='You'?'your fleet':slotLabel(t)}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
   el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;
-    const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder();lobbyChanged()})}
+    const tls=facTLs(f);if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder();lobbyChanged()})}
 /* Nov 21 (David): fleet lobby — up to 8 fleets (each human builds his own; the host / single player builds the AI fleets), each assigned to a team A–H */
 let selSlot=0,rightSel=1;
 const humans=()=>SLOTS.filter(x=>x&&x.kind==='human').map(x=>x.owner);   /* Nov 21 (David): any ship can be handed to another human player — two players can share one fleet */
 const slotLabel=i=>{const s=SLOTS[i];if(!s)return '';return s.kind==='human'?(s.owner===ME?'You':'Player '+(s.owner+1)):'AI fleet '+(SLOTS.slice(0,i+1).filter(x=>x&&x.kind==='ai').length)};
+/* Nov 22 (David): eras ("time settings") — each era limits which factions and tech levels can be fielded. 'open' = everything. */
+const ERAS={
+  open:{name:'Open — any ship'},
+  hiw3:{name:'Third Human Interplanetary War',allow:{Martian:[1],Earthling:[1]}},
+  dog1:{name:'First Dogahr Invasion',allow:{Martian:[1],Earthling:[1],Dogahr:[3]}},
+  dog2:{name:'Second Dogahr Invasion',allow:{Martian:[2],Earthling:[2],Dogahr:[3]},extra:['condor3']},
+  dbw:{name:'Dogahr/Blokai War',allow:{Martian:[3,4],Earthling:[3,4],Dogahr:[3],Hunibler:[3],Blokai:[5]}},
+  hun:{name:'Hunifer Invasion',allow:{Hunifer:[4],Blokai:[5],Dogahr:[3,4],Hunibler:[3,4],Martian:[3,4],Earthling:[3,4]}}};
+let era='open';
+const shipOK=k=>{const E=ERAS[era],d=SHIPS[k];if(!d)return false;if(!E||!E.allow)return true;return (E.allow[d.faction]||[]).includes(d.tl)||(E.extra||[]).includes(k)};
+const facTLs=f=>[...new Set(Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k].tl))].sort((a,b)=>b-a);
+const facOK=f=>facTLs(f).length>0;
+function eraFix(i){if(!SLOTS[i])return false;let ch=false;
+  if(!facOK(fleetFaction[i])){fleetFaction[i]=Object.keys(FACTIONS).find(facOK)||fleetFaction[i];ch=true}
+  const tls=facTLs(fleetFaction[i]),al=ERAS[era].allow&&ERAS[era].allow[fleetFaction[i]];if(tls.length&&!tls.includes(fleetTL[i])){fleetTL[i]=al?Math.max(...al):tls.includes(4)?4:tls[0];ch=true}
+  const n=fleet[i].length;fleet[i]=fleet[i].filter(x=>shipOK(x.key));if(fleet[i].length!==n)ch=true;return ch}
 const canEditSlot=i=>{const s=SLOTS[i];if(!s)return false;if(MP.role==='guest')return s.kind==='human'&&s.owner===ME;return s.kind==='ai'||s.owner===ME};
 const canManage=()=>MP.role!=='guest';
 function lobbyChanged(){if(MP.role==='guest'){if(typeof mpSendMySlot==='function')mpSendMySlot()}else if(MP.role==='host'&&typeof mpBroadcastLobby==='function')mpBroadcastLobby()}
-function renderBuilder(){renderHistory();const box=$('builder');selSlot=mySlotIdx();const others=SLOTS.map((x,i)=>x&&i!==selSlot?i:-1).filter(i=>i>=0);if(!others.includes(rightSel))rightSel=others.find(i=>SLOTS[i].kind==='ai')??others[0]??-1;
-  const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
+function renderBuilder(){renderHistory();{let ch=false;for(let i=0;i<MAXSLOTS;i++)if(canEditSlot(i)&&eraFix(i))ch=true;if(ch&&MP.role==='guest'&&typeof mpSendMySlot==='function')setTimeout(mpSendMySlot,0)}const box=$('builder');selSlot=mySlotIdx();const others=SLOTS.map((x,i)=>x&&i!==selSlot?i:-1).filter(i=>i>=0);if(!others.includes(rightSel))rightSel=others.find(i=>SLOTS[i].kind==='ai')??others[0]??-1;
+  const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]&&shipOK(k)).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
     const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);const hum=SLOTS[t].kind==='human',ed=canEditSlot(t);
     if(!ed)return `<div class="fleetcol"><h3 style="color:${TCOL8[SLOTS[t].team]}">${slotLabel(t)} <span class="dim" style="font-weight:normal;font-size:11px">Team ${TLET[SLOTS[t].team]} · ${fleet[t].length}/${MAXSHIPS} · built by ${hum?'that player':'the host'}</span></h3><div class="fl-list">${sorted.map(({x})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div><div class="row dim" style="margin-top:8px"><span style="color:${FACTIONS[fac].color}">⚑ ${fac}</span> TL${fleetTL[t]} · speed ${startSpeed[t]}${fleet[t].length>1?' · '+FORMS[fleetForm[t]]:''}</div></div>`;
     return `<div class="fleetcol"><h3 style="color:${TCOL8[SLOTS[t].team]}">${slotLabel(t)} <span class="dim" style="font-weight:normal;font-size:11px">Team ${TLET[SLOTS[t].team]} · ${fleet[t].length}/${MAXSHIPS}</span></h3>
      <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${humans().length>1?`<select data-fcmd="${t}:${i}" title="Who commands this ship in battle">${(hum?[]:[['','AI']]).concat(humans().map(pid=>[String(pid),pid===ME?'Me':'Player '+(pid+1)])).map(([v,l])=>`<option value="${v}" ${String(x.cmd!=null?x.cmd:(hum?SLOTS[t].owner:''))===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${hum||x.cmd!=null?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
-     <div class="row" style="margin-top:10px"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${[5,4,3,2,1].map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
+     <div class="row" style="margin-top:10px"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${(era==='open'?[5,4,3,2,1]:facTLs(fac)).map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
      <div class="row" style="gap:10px"><label class="dim">Starting speed <select data-sspeed="${t}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[t]===v?'selected':''}>${v}</option>`).join('')}</select></label>${fleet[t].length>1?`<label class="dim">Formation <select data-form="${t}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" ${fleetForm[t]===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
-     <div class="addlist">${avail.length?'':'<span class="dim">No ships at this tech level for this faction yet.</span>'}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
+     <div class="addlist">${avail.length?'':`<span class="dim">${era==='open'?'No ships at this tech level for this faction yet.':'None in this era at this tech level.'}</span>`}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
   const card=i=>{const s=SLOTS[i];const fac=fleetFaction[i];
     return `<div class="slotc ${i===rightSel?'sel':''}" ${i!==selSlot?`data-slotsel="${i}"`:''} style="border-left:5px solid ${TCOL8[s.team]};display:inline-flex;gap:6px;align-items:center;margin:3px">
       <b style="color:${TCOL8[s.team]}">${slotLabel(i)}</b><span class="dim" style="color:${FACTIONS[fac].color}">${fac}</span><span class="dim">${fleet[i].length} ship${fleet[i].length===1?'':'s'}</span>
@@ -1651,9 +1668,11 @@ function renderBuilder(){renderHistory();const box=$('builder');selSlot=mySlotId
   let tb=$('teamsbar');if(!tb){tb=document.createElement('div');tb.id='teamsbar';tb.style.cssText='border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:8px 0;background:#0b1622';$('forms').before(tb)}
   tb.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><b>Fleets &amp; teams</b><span class="dim sm">${used}/${MAXSLOTS} fleets · same team = allies · click a fleet to show it on the right</span>${canManage()&&used<MAXSLOTS?`<button class="btn" id="addai" style="margin-left:auto">+ Add AI fleet</button>`:''}</div><div>${SLOTS.map((s,i)=>s?card(i):'').join('')}</div>${MP.on?`<div class="dim sm">${MP.role==='host'?'Players join with your code; you set teams and build the AI fleets.':'The host sets teams and builds the AI fleets; build your own fleet on the left.'}</div>`:''}`;
 
-  const smSel=`<label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
+  const eraSel=`<label title="Era: limits which factions and tech levels can be fielded"><span class="dim">Era</span> <select id="era" ${MP.role==='guest'?'disabled':''}>${Object.entries(ERAS).map(([k,E])=>`<option value="${k}" ${era===k?'selected':''}>${E.name}</option>`).join('')}</select></label>${ERAS[era].allow?`<div class="dim sm" style="flex-basis:100%;text-align:center">${Object.entries(ERAS[era].allow).map(([f,l])=>`<span style="color:${FACTIONS[f].color}">${f}</span> TL${l.join('/')}`).join(' · ')}${(ERAS[era].extra||[]).map(k=>' · plus '+SHIPS[k].name).join('')}</div>`:''}`;
+  const smSel=eraSel+` <label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
   $('forms').innerHTML=smSel;
   $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();lobbyChanged()};
+  $('era').onchange=e=>{era=e.target.value;renderBuilder();lobbyChanged()};
   $('cmode').onchange=e=>{chargeMode=e.target.value;renderBuilder();lobbyChanged()};
   document.querySelectorAll('#builder [data-sspeed],#teamsbar [data-sspeed]').forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;lobbyChanged()}});
   box.querySelectorAll('[data-form]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{fleetForm[+b.dataset.form]=b.value;lobbyChanged()}});
@@ -1672,6 +1691,7 @@ function renderBuilder(){renderHistory();const box=$('builder');selSlot=mySlotId
 let BID=0;
 function start(){if(MP.role==='guest')return;BID++;
   /* Nov 21 (David): up to 8 fleets; each team starts on its own bearing around the centre (2 teams: facing each other as before); fleets on the same team stand side by side */
+  for(let i=0;i<MAXSLOTS;i++)if(fleet[i])fleet[i]=fleet[i].filter(x=>shipOK(x.key));   /* era guard */
   const act=[];for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&fleet[i]&&fleet[i].length)act.push(i);
   const mi=mySlotIdx();MYTEAM=SLOTS[mi]?SLOTS[mi].team:0;
   const teams=[...new Set(act.map(i=>SLOTS[i].team))].sort((a,b)=>a-b),nT=teams.length;const half=R.startDist/2;ships=[];const used=new Set();
@@ -1783,9 +1803,9 @@ function mpSend(m){if(MP.role==='guest'){if(MP.conn&&MP.conn.open)MP.conn.send(m
 
 // ---- lobby ----
 const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai,cmd:x.cmd}));
-function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode})}
+function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode,era})}
 function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);const keep=mi>=0?{f:fleet[mi],fac:fleetFaction[mi],tl:fleetTL[mi],form:fleetForm[mi],sp:startSpeed[mi]}:null;
-  SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;
+  SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;era=ERAS[m.era]?m.era:'open';
   for(let i=0;i<MAXSLOTS;i++){fleet[i]=(m.fleets[i]||[]).map(x=>({...x}));fleetFaction[i]=m.fac[i];fleetTL[i]=m.tl[i];fleetForm[i]=m.form[i];startSpeed[i]=m.speed[i]}
   const ni=mySlotIdx();if(keep&&ni===mi&&mpLastSlot){fleet[ni]=keep.f;fleetFaction[ni]=keep.fac;fleetTL[ni]=keep.tl;fleetForm[ni]=keep.form;startSpeed[ni]=keep.sp}   // my own slot: keep my local edits (the host echoes them back)
   if(MP.pre&&SLOTS[ni]&&SLOTS[ni].owner===ME){const q=MP.pre;MP.pre=null;fleetFaction[ni]=q.fac;fleetTL[ni]=q.tl;fleet[ni]=q.fleet;fleetForm[ni]=q.form;startSpeed[ni]=q.sp;setTimeout(mpSendMySlot,0)}   // keep the faction (and ships) picked before joining
