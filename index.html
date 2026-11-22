@@ -404,7 +404,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -1118,14 +1118,22 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   let rate=upkeepCost(s);const cap=income(s)-.75-(md2?pdLive*2*AIV.msDef2/IMP:0);let E=s.E;const out=[];let dropBurn=false;
   /* Nov 22 (David, fix 1): banked energy counts — a drain the reactor can't carry may still start if stored energy (above the PD reserve)
      covers the shortfall for that weapon's whole cycle. (The Dogahr Destroyer left its coilgun empty for 30 impulses sitting on 5 energy.) */
-  let bank=Math.max(0,s.E-pdNeed-(md2?pdLive*2+4*AIV.msDef2:0));
+  /* Nov 22 (David): against a side with more missile launchers, point defense is the AI's first priority. It always keeps enough energy to
+     reload every PD mount from empty on top of topping up what's missing now; burns, pivots, reinforcement and new gun loads wait while
+     that reserve isn't there, and lasers/coilguns/lances already charging are paused (progress kept) until it is. Torpedoes keep charging. (flag pdPri) */
+  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&(w.ammo>0||w.state==='reloading')).length;
+  const outL=AIV.pdPri&&pdLive>0&&enemiesOf(s).reduce((a,e)=>a+ml(e),0)>ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);
+  const resv=outL?pdNeed+pdLive*2:pdNeed;
+  if(outL&&s.E<resv)s.weapons.forEach((w,i)=>{if(w.alive&&w.charging&&w.T.kind!=='torp'&&(drains(w)||w.T.kind==='ap')&&!q.some(x=>x.type==='pausew'&&x.i===i))q.push({type:'pausew',i,cost:0})});
+  let bank=Math.max(0,s.E-resv-(md2?pdLive*2+4*AIV.msDef2:0));
   for(const x of q){
     if(x.type==='start'){const w=s.weapons[x.i];const n=w?(w.T.kind==='ap'?AP_IMP:w.T.kind==='torp'?IMP:cycleImp(s,w)):0;const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/n:w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
+      if(dr&&outL&&w.T.kind!=='torp'&&s.E<resv+2*dr)continue;
       if(dr){const over=Math.max(0,rate+dr-cap)-Math.max(0,rate-cap);if(over>1e-9){const need=over*n;if(!AIV.bank||bank<need-1e-9)continue;bank-=need}rate+=dr;out.push(x);continue}}
-    if(x.type==='pd'||x.type==='gen'||x.type==='dc'||x.type==='dccancel'||x.type==='hold'){out.push(x);E-=x.cost||0;continue}
+    if(x.type==='pd'||x.type==='gen'||x.type==='dc'||x.type==='dccancel'||x.type==='hold'||x.type==='pausew'){out.push(x);E-=x.cost||0;continue}
     const c=x.cost||0;
     if(x.type==='burn'&&dropBurn){dropBurn=false;continue}
-    if(c>0&&E-c<pdNeed-1e-9){if(x.type==='pivot')dropBurn=true;continue}
+    if(c>0&&E-c<resv-1e-9){if(x.type==='pivot')dropBurn=true;continue}
     if(x.type==='burn')dropBurn=false;
     out.push(x);E-=c}
   r.queue=out;
