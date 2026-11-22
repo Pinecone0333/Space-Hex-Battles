@@ -316,7 +316,7 @@ SHIPS.chemcru={...CHEM,cls:'Cruiser',weight:88,name:'Chemantar Cruiser',short:'C
 SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frigate',short:'Chem Frigate',hull:52,shield:22,big:false,reactor:19,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[-17.4,-7.4],[11.2,-7.4],[13.1,-7.2],[14.9,-6.4],[16.4,-5.3],[17.6,-3.7],[18.4,-1.9],[18.6,0],[18.4,1.9],[17.6,3.7],[16.4,5.3],[14.9,6.4],[13.1,7.2],[11.2,7.4],[-17.4,7.4]],lines:[[-16,0,15,0]],dots:[[13,0],[-4,-5],[-4,5]],
     weapons:[['ST','S'],['ST','S'],['SL','ALL'],['SL','ALL'],...rep(2,['MS','ALL'])],pd:['FX','ALL']};
-SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,pivotMax:1,dcTeams:3,reactor:84,genCost:20,genRegen:8,doctrine:'hunt',
+SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,pivotMax:1,dcTeams:3,reactor:82,genCost:20,genRegen:8,doctrine:'hunt',
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
@@ -325,7 +325,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 /* Nov 22 (David): Dogahr Corvette — the TL4 corvette benchmark, one size below a light frigate (11 / 52 / 17). Stats are Claude's picks on the class ladder. */
-SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:16,genCost:5,genRegen:2,frigate:true,
+SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:16,genCost:2.5,genRegen:1,frigate:true,
   shape:SHIPS.dfrigate.shape.map(([x,y])=>[x*.75,y*.75]),lines:SHIPS.dfrigate.lines.map(l=>l.map(v=>v*.75)),dots:SHIPS.dfrigate.dots.map(([x,y])=>[x*.75,y*.75]),
   weapons:[['SC','S'],['SL','LS'],['SL','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL']};   // Nov 22 (David): 2 missile launchers; about half a frigate's size, so half a frigate's durability (12/55 → 6/28)
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
@@ -374,12 +374,12 @@ SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Impro
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',blurb:'Heavy shields, plasma lances, long-range targeting'};
 SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:150,shield:75,big:true,tl:5,
-    reactor:52.5,genCost:10,genRegen:6,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
+    reactor:52,genCost:10,genRegen:6,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
     shape:[[36,-11],[30,-12.5],[24,-12],[19,-9.5],[16,-6],[8,-5],[6.1,-6.8],[3.3,-10.3],[-0.5,-13.1],[-5.2,-15],[-10.3,-15.9],[-15.5,-15.8],[-20.5,-14.5],[-24.9,-12.3],[-28.4,-9.2],[-30.8,-5.5],[-31.9,-1.4],[-30.8,5.5],[-28.4,9.2],[-24.9,12.3],[-20.5,14.5],[-15.5,15.8],[-10.3,15.9],[-5.2,15],[-0.5,13.1],[3.3,10.3],[6.1,6.8],[8,5],[16,6],[19,9.5],[24,12],[30,12.5],[36,11],[31,6],[28,0],[31,-6]],
     lines:[[-30,0,6,0],[-24,-9,-4,-9],[-24,9,-4,9]],dots:[[22,-7],[22,7],[-12,-13],[-12,13]],
     weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','LS']],pd:['FX','FX','FX','ALL','ALL','ALL']};
 SHIPS.blokaidd={faction:'Blokai',cls:'Destroyer',weight:60,name:'Blokai Destroyer',short:'Blokai DD',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:64,shield:42,big:false,tl:5,
-    reactor:27.5,genCost:5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
+    reactor:27,genCost:5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // Nov 18: TL5 destroyer — 1.5× destroyer shields (28→42), medium weapons, one fewer FX PD
     shape:[[27,-8.2],[22.5,-9.4],[18,-9],[14.2,-7.1],[12,-4.5],[6,-3.8],[4.6,-5.1],[2.5,-7.7],[-0.4,-9.8],[-3.9,-11.2],[-7.7,-11.9],[-11.6,-11.9],[-15.4,-10.9],[-18.7,-9.2],[-21.3,-6.9],[-23.1,-4.1],[-23.9,-1],[-23.1,4.1],[-21.3,6.9],[-18.7,9.2],[-15.4,10.9],[-11.6,11.9],[-7.7,11.9],[-3.9,11.2],[-0.4,9.8],[2.5,7.7],[4.6,5.1],[6,3.8],[12,4.5],[14.2,7.1],[18,9],[22.5,9.4],[27,8.2],[23.2,4.5],[21,0],[23.2,-4.5]],lines:[[-22.5,0,4.5,0],[-18,-6.8,-3,-6.8],[-18,6.8,-3,6.8]],dots:[[16.5,-5.2],[16.5,5.2],[-9,-9.8],[-9,9.8]],
     weapons:[['MPL','S'],['SL','FX'],['SL','FX'],['SL','RS'],['SL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
 // ---- hex geometry (flat-top axial) ----
@@ -418,7 +418,8 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  for(const k in SHIPS)if(SHIPS[k].tl===2&&k.endsWith('2')&&SHIPS[k.slice(0,-1)+'3'])SHIPS[k].reactor=h(SHIPS[k.slice(0,-1)+'3'].reactor*.85);
  for(const f of ['freighter','mfreighter']){const r3=SHIPS[f+'3'].reactor;SHIPS[f+'2'].reactor=h(r3*.85);SHIPS[f+'1'].reactor=h(r3*.7)}
  const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'peregrine3',earlyffl:'peregrine3',earlyeff:'peregrine3'};   // class: heavy cruiser, medium cruiser, heavy frigate
- for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7)}
+ for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7);
+ SHIPS.corvette2i.reactor=h(SHIPS.dcorvette3.reactor*.7);SHIPS.corvette.reactor=h(SHIPS.corvette2i.reactor*2/3)}   // corvette class on the TL1 ladder; light corvette = 2/3 of a corvette
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
 const REA_N=s=>s.reaN0||reaBoxes(s.d);
