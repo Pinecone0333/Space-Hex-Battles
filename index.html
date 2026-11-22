@@ -404,7 +404,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={rfMs:1,msDef2:2,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -1080,7 +1080,7 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,2-p.shots-p.pending.length):0),0):0;
   /* Nov 22 (David: 'the AI sucks at missile defense'): under missile threat, keep one full PD refill per turn out of the weapon-charging budget,
      and don't spend banked energy below a full PD refill plus a small reinforcement float (flag msDef2) */
-  const pdLive=!s.d.pdKind?s.pd.filter(p=>p.alive).length:0,md2=AIV.msDef2&&threat&&pdLive;
+  const pdLive=!s.d.pdKind?s.pd.filter(p=>p.alive).length:0,inb=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24),md2=AIV.msDef2&&inb&&pdLive;   // only while a wave is actually on its way (was: any enemy launcher in range — starved the guns all battle)
   let rate=upkeepCost(s);const cap=income(s)-.75-(md2?pdLive*2*AIV.msDef2/IMP:0);let E=s.E;const out=[];let dropBurn=false;
   /* Nov 22 (David, fix 1): banked energy counts — a drain the reactor can't carry may still start if stored energy (above the PD reserve)
      covers the shortfall for that weapon's whole cycle. (The Dogahr Destroyer left its coilgun empty for 30 impulses sitting on 5 energy.) */
@@ -1236,7 +1236,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const PM=AIV.agile?maxPiv(s):0,av=s.E-qCost(s)-genReserve(s);let bestP=0;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const tk=BURNS[k].turn||0;
      for(let pp=-PM;pp<=PM;pp++){if(Math.abs(pp+tk)>maxPiv(s))continue;const pc=pp?pivotCost(s,Math.sign(pp))*Math.abs(pp):0;if(!isFinite(pc)||av<burnCost(s,k)+pc)continue;
-      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>120*D2R&&!ordNav?.8:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
+      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>120*D2R&&!ordNav?.8:0)+(AIV.faceKeep&&!ordNav?Math.max(0,Math.abs(norm(fAng(b.f)-face))-Math.abs(norm(fAng(s.f)-face)))/(Math.PI/3)*.6:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
     if(best){for(let i=0;i<Math.abs(bestP);i++)queue(s,{type:'pivot',dir:Math.sign(bestP),cost:pivotCost(s,Math.sign(bestP))});queue(s,{type:'burn',a:best,cost:burnCost(s,best)});const b1=burnResult(s,best,(s.f+bestP+NF)%NF),bf=b1.f;if(bf!==s.f)s.lastTB={T,dir:Math.sign(norm(fAng(bf)-fAng(s.f)))}
       /* Nov 21: double burn — when movement is urgent and energy allows, a second straight-ahead burn (never the 3rd, critical one) */
       if(AIV.dbl&&urgent&&best!=='R'){const p1=hp(b1.dq,b1.dr),e1={x:e.x-p1.x,y:e.y-p1.y},b2=burnResult(s,'F',bf),p2=hp(b2.dq,b2.dr);const n1=Math.hypot(e1.x,e1.y)/HS,n2=Math.hypot(e1.x-p2.x,e1.y-p2.y)/HS;
