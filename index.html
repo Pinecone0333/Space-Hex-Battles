@@ -426,6 +426,28 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'hunolddd3',earlyffl:'hunolddd3',earlyeff:'hunolddd3'};   // class: heavy cruiser, medium cruiser, frigate (Nov 22, David: Early Frigates are normal frigates)
  for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7);
  SHIPS.corvette2i.reactor=h(SHIPS.dcorvette3.reactor*.7);SHIPS.corvette.reactor=h(SHIPS.corvette2i.reactor*2/3)}   // corvette class on the TL1 ladder; light corvette = 2/3 of a corvette
+/* Nov 22 (David): outline touch-ups — Chemantar Attack Frigate side engines; longer Chemantar Artillery Cruisers (single and Double) and Golthan stern; small wings on Hunibler, Hunifer and the Chemantar cruisers. Applied to every tech-level variant. */
+{const pieces=sh=>{const o=[[]];for(const p of sh){if(p)o[o.length-1].push(p);else o.push([])}return o.filter(x=>x.length)},
+   join=ps=>ps.reduce((a,x,i)=>a.concat(i?[null]:[],x),[]),
+   area=pc=>pc.reduce((a,p,i)=>{const q=pc[(i+1)%pc.length];return a+p[0]*q[1]-q[0]*p[1]},0),
+   orient=sh=>{const ps=pieces(sh),sg=Math.sign(area(ps[0]));return join(ps.map(pc=>Math.sign(area(pc))===sg?pc:pc.slice().reverse()))},   // same winding everywhere, so overlapping pieces fill solid
+   mir=pc=>pc.map(p=>[p[0],-p[1]]),
+   wing=(x0,e,span,len)=>{const w=[[x0,e-1],[x0-len*.55,e+span],[x0-len,e+span],[x0-len,e-1]];return[w,mir(w)]},
+   rect=(x1,x2,y1,y2)=>{const r=[[x2,y1],[x2,y2],[x1,y2],[x1,y1]];return[r,mir(r)]},
+   sx=(d,k)=>{d.shape=d.shape.map(p=>p&&[p[0]*k,p[1]]);if(d.lines)d.lines=d.lines.map(l=>[l[0]*k,l[1],l[2]*k,l[3]]);if(d.dots)d.dots=d.dots.map(p=>[p[0]*k,p[1]])},
+   add=(d,ps)=>{d.shape=join(pieces(d.shape).concat(ps))};
+ const W={hunold:[14,5,6,10],hunifer:[14,5,6,10],hunheavy:[18,13,6,10],huniferca:[18,13,6,10],hunolddd:[12,3.8,5,8],huniferdd:[10,3.8,5,8],hundd:[13,9.4,4.3,7.2],hunferdd:[13,9.4,4.3,7.2]};
+ const done=new Map();
+ for(const k in SHIPS){const d=SHIPS[k],b=k.replace(/[0-9]+[a-z]?$/,'')in SHIPS?k.replace(/[0-9]+[a-z]?$/,''):k;
+   if(done.has(d.shape)){const v=done.get(d.shape);d.shape=v.shape;d.lines=v.lines;d.dots=v.dots;continue}
+   const s0=d.shape;if(!s0)continue;
+   if(b==='chemff')add(d,rect(-23,-4,5,10.5));
+   else if(b==='chemart'){sx(d,1.3);add(d,wing(-4,13.5,8,18))}
+   else if(b==='chemdbl'){sx(d,1.3);const w=wing(-4,34.5,8,18);add(d,w)}
+   else if(b==='chemcru')add(d,wing(-2,12,8,18));
+   else if(b==='golthan'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]])}
+   else if(W[b])add(d,wing(...W[b]));
+   d.shape=orient(d.shape);done.set(s0,{shape:d.shape,lines:d.lines,dots:d.dots})}}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
 const REA_N=s=>s.reaN0||reaBoxes(s.d);
@@ -1816,7 +1838,7 @@ function shipSVG(d,W,H,col){const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=
   const inner=d.inner?`<path d="M${d.inner.map(p=>tp(p[0],p[1]).join(',')).join('L')}Z" fill="${col}26" stroke="${col}cc" stroke-width="1"/>`:'';
   const lines=(d.lines||[]).map(l=>{const a=tp(l[0],l[1]),b=tp(l[2],l[3]);return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}88" stroke-width="1"/>`}).join('');
   const dots=(d.dots||[]).map(q=>{const a=tp(q[0],q[1]);return `<circle cx="${a[0]}" cy="${a[1]}" r="${Math.max(1.5,2*sc)}" fill="none" stroke="${col}88"/>`}).join('');
-  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${path}" fill="#0c1622" stroke="${col}" stroke-width="1.6" style="filter:drop-shadow(0 0 4px ${col})" fill-rule="evenodd"/>${inner}${lines}${dots}</svg>`}
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${path}" fill="#0c1622" stroke="${col}" stroke-width="1.6" style="filter:drop-shadow(0 0 4px ${col})" fill-rule="nonzero"/>${inner}${lines}${dots}</svg>`}
 const arcName=a=>a==='ALL'?'360°':a==='S'?'spinal':a;
 function shipTipHTML(k){const d=SHIPS[k],fc=FACTIONS[d.faction].color,g={};
   for(const [wk,arc] of d.weapons){const w=WT[wk];if(w.kind==='missile')continue;(g[wk]=g[wk]||[]).push(arcName(arc))}
