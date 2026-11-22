@@ -441,7 +441,7 @@ function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
 // ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
 const sensRange=s=>Math.max(0,Math.round(10-10*(s.dmgSen||0)/(s.senN0||5)));
-/* Nov 21 (David): Golthan Run Dark. Costs the full generator drain again, needs the generator at 100% and shields up. Halves direct-fire hit chance from attackers within 60 deg of the bow. Firing breaks it for the next 4 impulses. */
+/* Nov 21 (David): Golthan Run Dark. Costs the full generator drain again, needs the generator at 100% and shields up. Cuts direct-fire hit chance by 30% (Nov 22; was halved) from attackers within 60 deg of the bow. Firing breaks it for the next 4 impulses. */
 const darkBroken=s=>s.darkFiredT!=null&&T>s.darkFiredT&&T<=s.darkFiredT+4;
 const darkOn=s=>!!(s.dark&&s.d.runDark&&!s.dead&&genLvl(s)>=1-1e-9&&s.shield+reinfAmt(s)>0&&!darkBroken(s));
 const inBow=(t,a)=>Math.abs(norm(Math.atan2(a.px.y-t.px.y,a.px.x-t.px.x)-fAng(t.f)))<=Math.PI/3+1e-6;
@@ -757,7 +757,8 @@ function canFireMount(s,key,t){if(!t||t.dead)return false;
   if(K==='torp')return w.stages>=1&&inArc(s,w.arc,t);
   return w.state==='ready'&&inArc(s,w.arc,t)}
 const accK=(s,k)=>s.d.tl===5&&ACC[k+'5']?k+'5':k;   // TL5 ships read the stretched 14-hex tables
-function hitP(s,key,t){return (darkCovers(t,s)?.5:1)*hitP0(s,key,t)}
+const DARK_MUL=.7;   /* Nov 22 (David): Run Dark cuts hit chance by 30% (was halved) */
+function hitP(s,key,t){return (darkCovers(t,s)?DARK_MUL:1)*hitP0(s,key,t)}
 function hitP0(s,key,t){const d=hexDist(s,t),ev=t.d.evade||0;if(key.startsWith('pd'))return Math.max(0,accAt(accK(s,'laser'),d)-(s.d.pdKind==='chain'?.15:0)-ev);const T_=s.weapons[+key.slice(1)].T;return T_.acc?Math.max(0,accAt(accK(s,T_.acc),d)-ev):1}   // evade: sleek hulls (Hunibler) are 5% harder to hit
 
 // ---- damage ----
@@ -1373,7 +1374,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
      ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>${upkeepRow(s)}`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[0,.25,.5,.75,1].map(l=>btn('gen:'+l,l?Math.round(l*100)+'%':'Off',canQueue(s,{type:'gen',lvl:l,cost:0}),!l?'Turn the generator off: no drain, but shields collapse to 0.':(gc*l)+' energy per turn, drained '+(+(gc*l/IMP).toFixed(3))+' each impulse. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}</div>
      ${upkeepRow(s)}
-     ${s.d.runDark?`<div class="row"><span class="lab">Run Dark</span><b class="${darkOn(s)?'good':s.dark?'warn':'dim'}">${darkOn(s)?'ACTIVE':s.dark?(darkBroken(s)?'broken by fire → '+when(s.darkFiredT+5):'no shields'):'off'}</b>${sd?`<button class="btn${s.dark?' aion':''}" data-act="rundark" ${s.dark||genLvl(s)>=1-1e-9?'':'disabled'} title="Costs ${genCost(s)} energy per turn (${+(genCost(s)/IMP).toFixed(3)} each impulse) on top of the generator; needs the generator at 100% and shields up. Halves the hit chance of direct fire (not missiles) from ships within 60° of the bow. Firing any weapon or lighting missiles cancels the effect for 4 impulses.">${s.dark?'Go light':'Run dark'}</button>`:''}</div>`:''}
+     ${s.d.runDark?`<div class="row"><span class="lab">Run Dark</span><b class="${darkOn(s)?'good':s.dark?'warn':'dim'}">${darkOn(s)?'ACTIVE':s.dark?(darkBroken(s)?'broken by fire → '+when(s.darkFiredT+5):'no shields'):'off'}</b>${sd?`<button class="btn${s.dark?' aion':''}" data-act="rundark" ${s.dark||genLvl(s)>=1-1e-9?'':'disabled'} title="Costs ${genCost(s)} energy per turn (${+(genCost(s)/IMP).toFixed(3)} each impulse) on top of the generator; needs the generator at 100% and shields up. Cuts the hit chance of direct fire (not missiles) from ships within 60° of the bow by 30%. Firing any weapon or lighting missiles cancels the effect for 4 impulses.">${s.dark?'Go light':'Run dark'}</button>`:''}</div>`:''}
      <div class="row dim sm">${s.gen.from>T?`online ${when(s.gen.from)} · `:''}${g?`cap ${Math.round(shieldCap(s))} · `:''}regen <b class="txt">+${regenRate(s).toFixed(1)}</b>/turn <span title="Hit within the last 4 impulses: no regeneration (repair only). Hit within 12: base rate. Not hit for 12+ impulses: double rate.">(${['undamaged ×2','hit recently','under fire'][regenTier(s)]})</span></div>
      ${sd?`<div class="row">${btn('reinf:1','Reinforce +1',canQueue(s,{type:'reinf',n:1,cost:2}),'2 energy per point, lasts one turn (8 impulses); max 2 shield points per impulse')}${btn('reinf:2','+2',canQueue(s,{type:'reinf',n:2,cost:4}))}
       ${btn('repair:1','Repair +1',canQueue(s,{type:'repair',n:1,cost:2}),'2 energy per base-shield point (generator must run); max 2 shield points per impulse')}${btn('repair:2','+2',canQueue(s,{type:'repair',n:2,cost:4}))}</div>`:''}`}
@@ -1618,7 +1619,7 @@ function shipTipHTML(k){const d=SHIPS[k],fc=FACTIONS[d.faction].color,g={};
     const cost=w.kind==='torp'?`${w.perTurn}/turn ×3`:w.kind==='ap'?`${w.cost} over 2 turns`:w.kind==='missile'?'free':`${w.cost}`;
     return `<tr><td><b>${arcs.length}× ${w.ab}</b></td><td class="dim">${w.name}</td><td>${Object.entries(cnt).map(([a,n])=>(n>1?n+' ':'')+a).join(' · ')}</td><td class="num">${dmg} dmg</td><td class="num dim">${cost} E</td></tr>`}).join('');
   const ms=d.weapons.filter(([wk])=>WT[wk].kind==='missile').length;const pdc={};d.pd.forEach(a=>pdc[arcName(a)]=(pdc[arcName(a)]||0)+1);
-  const traits=[d.noShield?'no shields':'',d.armor?`front armor ${d.armor}`:'',d.evade?`${Math.round(d.evade*100)}% harder to hit`:'',d.moveMul?`maneuvers ×${d.moveMul}`:'',d.runDark?'Run Dark (halves direct fire from the bow arc)':'',d.pdKind==='chain'?'chain-gun PD (free)':''].filter(Boolean).join(' · ');
+  const traits=[d.noShield?'no shields':'',d.armor?`front armor ${d.armor}`:'',d.evade?`${Math.round(d.evade*100)}% harder to hit`:'',d.moveMul?`maneuvers ×${d.moveMul}`:'',d.runDark?'Run Dark (−30% to direct-fire hit chance from the bow arc)':'',d.pdKind==='chain'?'chain-gun PD (free)':''].filter(Boolean).join(' · ');
   return `<div class="tip-h"><span style="color:${fc}">${d.name}</span> <span class="dim">TL${d.tl||4}</span></div>
    <div class="tip-b"><div class="tip-s">${shipSVG(d,120,150)}</div><div class="tip-w">
    <div class="dim" style="margin-bottom:4px">Shields <b>${d.noShield?'—':d.shield}</b> · Hull <b>${d.hull}</b> · Reactor <b>${d.reactor}</b>${d.genCost&&!d.noShield?` · Generator ${d.genCost}`:''}</div>
