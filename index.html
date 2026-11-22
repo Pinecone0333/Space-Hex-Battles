@@ -367,7 +367,7 @@ for(const n of [1,2,3,4]){const E=SHIPS['freighter'+n];SHIPS['mfreighter'+n]={..
   weapons:[E.weapons[0],E.weapons[0],['MR','ALL'],['MR','ALL']]}}
 SHIPS.freighter4.name='Earthling Freighter';SHIPS.freighter1.name='Earthling Freighter (TL1)';SHIPS.mfreighter1.short='M. Freighter';}
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
-SHIPS.corvette={faction:'Martian',cls:'Light Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+SHIPS.corvette={faction:'Martian',cls:'Light Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:6.5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
     weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
 SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8.5};   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
