@@ -362,7 +362,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1};   // AI variants (for testing)
+let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false;
@@ -813,6 +813,8 @@ function autoFireSel(s,t){return [] }
 // ---- AI ----
 // AI keeps enough energy back to renew the shield generator when renewal is near (shields collapse if it lapses)
 function genReserve(s){const u=upkeepCost(s)-income(s);return u>0?u+.25:0}   // keep enough to pay next impulse's drains
+/* r9 (Nov 21, David): turn nose-on by time, not distance — true when the target, at the current closing speed, reaches 6 hexes (torpedo 65%) within 3 impulses. Against fast attackers (double burns) the fixed 4-hex rule left no time to rotate. */
+function turnIn(s,t,d){if(!t)return false;const Vt=hp(t.vq,t.vr),Vs=hp(s.vq,s.vr),dx=t.px.x-s.px.x,dy=t.px.y-s.px.y,L=Math.hypot(dx,dy)||1;const vc=-((Vt.x-Vs.x)*dx+(Vt.y-Vs.y)*dy)/L/HS;return vc>0&&(d-6)/(vc/IMP)<=3}
 // pivot direction for the AI: the short way if those thrusters work, otherwise the long way round (thrusters on that side destroyed)
 function aiPivotDir(s,fd){if(!fd)return 0;const d=Math.sign(fd);return isFinite(pivotCost(s,d))?d:isFinite(pivotCost(s,-d))?-d:0}
 // AINEW[team]=false runs the previous AI for that side (testing only)
@@ -975,7 +977,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     s.mode=s.alphaDone&&torps.length&&!AIV.extend?'brawl':(torps.length?torps.every(ready):guns.every(ready))?'attack':'charge';
     s.holdImp=AIV.mhold&&s.mode==='attack'&&d<=9?(s.holdImp||0)+1:0;   // impulses spent holding fire for the alpha strike
     if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
-    else if(s.mode==='attack'){want=AIV.fast?{range:1,radial:1.5,maxClose:12,orbit:d>6?2.5:0}:AIV.r5&&!MDOC(s)?{range:1,radial:1.3,maxClose:10}:{range:1,radial:1.2};face=d>4?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
+    else if(s.mode==='attack'){want=AIV.fast?{range:1,radial:1.5,maxClose:12,orbit:d>6?2.5:0}:AIV.r5&&!MDOC(s)?{range:1,radial:1.3,maxClose:10}:{range:1,radial:1.2};face=d>4&&!(AIV.r9&&turnIn(s,t,d))?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
     else if(AIV.crip&&(s.hull<s.d.hull*.5||s.reactor<s.reactor0*.6)&&torps.length){want={range:18,radial:1.2,orbit:.5};face=a-side*Math.PI/2;prio=['torps'];reserve=6;s.crip=true}   // crippled: open the range and spend only on torpedoes, generator and engines
     else{want={range:15,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
   }else if(s.d.doctrine==='hunt'||s.d.doctrine==='brawl'){
@@ -1042,7 +1044,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'||AIV.apfix&&g==='aplances'?0:AIV.pdBudget&&s.mode==='charge'?reserve:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
   const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance'||w.T.kind==='ap')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
-  const wantNose=AIV.align&&spReady&&d<=(s.d.faction==='Dogahr'?10:9)&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&d<=6||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
+  const wantNose=AIV.align&&spReady&&(d<=(s.d.faction==='Dogahr'?10:9)||AIV.r9&&s.mode==='attack'&&d<=12&&turnIn(s,t,d))&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&(d<=6||AIV.r9&&turnIn(s,t,d))||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
   const noseFoes=(AIV.r5?!DDOC(s):s.d.faction==='Martian')||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=10&&torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
   const look=2/IMP;
@@ -1374,7 +1376,7 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
     else el.style.display='none'}
   $('side').innerHTML=h;$('rside').innerHTML=rh;$('log').innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('');$('log').scrollTop=1e6;
   let b='';if(dec&&s&&!s.dead&&!s.ai){const B=(k,lab,a)=>{const act={type:'burn',a,cost:burnCost(s,a)};const dir=Math.sign(BURNS[a].turn||0),m=dir?turnPen(s,dir):0;return `<button class="btn big ${m?'thrwarn':''}" data-act="burn:${a}" ${canQueue(s,act)?'':'disabled'} title="${+act.cost.toFixed(2)} energy${m?` — ${thrName(dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
-    const pv=(k,lab,dir)=>{const m=turnPen(s,+dir);return `<button class="btn big ${m?'thrwarn':''}" data-act="pivot:${dir}" ${canQueue(s,{type:'pivot',dir,cost:pivotCost(s,+dir)})?'':'disabled'} title="${isFinite(pivotCost(s,+dir))?+pivotCost(s,+dir).toFixed(2)+' energy':'thrusters destroyed'}${m?` — ${thrName(+dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
+    const pv=(k,lab,dir)=>{const m=turnPen(s,+dir);return `<button class="btn big ${m?'thrwarn':''}" data-act="pivot:${dir}" ${canQueue(s,{type:'pivot',dir:+dir,cost:pivotCost(s,+dir)})?'':'disabled'} title="${isFinite(pivotCost(s,+dir))?+pivotCost(s,+dir).toFixed(2)+' energy':'thrusters destroyed'}${m?` — ${thrName(+dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
     const db=decelBurn(s);
     b=`
       <div style="display:flex;flex-direction:column;gap:4px"><button class="btn big accel" data-act="burn:F" ${canQueue(s,{type:'burn',a:'F',cost:burnCost(s,'F')})?'':'disabled'} title="${burnCost(s,'F')} energy"><span class="k">W</span> ▲ ACCEL${nBurnQ(s)===1?' ×2':nBurnQ(s)===2?'<b class="pen">⚠ CRIT</b>':''}</button>
