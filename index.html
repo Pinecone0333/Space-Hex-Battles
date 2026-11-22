@@ -189,6 +189,7 @@ const WT={
   XC:{name:'Superheavy Coilgun',ab:'CG(sh)',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},
   TC:{name:'Titan Coilgun',ab:'CG(t)',grp:'coils',kind:'slug',acc:'coil',dmg:22,cost:11},   // one more step: 22 dmg / 11 energy   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
   MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:4},
+  MR:{name:'Missile Rack',ab:'MR',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:2,noReload:true},   /* Nov 22 (David): 2 missiles, fired like a launcher, never reloaded */
   ST:{name:'Small Energy Torpedo',ab:'ET(s)',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'ET(m)',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
   HT:{name:'Heavy Energy Torpedo',ab:'ET(h)',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
@@ -347,7 +348,14 @@ const FRS=[[-24,-10],[18,-10],[24,-6],[24,6],[18,10],[-24,10]];
 SHIPS.freighter1={faction:'Earthling',cls:'Freighter',weight:20,name:'Earthling Freighter',short:'Freighter',color:'#8fb8ff',laser:'#ff3b3b',torp:'#ff4d4d',hull:50,shield:0,noShield:true,big:true,dcTeams:1,reaBoxes:10,tl:1,accPen:0,reactor:8,genCost:0,doctrine:'flee',freighter:true,pdKind:'chain',
     shape:FRS,lines:[[-14,-10,-14,10],[-4,-10,-4,10],[6,-10,6,10]],dots:[[20,0]],
     weapons:[['RG','ALL']],pd:['FX','ALL']};
-SHIPS.freighter2={...SHIPS.freighter1,name:'Earthling Freighter (TL2)',short:'Freighter II',tl:2,weight:20.5,weapons:[['SL2','ALL']]};}
+SHIPS.freighter2={...SHIPS.freighter1,name:'Earthling Freighter (TL2)',short:'Freighter II',tl:2,weight:20.5,weapons:[['SL2','ALL']]};
+/* Nov 22 (David): freighters up to TL4 (Claude's extrapolation). TL3: full-strength small laser, laser PD, reactor 10. TL4: adds shields 10 (after halving) with a 5-energy generator, reactor 15 (= TL3 + generator). (All reactors −2 later.) */
+SHIPS.freighter3={...SHIPS.freighter1,name:'Earthling Freighter (TL3)',short:'Freighter III',tl:3,weight:21,reactor:10,pdKind:undefined,weapons:[['SL','ALL']]};
+SHIPS.freighter4={...SHIPS.freighter3,name:'Earthling Freighter (TL4)',short:'Freighter IV',tl:4,weight:21.5,reactor:15,shield:20,noShield:false,genCost:5,genRegen:2};   /* shield 20 before the global halving = 10 */
+/* Martian freighters: Earthling freighter stats, but two 360° mounts and two missile racks (2 missiles each, never reloaded) */
+for(const n of [1,2,3,4]){const E=SHIPS['freighter'+n];SHIPS['mfreighter'+n]={...E,faction:'Martian',name:'Martian Freighter'+(n<4?` (TL${n})`:''),short:'M. Freighter'+(n>1?' '+['','','II','III','IV'][n]:''),color:'#ff9a8a',laser:'#ff5a4a',torp:'#ffb03a',weight:E.weight+.2,
+  weapons:[E.weapons[0],E.weapons[0],['MR','ALL'],['MR','ALL']]}}
+SHIPS.freighter4.name='Earthling Freighter';SHIPS.freighter1.name='Earthling Freighter (TL1)';SHIPS.mfreighter1.short='M. Freighter';}
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
 SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
@@ -679,7 +687,7 @@ function commit(){
     if(!(key[0]==='w'&&s.weapons[+key.slice(1)].T.kind==='missile'))s.darkFiredT=T;
     if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
-    if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
+    if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true}));if(own(s))sfx('missile',.35);continue}
       s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg}));sfx('missile',fr(s)?1:.65);continue}
     let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else w.state='idle';
@@ -691,7 +699,7 @@ function commit(){
   for(const s of alive()){const DL=defLaunchers(s);if(!DL.length)continue;
     const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead));   /* Nov 21 (David): Defend launches the moment a missile aimed at the ship appears, at any range (was within 16 hexes) */
     for(const th of thr){const w=DL.find(w=>w.state==='ready'&&w.ammo>0);if(!w)break;
-      w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
+      w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
     const d=Math.min(i*.14,1.6),vol=fr(sh.s)?1:.65;let f;
@@ -1210,8 +1218,8 @@ const TEAMCOL=['#5aff8a','#ff8a3d'];
 /* Nov 21 (David): relation colours — your ships green, allies blue, enemies red */
 const REL={own:'#5aff8a',ally:'#4fa8ff',foe:'#ff8a3d'},REL2={own:'#b8ffcc',ally:'#a8d4ff',foe:'#ffc79e'};const rel=s=>own(s)?'own':fr(s)?'ally':'foe';
 // grouped missile launchers: one row of status chips + launch/cycle buttons
-function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireSel.has('w'+i);const c=!w.alive?'<span class="bad">✖</span>':defLaunchers(s).includes(w)&&s.msMode==='off'?`<span class="good" title="held for defense">⛨</span>`:armed?'<span class="warn">◉</span>':w.state==='ready'?'<span class="good">●</span>':w.state==='cycling'?'<span class="dim">◔</span>':w.state==='reloading'?'<span class="dim">↻</span>':'<span class="dim">○</span>';
-    return `<span title="${w.arc} launcher: ${!w.alive?'destroyed':w.state}${w.alive?' · '+w.ammo+'/4 missiles'+(w.state!=='ready'&&w.state!=='idle'?' · ready '+when(w.readyT):''):''}">${c}</span>`}).join('');
+function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireSel.has('w'+i);const c=!w.alive?'<span class="bad">✖</span>':defLaunchers(s).includes(w)&&s.msMode==='off'?`<span class="good" title="held for defense">⛨</span>`:armed?'<span class="warn">◉</span>':w.state==='ready'?'<span class="good">●</span>':w.state==='cycling'?'<span class="dim">◔</span>':w.state==='reloading'?'<span class="dim">↻</span>':w.state==='empty'?'<span class="dim" style="opacity:.4">∅</span>':'<span class="dim">○</span>';
+    return `<span title="${w.arc} launcher: ${!w.alive?'destroyed':w.state}${w.alive?' · '+w.ammo+'/'+w.T.mag+' missiles'+(w.T.noReload?' (rack, no reload)':'')+(w.state!=='ready'&&w.state!=='idle'&&w.state!=='empty'?' · ready '+when(w.readyT):''):''}">${c}</span>`}).join('');
   const rdy=ws.filter(({w})=>w.alive&&w.state==='ready').length,ammo=ws.reduce((a,{w})=>a+(w.alive?w.ammo:0),0);
   const fire=t?ws.filter(({i})=>canFireMount(s,'w'+i,t)):[];const armed=ws.filter(({i})=>s.fireSel.has('w'+i)).length;
   const idle=ws.filter(({w,i})=>canQueue(s,{type:'start',i,cost:0})).length;let ctl='';
