@@ -1135,7 +1135,9 @@ function log(text,cls,intel){if(REC&&MP.role!=='guest')REC.log.push([T,text]);
   logLines.push({text,cls:cls||''});if(logLines.length>12)logLines.shift();const el=$('log');if(el)el.innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('')}
 function bar(v,max,cls){return `<div class="bar ${cls||''}"><i style="width:${max>0?clamp(v/max*100,0,100):0}%"></i></div>`}
 const btn=(id,label,ok,title)=>`<button class="btn" data-act="${id}" ${ok?'':'disabled'} ${title?`title="${title}"`:''}>${label}</button>`;
-const TEAMCOL=['#4fd8ff','#ff8a3d'];
+const TEAMCOL=['#5aff8a','#ff5a5a'];
+/* Nov 21 (David): relation colours — your ships green, allies blue, enemies red */
+const REL={own:'#5aff8a',ally:'#4fa8ff',foe:'#ff5a5a'},REL2={own:'#b8ffcc',ally:'#a8d4ff',foe:'#ffb0b0'};const rel=s=>own(s)?'own':fr(s)?'ally':'foe';
 // grouped missile launchers: one row of status chips + launch/cycle buttons
 function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireSel.has('w'+i);const c=!w.alive?'<span class="bad">✖</span>':defLaunchers(s).includes(w)&&s.msMode==='off'?`<span class="good" title="held for defense">⛨</span>`:armed?'<span class="warn">◉</span>':w.state==='ready'?'<span class="good">●</span>':w.state==='cycling'?'<span class="dim">◔</span>':w.state==='reloading'?'<span class="dim">↻</span>':'<span class="dim">○</span>';
     return `<span title="${w.arc} launcher: ${!w.alive?'destroyed':w.state}${w.alive?' · '+w.ammo+'/4 missiles'+(w.state!=='ready'&&w.state!=='idle'?' · ready '+when(w.readyT):''):''}">${c}</span>`}).join('');
@@ -1470,11 +1472,11 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
   if(showArcs&&P&&!P.dead){const A=posOf(P);const seen=new Set();for(const w of P.weapons){if(!w.alive||!w.T.acc)continue;const key=w.T.grp+w.arc;if(seen.has(key))continue;seen.add(key);
     const [c,hw]=ARCS[w.arc],rad=TCR[w.T.acc]*HS*cam.s;const col=w.T.grp==='lasers'?P.d.laser:w.T.grp==='torps'?P.d.torp:'#ffe066';
     ctx.beginPath();ctx.moveTo(sx(A.x),sy(A.y));ctx.arc(sx(A.x),sy(A.y),rad,fAng(P.f)+(c-hw)*D2R,fAng(P.f)+(c+hw)*D2R);ctx.closePath();ctx.fillStyle=col+'10';ctx.fill();ctx.strokeStyle=col+'66';ctx.stroke()}}
-  for(const s of ships){if(s.dead)continue;const c=hp(s.q,s.r);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;const x=sx(c.x)+R_*.98*Math.cos(a),y=sy(c.y)+R_*.98*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle=TEAMCOL[s.team]+(s===P?'':'99');ctx.lineWidth=(s===P?2.5:1.5)*dpr;ctx.stroke();ctx.lineWidth=1}
+  for(const s of ships){if(s.dead)continue;const c=hp(s.q,s.r);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;const x=sx(c.x)+R_*.98*Math.cos(a),y=sy(c.y)+R_*.98*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle=REL[rel(s)]+(s===P?'':'99');ctx.lineWidth=(s===P?2.5:1.5)*dpr;ctx.stroke();ctx.lineWidth=1}
   // drift arrows: one turn of coasting
   for(const s of ships){if(s.dead)continue;const a=posOf(s);let vq=s.vq,vr=s.vr;
     if(own(s)&&phase==='decide'){const qb=s.queue.find(x=>x.type==='burn');if(qb){const b=burnResult(s,qb.a);vq+=b.dq;vr+=b.dr}}
-    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?'#ffd24dcc':s.color+(s===P&&phase==='decide'?'cc':'66'),!fr(s)?[6,4]:[3,5])}}
+    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?REL.foe+'cc':own(s)?s.color+(s===P&&phase==='decide'?'cc':'66'):REL.ally+'99',!fr(s)?[6,4]:[3,5])}}
   const PT=P&&!P.dead?tgt(P):null;if(PT){const a=posOf(P),b=posOf(PT);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(P,PT)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
   for(const s of ships)if(!s.dead&&own(s)&&s.dark&&s.d.runDark){const p=posOf(s),R0=12*HS,a0=s.drawAng==null?fAng(s.f):s.drawAng,on=darkOn(s);   /* Run Dark: bow wedge (±60°), enemies inside marked green, outside red */
@@ -1519,8 +1521,8 @@ function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(p
   if(s.d.inner){ctx.beginPath();s.d.inner.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=s.color+'26';ctx.fill();ctx.strokeStyle=s.color+'cc';ctx.lineWidth=1/sc*dpr;ctx.stroke()}   // aft hull block (Condor)
   ctx.strokeStyle=s.color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of s.d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of s.d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
   if(s.burnFx>0){ctx.fillStyle=`rgba(255,180,90,${s.burnFx})`;ctx.beginPath();ctx.moveTo(-36,-5);ctx.lineTo(-52-Math.random()*8,0);ctx.lineTo(-36,5);ctx.closePath();ctx.fill()}
-  ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=own(s)?TEAMCOL[0]:fr(s)?'#7dffa0':TEAMCOL[1];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(own(s)?(s.ai?' (AI)':''):'')+(nTeams()>2&&!fr(s)?' ['+TLET[s.team]+']':'')+(fr(s)&&!own(s)?(s.owner!=null?' (P'+(s.owner+1)+')':' (ally)'):''),ly=Y+48*sc+8*dpr;
-    {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=!fr(s)?'#ffd24d':'#8fe3ff';ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
+  ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=REL[rel(s)];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(own(s)?(s.ai?' (AI)':''):'')+(nTeams()>2&&!fr(s)?' ['+TLET[s.team]+']':'')+(fr(s)&&!own(s)?(s.owner!=null?' (P'+(s.owner+1)+')':' (ally)'):''),ly=Y+48*sc+8*dpr;
+    {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=REL2[rel(s)];ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
 
 // ---- flow: fleet builder ----
 const fleet=[[],[],[],[],[],[],[],[]];const MAXSHIPS=20;
@@ -1582,6 +1584,7 @@ function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();c
     const tls=[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))];if(!tls.includes(fleetTL[t]))fleetTL[t]=tls.includes(4)?4:Math.max(...tls);el.remove();renderBuilder();lobbyChanged()})}
 /* Nov 21 (David): fleet lobby — up to 8 fleets (each human builds his own; the host / single player builds the AI fleets), each assigned to a team A–H */
 let selSlot=0;
+const humans=()=>SLOTS.filter(x=>x&&x.kind==='human').map(x=>x.owner);   /* Nov 21 (David): any ship can be handed to another human player — two players can share one fleet */
 const slotLabel=i=>{const s=SLOTS[i];if(!s)return '';return s.kind==='human'?(s.owner===ME?'You':'Player '+(s.owner+1)):'AI fleet '+(SLOTS.slice(0,i+1).filter(x=>x&&x.kind==='ai').length)};
 const canEditSlot=i=>{const s=SLOTS[i];if(!s)return false;if(MP.role==='guest')return s.kind==='human'&&s.owner===ME;return s.kind==='ai'||s.owner===ME};
 const canManage=()=>MP.role!=='guest';
@@ -1590,7 +1593,7 @@ function renderBuilder(){renderHistory();const box=$('builder');if(!SLOTS[selSlo
   const side=(t)=>{const fac=fleetFaction[t];const avail=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===fac&&SHIPS[k].tl===fleetTL[t]).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight);
     const sorted=fleet[t].map((x,i)=>({x,i})).sort((a,b)=>SHIPS[b.x.key].weight-SHIPS[a.x.key].weight);const hum=SLOTS[t].kind==='human';
     return `<div class="fleetcol"><h3 style="color:${TCOL8[SLOTS[t].team]}">${slotLabel(t)} <span class="dim" style="font-weight:normal;font-size:11px">Team ${TLET[SLOTS[t].team]} · ${fleet[t].length}/${MAXSHIPS}</span></h3>
-     <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${hum?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
+     <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor}</span>${humans().length>1?`<select data-fcmd="${t}:${i}" title="Who commands this ship in battle">${(hum?[]:[['','AI']]).concat(humans().map(pid=>[String(pid),pid===ME?'Me':'Player '+(pid+1)])).map(([v,l])=>`<option value="${v}" ${String(x.cmd!=null?x.cmd:(hum?SLOTS[t].owner:''))===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${hum||x.cmd!=null?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
      <div class="row" style="margin-top:10px"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${[5,4,3,2,1].map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb} · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}</span></div>
      <div class="addlist">${avail.length?'':'<span class="dim">No ships at this tech level for this faction yet.</span>'}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor}</span></button>`}).join('')}</div></div>`};
   const card=i=>{const s=SLOTS[i];const ed=canEditSlot(i),fac=fleetFaction[i];
@@ -1617,6 +1620,7 @@ function renderBuilder(){renderHistory();const box=$('builder');if(!SLOTS[selSlo
   const ad=$('addai');if(ad)ad.onclick=()=>{const i=SLOTS.findIndex(x=>!x);if(i<0)return;const usedT=new Set(SLOTS.filter(Boolean).map(x=>x.team));let tm=0;while(usedT.has(tm)&&tm<7)tm++;SLOTS[i]={kind:'ai',owner:null,team:tm,name:''};fleet[i]=[];fleetFaction[i]='Dogahr';fleetTL[i]=4;fleetForm[i]='line';startSpeed[i]=4;selSlot=i;renderBuilder();lobbyChanged()};
   box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder();lobbyChanged()});
   box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-fcmd]').forEach(b=>b.onchange=()=>{const [t,i]=b.dataset.fcmd.split(':');const x=fleet[+t][+i];const hum=SLOTS[+t].kind==='human';x.cmd=b.value===''||(hum&&+b.value===SLOTS[+t].owner)?undefined:+b.value;renderBuilder();lobbyChanged()});
   box.querySelectorAll('[data-fai]').forEach(b=>b.onchange=()=>{const [t,i]=b.dataset.fai.split(':');fleet[+t][+i].ai=b.checked;lobbyChanged()});
   box.querySelectorAll('[data-facpick]').forEach(b=>b.onclick=()=>openFactionPicker(+b.dataset.facpick));bindShipTips(box);const tipEl=$('shiptip');if(tipEl)tipEl.style.display='none';
   box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{fleetTL[+b.dataset.tl]=+b.value;renderBuilder();lobbyChanged()});
@@ -1637,7 +1641,8 @@ function start(){if(MP.role==='guest')return;
       fleet[l.i].forEach((x,j)=>{const p=l.S[j];const lx=(p.x+off)*HX*1.5;let ly=p.y*HX*SQ3;let h,q,r;
         for(let g=0;g<30;g++){const X=C.x+lat.x*lx+out.x*ly,Y=C.y+lat.y*lx+out.y*ly;h=pixToHex(X,Y);q=h.q;r=h.r;if(!used.has(q+','+r))break;ly+=HX*SQ3}used.add(q+','+r);
         const d=SHIPS[x.key];cnt[x.key]=(cnt[x.key]||0)+1;const name=d.short+(tot[x.key]>1?' '+cnt[x.key]:'');
-        const sh=makeShip(x.key,q,r,bf,tm,owner==null?true:!!x.ai,name,owner);sh.slot=l.i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}});
+        const ow=x.cmd!=null&&humans().includes(x.cmd)?x.cmd:owner;const sh=makeShip(x.key,q,r,bf,tm,ow==null?true:!!x.ai,name,ow);sh.slot=l.i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}});
+  {const m0=ships.find(s=>own(s));if(m0)MYTEAM=m0.team}
   for(const sh of ships)sh.target=nearestEnemy(sh);
   if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
   for(const sh of ships){const v=startSpeed[sh.slot]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
@@ -1732,7 +1737,7 @@ function mpJoin(code){const i0=mySlotIdx();const pre={fac:fleetFaction[i0],tl:fl
 function mpSend(m){if(MP.role==='guest'){if(MP.conn&&MP.conn.open)MP.conn.send(m)}else for(const x of MP.conns)if(x.c.open)x.c.send(m)}
 
 // ---- lobby ----
-const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai}));
+const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai,cmd:x.cmd}));
 function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode})}
 function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);const keep=mi>=0?{f:fleet[mi],fac:fleetFaction[mi],tl:fleetTL[mi],form:fleetForm[mi],sp:startSpeed[mi]}:null;
   SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;
@@ -1743,11 +1748,11 @@ function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owne
   if($('start').style.display!=='none')renderBuilder()}
 function mpSendMySlot(){const i=mySlotIdx();const m={t:'myslot',fleet:mpFleetOut(i),fac:fleetFaction[i],tl:fleetTL[i],form:fleetForm[i],speed:startSpeed[i]};const j=JSON.stringify(m);if(j===mpLastSlot)return;mpLastSlot=j;mpSend(m)}
 function mpApplySlot(pid,m){const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===pid);if(i<0)return;
-  fleet[i]=(m.fleet||[]).slice(0,MAXSHIPS).filter(x=>SHIPS[x.key]).map(x=>({key:x.key,ai:!!x.ai}));if(FACTIONS[m.fac])fleetFaction[i]=m.fac;fleetTL[i]=m.tl;fleetForm[i]=m.form;startSpeed[i]=m.speed;
+  fleet[i]=(m.fleet||[]).slice(0,MAXSHIPS).filter(x=>SHIPS[x.key]).map(x=>({key:x.key,ai:!!x.ai,cmd:Number.isInteger(x.cmd)?x.cmd:undefined}));if(FACTIONS[m.fac])fleetFaction[i]=m.fac;fleetTL[i]=m.tl;fleetForm[i]=m.form;startSpeed[i]=m.speed;
   if($('start').style.display!=='none')renderBuilder();mpBroadcastLobby()}
 
 // ---- host → guest snapshots (each guest gets its own view) ----
-const teamOfPid=pid=>{const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===pid);if(s)return s.team;const sh=ships.find(x=>x.owner===pid);return sh?sh.team:-1};
+const teamOfPid=pid=>{const sh=ships.find(x=>x.owner===pid);if(sh)return sh.team;const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===pid);return s?s.team:-1};
 function serShip(s,pid){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k==='hist'||k==='fireChoice')continue;o[k]=s[k]}
   o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.owner===pid?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
   if(s.owner!==pid)o.queue=[];   // never reveal anyone else's orders
