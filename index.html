@@ -408,6 +408,13 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 // Nov 21 (David): every reactor 2 lower — energy allocation should matter more
 for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
+/* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
+   TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
+{const h=x=>Math.round(x*2)/2;
+ for(const k in SHIPS)if(SHIPS[k].tl===2&&k.endsWith('2')&&SHIPS[k.slice(0,-1)+'3'])SHIPS[k].reactor=h(SHIPS[k.slice(0,-1)+'3'].reactor*.85);
+ for(const f of ['freighter','mfreighter']){const r3=SHIPS[f+'3'].reactor;SHIPS[f+'2'].reactor=h(r3*.85);SHIPS[f+'1'].reactor=h(r3*.7)}
+ const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'peregrine3',earlyffl:'peregrine3',earlyeff:'peregrine3'};   // class: heavy cruiser, medium cruiser, heavy frigate
+ for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7)}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
 const REA_N=s=>s.reaN0||reaBoxes(s.d);
