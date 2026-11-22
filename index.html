@@ -175,6 +175,8 @@ ACC.laser2=shrinkTo(ACC.laser,8,0,.1);ACC.coil2=shrinkTo(ACC.coil,8);ACC.torp2=s
 const shrink1=(A,add=0,floor=.05)=>A.map((p,r)=>r<=6?Math.min(1,A[Math.min(A.length-1,2*r)]+add):floor);
 ACC.laser1=shrink1(ACC.laser,0,.1);   // Nov 20 (David): laser floor beyond the computer is 10%, not 5%
 ACC.coil1=shrink1(ACC.coil);ACC.torp1=shrink1(ACC.torp);ACC.rail1=shrink1(ACC.coil,.05);
+ACC.rail=ACC.coil.map((p,r)=>r<=12?Math.min(1,+(p+.05).toFixed(2)):.05);   /* Nov 22 (David): TL4 railgun turrets — the coilgun table +5 (turret), 12-hex computer */
+{const ext=(A,f)=>{const B=A.slice();while(B.length<61)B.push(f);return B};ACC.rail5=shrinkTo(ext(ACC.rail,.05),14,0,.05,true);ACC.rail2=shrinkTo(ACC.rail,8)}
 const sixths=p=>Math.round(p*100)+'%';
 const TCR={laser:10,coil:6,torp:10,laser2:8,coil2:6,torp2:8,laser1:6,coil1:6,torp1:6,rail1:6};
 const accAt=(k,r)=>ACC[k][Math.min(Math.round(r),60)];
@@ -205,14 +207,17 @@ WT.HAP={name:'Heavy Antiproton Lance',ab:'APL(h)',grp:'aplances',kind:'ap',acc:'
 const AP_IMP=2*IMP;
 const torpHot=(s,e)=>(s.torpMem||{})[e.name]!==false||!AIV.tmem||T-((s.torpSeen||{})[e.name]??-99)>=IMP;   // a turn after seeing torpedoes fire, assume they've recharged enough to matter
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
-// tech level 2 weapons: same energy for 2/3 of the damage, and the shorter-ranged targeting computer
-for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true,...(b.dmg?{dmg:Math.round(b.dmg*2/3)}:{dmgMul:2/3})}}
-// TL1 weapons (Nov 19, David): the TL2 rule (2/3 damage for the same energy) with the TL1 targeting computer; the railgun turret is a TL1 design (3 dmg / 2 energy)
-WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.SC.dmg*2/3),tl1:true};
+// tech level 2 weapons: the shorter-ranged targeting computer (damage reduction removed Nov 22)
+/* Nov 22 (David): NO damage reduction at lower tech levels — TL4 is the baseline; TL1/TL2 weapons differ only in their shorter targeting computers */
+for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
+// TL1 weapons (Nov 19, David): the TL1 targeting computer (2/3 damage removed Nov 22); the railgun turret is a TL1 design (3 dmg / 2 energy)
+WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'RG(s)',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
 WT.MRG={name:'Medium Railgun Turret',ab:'RG(m)',grp:'rails',kind:'slug',acc:'rail1',dmg:6,cost:4,fx:'rail',tl1:true};   // Nov 19 (David): same 1.5 dmg per energy as the small turret (3/2)
-WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',dmg:Math.round(WT.SL.dmg*2/3),tl1:true};
-WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',dmg:Math.round(WT.MC.dmg*2/3),tl1:true};
+WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',tl1:true};
+WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',tl1:true};
+/* Nov 22 (David): every existing weapon is also available at TL4 — railgun turrets with the TL4 computer (coilgun table +5) */
+WT.RG4={...WT.RG,name:'Small Railgun Turret (TL4)',acc:'rail',tl1:false};WT.MRG4={...WT.MRG,name:'Medium Railgun Turret (TL4)',acc:'rail',tl1:false};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
 const FACTIONS={Dogahr:{color:'#39e75f',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
@@ -1630,7 +1635,7 @@ function formSlots(form,list){const n=list.length,sp=4;const out=[];
   return out}
 const fleetFaction=['Martian','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr'],fleetTL=[4,4,4,4,4,4,4,4];
 const mySlotIdx=()=>{const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);return i<0?0:i};
-const TLNOTE={5:'built for shields: 1.5× shields, targeting +2 hexes',4:'shielded refits',3:'no shields, weaker reactors',2:'no shields, 8-hex targeting, 2/3-damage weapons'};
+const TLNOTE={5:'built for shields: 1.5× shields, 14-hex targeting',4:'shielded refits (the baseline)',3:'no shields, weaker reactors',2:'no shields, weaker reactors, 8-hex targeting',1:'no shields, small reactors, 6-hex targeting, chain-gun PD'};
 function shipLabel(k){const d=SHIPS[k];return `<span class="fbadge" style="background:${FACTIONS[d.faction].color}22;border-color:${FACTIONS[d.faction].color};color:${FACTIONS[d.faction].color}">${d.faction}</span> <b>${d.cls}</b>`}
 // ---- Setup screen helpers (Nov 21, David): faction select screen, ship sprites, weapon tooltips ----
 function shipSVG(d,W,H,col){const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
