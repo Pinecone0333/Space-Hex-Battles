@@ -320,7 +320,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
   SHIPS[k+'3']={...d,tl:3,name:d.name+' (TL3)',short:d.short+' III',shield:0,noShield:true,reactor:r3,weight:d.weight-.1};
-  if(d.faction==='Martian')SHIPS[k+'2']={...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
+  if(d.faction==='Martian'||d.faction==='Earthling')SHIPS[k+'2']=   /* Nov 21 (David): Earthlings get TL2 too */{...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
 
 // ---- Martian TL1 (Nov 19, David). Early Frigate: no shields, chain-gun PD, railgun turrets. Placeholder outline (smaller, plainer Peregrine) until David's sprite ----
@@ -331,6 +331,14 @@ SHIPS.earlyca={faction:'Martian',cls:'Early Heavy Cruiser',weight:95,name:'Marti
     shape:[[-30,-24],[-22,-24],[-16,-12],[30,-12],[30,12],[-16,12],[-22,24],[-30,24]],lines:[[-28,-4,30,-4],[-28,4,30,4]],dots:[[14,-12],[14,12],[-6,0]],   // placeholder outline until David's sprite
     weapons:[['MRG','FX'],['MRG','LS'],['MRG','RS'],...rep(3,['MC1','S']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL','ALL']};
 SHIPS.earlyffl={...SHIPS.earlyff,cls:'Early Laser Frigate',weight:41,name:'Martian Early Laser Frigate',short:'Early Laser FF',weapons:[['SC1','S'],['SL1','FX'],['SL1','RS'],['SL1','LS'],['MS','ALL'],['MS','ALL']]};   // Nov 19 (David): Early Frigate with small lasers in place of the railgun turrets
+// ---- Earthling TL1 (Nov 21, David). No shields, chain-gun PD, railgun turrets on the Earthling RX/LX arcs. Outlines = the Earthling hull scaled down (placeholder) ----
+{const sc=(a,k)=>a.map(p=>p.map(v=>Math.round(v*k*10)/10)),E=SHIPS.earthling;
+SHIPS.earlyeff={faction:'Earthling',cls:'Early Frigate',weight:40,name:'Earthling Early Frigate',short:'Earthling Early FF',color:'#5a9cff',laser:'#ff3b3b',torp:'#ff4d4d',hull:40,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:10,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+    shape:sc(E.shape,.6),lines:sc(E.lines,.6),dots:sc(E.dots,.6),
+    weapons:[['SC1','S'],['RG','LX'],['RG','RX'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL']};
+SHIPS.earlyeca={faction:'Earthling',cls:'Early Cruiser',weight:80,name:'Earthling Early Cruiser',short:'Earthling Early CL',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:70,shield:0,noShield:true,big:true,tl:1,accPen:0,reactor:18,genCost:0,doctrine:'alpha',pdKind:'chain',
+    shape:sc(E.shape,.85),lines:sc(E.lines,.85),dots:sc(E.dots,.85),   /* reactor 18 = its full gun reload per turn (2×4 + 2×5), like the Martian Early CA; hull 70 (Claude's pick, below the Martian Early CA's 100) */
+    weapons:[...rep(2,['MC1','S']),['MRG','LX'],['MRG','LX'],['MRG','RX'],['MRG','RX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};}
 // Martian TL1 corvettes (Nov 19, David): the base model is deliberately underpowered — reloading both turrets (4/turn) leaves ~1 energy per turn to maneuver
 SHIPS.corvette={faction:'Martian',cls:'Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
