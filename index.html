@@ -423,7 +423,7 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
 {const h=x=>Math.round(x*2)/2;
  for(const k in SHIPS)if(SHIPS[k].tl===2&&k.endsWith('2')&&SHIPS[k.slice(0,-1)+'3'])SHIPS[k].reactor=h(SHIPS[k.slice(0,-1)+'3'].reactor*.85);
  for(const f of ['freighter','mfreighter']){const r3=SHIPS[f+'3'].reactor;SHIPS[f+'2'].reactor=h(r3*.85);SHIPS[f+'1'].reactor=h(r3*.7)}
- const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'peregrine3',earlyffl:'peregrine3',earlyeff:'peregrine3'};   // class: heavy cruiser, medium cruiser, heavy frigate
+ const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'hunolddd3',earlyffl:'hunolddd3',earlyeff:'hunolddd3'};   // class: heavy cruiser, medium cruiser, frigate (Nov 22, David: Early Frigates are normal frigates)
  for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7);
  SHIPS.corvette2i.reactor=h(SHIPS.dcorvette3.reactor*.7);SHIPS.corvette.reactor=h(SHIPS.corvette2i.reactor*2/3)}   // corvette class on the TL1 ladder; light corvette = 2/3 of a corvette
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
@@ -1949,7 +1949,7 @@ const PTS3={'Dreadnought':300,'Double Cruiser':220,'Heavy Cruiser':150,'Cruiser'
 const PTS_TL={1:.6,2:.8,3:1,4:1.3,5:1.6};
 function ptsClass(k){const d=SHIPS[k],c=d.cls,b=k.replace(/[0-9]+$/,'');
   if(b==='dread')return 'Dreadnought';if(/Double/.test(c))return 'Double Cruiser';if(/Heavy Cruiser/.test(c))return 'Heavy Cruiser';if(/Light Cruiser/.test(c))return 'Light Cruiser';if(/Cruiser/.test(c))return 'Cruiser';
-  if(/Destroyer/.test(c))return 'Destroyer';if(b==='peregrine'||/Early.*Frigate/.test(c))return 'Heavy Frigate';if(b==='dfrigate'||b==='chemff')return 'Light Frigate';if(/Frigate/.test(c))return 'Frigate';
+  if(/Destroyer/.test(c))return 'Destroyer';if(b==='peregrine')return 'Heavy Frigate';if(b==='dfrigate'||b==='chemff')return 'Light Frigate';if(/Frigate/.test(c))return 'Frigate';
   if(/Light Corvette/.test(c))return 'Light Corvette';if(/Corvette/.test(c))return 'Corvette';if(/Freighter/.test(c))return 'Freighter';return 'Destroyer'}
 const shipPts=k=>Math.round(PTS3[ptsClass(k)]*(PTS_TL[SHIPS[k].tl||4]||1)/5)*5;
 const shipValue=shipPts;
