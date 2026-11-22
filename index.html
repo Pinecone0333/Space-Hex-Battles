@@ -1643,8 +1643,8 @@ const CAMPAIGNS={sdi2:{name:'Second Dogahr Invasion — Part 2',side:'Martian',e
 const SCENARIOS={
   bloodynose:{name:'Bloody Nose',era:'dog2',camp:'sdi2',mission:1,
     blurb:'A Dogahr hunting group — a Light Cruiser, two Destroyers and a Frigate — has caught six Earthling freighters running for Mars. A Martian squadron of two Albatrosses and three Peregrines arrives to rescue them.',
-    goal:{Martian:'Destroy the Dogahr hunting group and save as many freighters as you can.',Dogahr:'Destroy the freighters — and the Martian squadron that came to save them.'},
-    sides:['Martian','Dogahr'],
+    goal:{Martian:'Destroy the Dogahr hunting group and save as many freighters as you can.',Dogahr:'Destroy the freighters — and the Martian squadron that came to save them.',Earthling:'Command the six freighters: keep them alive while the Martian squadron (AI) deals with the Dogahr.'},
+    sides:['Martian','Dogahr','Earthling'],
     /* slot 0 Martian (team A), slot 1 Dogahr (team B), slot 2 Earthling freighters (team A, always AI) */
     fleets:[{fac:'Martian',tl:2,team:0,ships:['albatross2','albatross2','peregrine2','peregrine2','peregrine2']},
             {fac:'Dogahr',tl:3,team:1,ships:['lcruiser3','destroyer3','destroyer3','dfrigate3']},
@@ -1662,7 +1662,7 @@ function startScenario(id,side,camp){const S=SCENARIOS[id];if(!S)return;
   if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode});
   SCEN={id,side,camp:!!camp};era=S.era;startMode='stations';
   SLOTS=[null,null,null,null,null,null,null,null];
-  S.fleets.forEach((F,i)=>{const human=!F.ai&&F.fac===side;SLOTS[i]=human?{kind:'human',owner:ME,team:F.team,name:'You'}:{kind:'ai',owner:null,team:F.team,name:F.name||''};
+  S.fleets.forEach((F,i)=>{const human=F.fac===side;SLOTS[i]=human?{kind:'human',owner:ME,team:F.team,name:'You'}:{kind:'ai',owner:null,team:F.team,name:F.name||''};
     fleet[i]=F.ships.map(k=>({key:k,ai:!human}));fleetFaction[i]=F.fac;fleetTL[i]=F.tl;fleetForm[i]='line';startSpeed[i]=0});
   for(let i=S.fleets.length;i<MAXSLOTS;i++)fleet[i]=[];
   const mp=$('modepick');if(mp)mp.remove();const fp=$('facpick');if(fp)fp.remove();
@@ -1678,20 +1678,20 @@ function openModePicker(){for(const id of ['modepick','facpick']){const o=$(id);
       <button class="faccard" data-mode="campaign" style="--fc:#ff6a5a" ${online?'disabled title="Offline only for now"':''}><div class="fc-t"><b style="color:#ff6a5a;font-size:16px">★ Campaign</b><span class="dim">Missions in order, one side, progress saved in this browser.${online?' <i>(offline only for now)</i>':''}</span></div></button></div>`}
     else if(view==='scenario'){h=`<div class="fp-h"><button class="btn" data-mback style="margin:0">◂</button><b style="font-size:17px">Scenarios</b></div>`+Object.entries(SCENARIOS).map(([id,S])=>`<div class="faccard" style="--fc:#ffb84d;display:block;cursor:default;margin-bottom:8px">
         <b style="color:#ffb84d;font-size:16px">${S.name}</b> <span class="dim">· ${ERAS[S.era].name}${S.camp?' · also mission '+S.mission+' of '+CAMPAIGNS[S.camp].name:''}</span><div style="margin:6px 0">${S.blurb}</div>
-        <div class="row" style="gap:6px;flex-wrap:wrap"><span class="dim">Play as</span>${S.sides.map(f=>`<button class="btn ${side===f?'aion':''}" data-mside="${f}" style="border-color:${FACTIONS[f].color};color:${FACTIONS[f].color}">${f}</button>`).join('')}<span class="dim sm" style="flex-basis:100%">${S.goal[side]||''}</span>
-        <button class="btn big go" data-mgo="${id}" style="margin-left:auto">Launch ▶</button></div></div>`).join('')}
+        ${S.sides.map(f=>`<div class="row" style="gap:10px;margin:6px 0;align-items:center"><button class="btn big" data-mgo="${id}" data-mside="${f}" style="min-width:230px;border-color:${FACTIONS[f].color};color:${FACTIONS[f].color}">Play as the ${f==='Dogahr'?'Dogahr':f+'s'} ▶</button><span class="dim sm">${S.goal[f]||''}</span></div>`).join('')}</div>`).join('')}
     else if(view==='campaign'){h=`<div class="fp-h"><button class="btn" data-mback style="margin:0">◂</button><b style="font-size:17px">Campaigns</b></div>`+Object.entries(CAMPAIGNS).map(([cid,C])=>`<div class="faccard" style="--fc:#ff6a5a;display:block;cursor:default;margin-bottom:8px">
         <b style="color:#ff6a5a;font-size:16px">${C.name}</b> <span class="dim">· play as the <span style="color:${FACTIONS[C.side].color}">${C.side}s</span> · ${ERAS[C.era].name}</span><div class="dim" style="margin:6px 0">${C.blurb}</div>
         ${C.missions.map((id,k)=>{const S=SCENARIOS[id],open=k===0||P0[C.missions[k-1]];return `<div class="row" style="gap:8px;margin:4px 0"><b>${k+1}. ${S.name}</b>${P0[id]?'<span style="color:var(--good)">✓ won</span>':''}<span class="dim sm" style="flex:1">${S.goal[C.side]}</span><button class="btn go" data-cgo="${id}" ${open?'':'disabled'}>${P0[id]?'Replay':'Play'} ▶</button></div>`}).join('')}
-        <div class="dim sm">More missions coming.</div></div>`).join('')}
+        <div class="dim sm">More missions coming.</div></div>`).join('')+`<div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap"><span class="dim sm" style="flex:1">Progress is saved in this browser only (the GitHub page and the Claude page keep separate saves). Back it up or move it to another computer with a save file:</span><button class="btn" data-csave>💾 Save progress file</button><button class="btn" data-cload>📂 Load progress file</button></div>`}
     el.innerHTML=`<div class="fp-in">${h}</div>`};
   draw();document.body.appendChild(el);
   el.addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;initAudio();
     if(b.dataset.mode==='skirmish'){el.remove();leaveScenario();$('start').style.display='flex';renderBuilder();openFactionPicker(mySlotIdx(),true);return}
     if(b.dataset.mode){view=b.dataset.mode;draw();return}
     if(b.hasAttribute('data-mback')){view='modes';draw();return}
-    if(b.dataset.mside){side=b.dataset.mside;draw();return}
-    if(b.dataset.mgo){startScenario(b.dataset.mgo,side,false);return}
+    if(b.dataset.mgo){startScenario(b.dataset.mgo,b.dataset.mside,false);return}
+    if(b.hasAttribute('data-csave')){const blob=new Blob([JSON.stringify({game:'Space Hex Tactics campaign save',v:1,date:new Date().toISOString(),progress:campProg()},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='space-hex-campaign.json';document.body.appendChild(a);a.click();a.remove();return}
+    if(b.hasAttribute('data-cload')){const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const j=JSON.parse(t);if(!j||typeof j.progress!=='object')throw 0;const cur=campProg();localStorage.setItem('shtCampaign',JSON.stringify({...cur,...j.progress}));toast('Campaign progress loaded','good');draw()}catch(e){toast('That file is not a Space Hex campaign save','warnt')}})};inp.click();return}
     if(b.dataset.cgo){startScenario(b.dataset.cgo,CAMPAIGNS[SCENARIOS[b.dataset.cgo].camp].side,true);return}})}
 /* Nov 21 (David): fleet lobby — up to 8 fleets (each human builds his own; the host / single player builds the AI fleets), each assigned to a team A–H */
 let selSlot=0,rightSel=1;
