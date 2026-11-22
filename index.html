@@ -102,6 +102,11 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 #critbox{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:none;align-items:center;justify-content:center}.critcard{background:#1a0f0f;border:2px solid #ff5a3d;border-radius:8px;padding:14px 16px;max-width:380px;color:#f0d8d0;font-size:13px;box-shadow:0 0 24px #ff5a3d66}.crith{color:#ff6a4d;font-weight:bold;font-size:16px;margin-bottom:6px;letter-spacing:1px}.btn.critgo{background:#6a1a10;border-color:#ff5a3d;color:#ffd0c0}
 #start{overflow-y:auto;align-items:flex-start;padding:12px 0}#start>.box{margin:auto}   /* Nov 21: long fleets scroll instead of being cut off at the top */
 table.cas{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}table.cas td{padding:2px 6px;border-bottom:1px solid #1c2733;white-space:nowrap}
+.ordsel{font-size:11px;background:#0f1a26;color:var(--fg,#d6e2ee);border:1px solid #2b3c4f;border-radius:4px;margin-left:4px;max-width:150px}
+
+.ctlpick{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center}
+.ctlcard{background:#0d1621;border:2px solid #ffb84d;border-radius:12px;padding:18px;max-width:440px;display:flex;flex-direction:column;gap:10px}
+.ctlcard .btn{text-align:left;padding:10px 12px;white-space:normal;line-height:1.35}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -398,7 +403,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -478,8 +483,8 @@ const inBow=(t,a)=>Math.abs(norm(Math.atan2(a.px.y-t.px.y,a.px.x-t.px.x)-fAng(t.
 const darkCovers=(t,a)=>darkOn(t)&&inBow(t,a);
 /* deployed (dark) missiles: visible to the enemy only inside the sensor range of one of its ships */
 const mslSpotted=(m,team)=>!m.dorm||m.owner.team===team||ships.some(x=>!x.dead&&x.team===team&&Math.hypot(m.px.x-x.px.x,m.px.y-x.px.y)/HS<=sensRange(x));
-const scanWeapons=(e,team=MYTEAM)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
-const scanStatus=(e,team=MYTEAM)=>ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0);
+const scanWeapons=(e,team=MYTEAM)=>e.team===team||ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0&&hexDist(o,e)<=sensRange(o));
+const scanStatus=(e,team=MYTEAM)=>e.team===team||ships.some(o=>o.team===team&&!o.dead&&sensRange(o)>0);
 function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   if(x.k==='w'){const w=s.weapons[x.i];w.alive=true;if(w.T.kind!=='missile'&&w.T.kind!=='torp')w.state='idle';if(w.T.kind==='torp'){w.state='idle';w.stages=0;w.charging=false;w.holding=false}}
   else if(x.k==='pd'){s.pd[x.i].alive=true;s.pd[x.i].shots=0;s.pd[x.i].pending=[]}
@@ -497,7 +502,31 @@ const alive=()=>ships.filter(s=>!s.dead);
 const enemiesOf=s=>ships.filter(x=>!x.dead&&x.team!==s.team);
 const mine=()=>ships.filter(s=>own(s)&&!s.dead&&!s.ai);
 function nearestEnemy(s){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d<bd){bd=d;b=e}}return b}
-function tgt(s){if(!s.target||s.target.dead)s.target=isAI(s)&&AIV.focus?pickTarget(s):nearestEnemy(s);return s.target}
+function tgt(s){if(!s.target||s.target.dead||s.ai&&s.target.team===s.team)s.target=isAI(s)&&AIV.focus?pickTarget(s):nearestEnemy(s);return s.target}
+const foeTgt=s=>{const t=tgt(s);return t&&t.team!==s.team?t:nearestEnemy(s)};   // a player ship may target a friendly to inspect it; AI planning always uses an enemy
+const flagship=()=>P&&!P.dead&&own(P)&&!P.ai?P:(mine()[0]||null);   // 'me' for fleet orders: the ship you're flying
+const ORD_LBL={free:'AI (own judgment)',follow:'Follow me',attack:'Attack my target',defend:'Defend'};
+function ordText(x){const o=x.order;if(!o||o.k==='free')return '';const a=shipByName(o.a);return o.k==='follow'?'⇢ follows '+(a?a.name:'?'):o.k==='attack'?'⚔ attacks '+(a?a.name:'?')+"'s target":'⛨ guards '+(a?a.name:'?')}
+function setOrder(x,k){const f=flagship();if(!x||x.dead||!own(x)||!x.ai)return false;if(k==='free'){x.order=null;return true}
+  if(!f||f===x)return false;let a=f;if(k==='defendt'){const t=f.target;if(!t||t.dead||t.team!==x.team||t===x)return false;a=t;k='defend'}
+  x.order={k,a:a.name};return true}
+const shipByName=n=>n&&ships.find(x=>x.name===n&&!x.dead)||null;
+/* Nov 22 (David): fleet orders for AI wingmen — s.order={k:'follow'|'attack'|'defend', a:<anchor ship name>}.
+   follow: keep station on the anchor (my ship), fight its target; attack: fight my current target; defend: stay close to the anchor ship, fight whatever threatens it. */
+function orderAnchor(s){const o=s.order;if(!o||o.k==='free')return null;const a=shipByName(o.a);if(!a||a.team!==s.team||a===s){s.order=null;return null}return a}
+function orderTarget(s){const a=orderAnchor(s);if(!a)return null;const o=s.order;
+  if(o.k==='follow'||o.k==='attack'){const t=a.target;if(t&&!t.dead&&t.team!==s.team)return t;return null}
+  if(o.k==='defend'){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(e,a);if(d<bd){bd=d;b=e}}return bd<=16?b:null}
+  return null}
+function orderVd(s){const a=orderAnchor(s);if(!a)return null;const o=s.order;if(o.k==='attack')return null;
+  const L=ships.filter(x=>!x.dead&&x.order&&x.order.k===o.k&&x.order.a===o.a).sort((x,y)=>(y.d.weight||0)-(x.d.weight||0)||(x.name<y.name?-1:1));const j=Math.max(0,L.indexOf(s));
+  const fa=fAng(a.f);let back,sidev;
+  if(o.k==='follow'){const row=1+Math.floor(j/2);back=2*row;sidev=(j%2?1:-1)*2*row}   // wedge behind my ship, 2 hexes back and 2 out per step
+  else{back=-1;sidev=(j%2?1:-1)*(2+Math.floor(j/2)*2)}   // escort: alongside, 2 hexes out
+  const ux=Math.cos(fa),uy=Math.sin(fa);const st={x:a.px.x+(-ux*back-uy*sidev)*HS,y:a.px.y+(-uy*back+ux*sidev)*HS};
+  if(o.k==='defend'){const e=orderTarget(s);if(e){const ang=Math.atan2(e.px.y-a.px.y,e.px.x-a.px.x);st.x=a.px.x+Math.cos(ang)*2*HS;st.y=a.px.y+Math.sin(ang)*2*HS}}   // put itself between the threat and the ship it guards
+  const Va=hp(a.vq,a.vr),dx=(st.x-s.px.x)/HS,dy=(st.y-s.px.y)/HS,dist=Math.hypot(dx,dy),k=Math.min(8,dist*1.2)/(dist||1);
+  return{x:Va.x+dx*k*HS,y:Va.y+dy*k*HS}}
 // AI target choice: close, weakened, and already under fire from allies (focus fire beats spreading damage)
 function pickTarget(s){let b=null,bv=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d>30&&b)continue;const hpF=(e.hull+e.shield)/(e.d.hull+e.d.shield);
     const allies=ships.filter(x=>x!==s&&!x.dead&&x.team===s.team&&x.target===e).length;const v=d+10*hpF-3*Math.min(allies,2);if(v<bv){bv=v;b=e}}return b||nearestEnemy(s)}
@@ -701,7 +730,7 @@ function commit(){
   const preArc=new Map();for(const s of alive()){const t=tgt(s);if(!t)continue;const sel=isAI(s)?(s.fireChoice||[]):[...s.fireSel];preArc.set(s,new Set(sel.filter(k=>canFireMount(s,k,t))))}
   for(const s of alive())applyQueue(s);
   const shots=[];
-  const collect=(s,t,sel)=>{for(const key of sel){if(!canFireMount(s,key,t)&&!(preArc.get(s)&&preArc.get(s).has(key)))continue;
+  const collect=(s,t,sel)=>{if(t.team===s.team)return;for(const key of sel){if(!canFireMount(s,key,t)&&!(preArc.get(s)&&preArc.get(s).has(key)))continue;
     if(!(key[0]==='w'&&s.weapons[+key.slice(1)].T.kind==='missile'))s.darkFiredT=T;
     if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];const n=p.shots;p.shots=0;fireRec(s,'PD','pd',n,t,n);for(let i=0;i<n;i++)shots.push({s,t,kind:'pd',dmg:1,hit:Math.random()<hitP(s,key,t)});continue}
     const w=s.weapons[+key.slice(1)],K=w.T.kind;
@@ -783,7 +812,7 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
 // ---- weapons ----
 /* Nov 21 (David): launchers held back for defense — all of them in Defend mode, or the first N working launchers when Attack mode has N set aside (s.msDef) */
 function defLaunchers(s){const L=s.weapons.filter(w=>w.alive&&w.T.kind==='missile');if(s.msMode==='def')return L;if(s.msMode==='off'&&s.msDef>0)return L.slice(0,s.msDef);return []}
-function canFireMount(s,key,t){if(!t||t.dead)return false;
+function canFireMount(s,key,t){if(!t||t.dead||t.team===s.team)return false;
   if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];return p.alive&&p.shots>0&&inArc(s,p.arc,t)}
   const w=s.weapons[+key.slice(1)];if(!w.alive)return false;const K=w.T.kind;
   if(K==='missile')return s.msMode==='off'&&!defLaunchers(s).includes(w)&&w.state==='ready'&&w.ammo>0;
@@ -986,9 +1015,12 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   const threat=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24)||enemiesOf(s).some(e=>hexDist(e,s)<=30&&e.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0));
   const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,2-p.shots-p.pending.length):0),0):0;
   let rate=upkeepCost(s);const cap=income(s)-.75;let E=s.E;const out=[];let dropBurn=false;
+  /* Nov 22 (David, fix 1): banked energy counts — a drain the reactor can't carry may still start if stored energy (above the PD reserve)
+     covers the shortfall for that weapon's whole cycle. (The Dogahr Destroyer left its coilgun empty for 30 impulses sitting on 5 energy.) */
+  let bank=Math.max(0,s.E-pdNeed);
   for(const x of q){
-    if(x.type==='start'){const w=s.weapons[x.i];const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/(w.T.kind==='ap'?AP_IMP:cycleImp(s,w)):w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
-      if(dr){if(rate+dr>cap+1e-9)continue;rate+=dr;out.push(x);continue}}
+    if(x.type==='start'){const w=s.weapons[x.i];const n=w?(w.T.kind==='ap'?AP_IMP:w.T.kind==='torp'?IMP:cycleImp(s,w)):0;const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/n:w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
+      if(dr){const over=Math.max(0,rate+dr-cap)-Math.max(0,rate-cap);if(over>1e-9){const need=over*n;if(!AIV.bank||bank<need-1e-9)continue;bank-=need}rate+=dr;out.push(x);continue}}
     if(x.type==='pd'||x.type==='gen'||x.type==='dc'||x.type==='dccancel'||x.type==='hold'){out.push(x);E-=x.cost||0;continue}
     const c=x.cost||0;
     if(x.type==='burn'&&dropBurn){dropBurn=false;continue}
@@ -1022,7 +1054,9 @@ function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.t
 // liberal reinforcement): Dogahr and, for now, Golthan. Everyone else hunts without the Dogahr's torpedo-shyness and reinforces only when it matters.
 const MDOC=s=>s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>s.d.faction==='Dogahr'||s.d.faction==='Golthan';
 const drainNow=s=>s.weapons.reduce((a,w)=>a+(!w.alive||!w.charging?0:w.T.kind==='torp'?w.T.perTurn/IMP:w.T.kind==='ap'?w.T.cost/AP_IMP:drains(w)?w.T.cost/cycleImp(s,w):0),0);   // per-impulse weapon-charging drain
-function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===1&&!s.isPlayer||s.ai&&impOf(T)===1)s.target=AIV.focus?pickTarget(s):nearestEnemy(s);const t=tgt(s);
+function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===1&&!s.isPlayer||s.ai&&impOf(T)===1)s.target=AIV.focus?pickTarget(s):nearestEnemy(s);
+  if(isAI(s)){const sc=SCEN&&SCENARIOS[SCEN.id].aiTarget&&SCENARIOS[SCEN.id].aiTarget(s),ot=orderTarget(s);if(ot)s.target=ot;else if(sc)s.target=sc}
+  const t=foeTgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=(MDOC(s)&&enemyMs>ownMs||AIV.r8&&!DDOC(s)&&enemyMs>=ownMs*1.5)&&!(AIV.msClose&&d<=8)?'def':'off';   /* r8: every non-Dogahr doctrine goes to Defend when clearly out-launched */
@@ -1127,20 +1161,20 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   // navigation: steer velocity toward a desired velocity relative to the target
   const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
-  const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;const Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4;
+  const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;let Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};let ordNav=false;if(isAI(s)){const ov=orderVd(s);if(ov){Vd=ov;ordNav=true}}{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
+  const urgent=s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4||ordNav&&em>1;
   const pen0=posPen(V,s.f);const navOK=!starved||d<3;
   if(navOK&&(em>=(urgent?.75:1.5)||pen0>.35)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent||pen0>.6?0:Math.min(8,s.reactor/4))){let best=null,bv=em+pen0;
     // Nov 20: agile ships can pivot first and then burn along the new facing (all within the ship's rotation limit per impulse)
     const PM=AIV.agile?maxPiv(s):0,av=s.E-qCost(s)-genReserve(s);let bestP=0;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const tk=BURNS[k].turn||0;
      for(let pp=-PM;pp<=PM;pp++){if(Math.abs(pp+tk)>maxPiv(s))continue;const pc=pp?pivotCost(s,Math.sign(pp))*Math.abs(pp):0;if(!isFinite(pc)||av<burnCost(s,k)+pc)continue;
-      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>120*D2R?.8:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
+      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>120*D2R&&!ordNav?.8:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
     if(best){for(let i=0;i<Math.abs(bestP);i++)queue(s,{type:'pivot',dir:Math.sign(bestP),cost:pivotCost(s,Math.sign(bestP))});queue(s,{type:'burn',a:best,cost:burnCost(s,best)});const b1=burnResult(s,best,(s.f+bestP+NF)%NF),bf=b1.f;if(bf!==s.f)s.lastTB={T,dir:Math.sign(norm(fAng(bf)-fAng(s.f)))}
       /* Nov 21: double burn — when movement is urgent and energy allows, a second straight-ahead burn (never the 3rd, critical one) */
       if(AIV.dbl&&urgent&&best!=='R'){const p1=hp(b1.dq,b1.dr),e1={x:e.x-p1.x,y:e.y-p1.y},b2=burnResult(s,'F',bf),p2=hp(b2.dq,b2.dr);const n1=Math.hypot(e1.x,e1.y)/HS,n2=Math.hypot(e1.x-p2.x,e1.y-p2.y)/HS;
         if(n2<n1-.5&&s.E-qCost(s)-genReserve(s)-burnCost(s,'F')>=Math.min(4,s.reactor/8))queue(s,{type:'burn',a:'F',cost:burnCost(s,'F')})}}
-    else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd)for(let i=0;i<Math.min(Math.abs(fd),maxPiv(s));i++)if(!queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)}))break}}
+    else{let ta=Math.atan2(e.y,e.x);const off=norm(ta-a);if(Math.abs(off)>120*D2R&&!ordNav)ta=face;const fd=Math.round(norm(ta-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd)for(let i=0;i<Math.min(Math.abs(fd),maxPiv(s));i++)if(!queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)}))break}}
   else if(navOK){const fd=Math.round(norm(face-fAng(s.f))/(Math.PI/6));const pd=aiPivotDir(s,fd);if(pd)for(let i=0;i<Math.min(Math.abs(fd),maxPiv(s));i++){if(!(s.E-qCost(s)>reserve+pivotCost(s,pd))||!queue(s,{type:'pivot',dir:pd,cost:pivotCost(s,pd)}))break}}
   if(wantNose){const fb=s.queue.find(x=>x.type==='burn');const preP=fb&&s.queue.slice(0,s.queue.indexOf(fb)).some(x=>x.type==='pivot');
     let fq=s.f;for(const x of s.queue){if(x.type==='pivot'&&(!preP||s.queue.indexOf(x)<s.queue.indexOf(fb)))fq=(fq+x.dir+NF)%NF;if(x===fb)fq=burnResult(s,fb.a,fq).f}const f0=preP?fq:fb?burnResult(s,fb.a).f:s.f;
@@ -1250,8 +1284,9 @@ function missileRow(s,ws,t,sd,col){const ch=ws.map(({w,i})=>{const armed=s.fireS
 // target scan: shields/hull need working sensors; weapon status needs a friendly ship within its sensor range
 function scanPanel(s,t){if(t.dead)return `<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> ✕</h2></div>`;
   const d=hexDist(s,t),stOK=scanStatus(t),wOK=scanWeapons(t),best=Math.max(0,...ships.filter(o=>fr(o)&&!o.dead).map(sensRange));
-  let h=`<div class="panel"><h2>Target: <span style="color:${t.color}">${t.name}</span> <span class="dim" style="text-transform:none">${t.d.name}</span></h2>
-   <div class="row dim sm">${d} hexes · v ${vlen(t.vq,t.vr)} · facing ${fName(t.f)}</div>`;
+  const fri=t.team===s.team,rel=fri?(own(t)?'yours':'ally'):'';
+  let h=`<div class="panel"><h2>${fri?'Inspecting':'Target'}: <span style="color:${t.color}">${t.name}</span> <span class="dim" style="text-transform:none">${t.d.name}${rel?` · <span style="color:${own(t)?'var(--good)':'#6fb8ff'}">${rel}</span>`:''}</span></h2>
+   <div class="row dim sm">${d} hexes · v ${vlen(t.vq,t.vr)} · facing ${fName(t.f)}${fri?` · E ${t.E.toFixed(0)}/${+t.reactor.toFixed(1)}${t.ai&&ordText(t)?' · '+ordText(t):t.ai?' · AI':''}`:''}</div>${fri?`<div class="row sm" style="color:#ffd27a">Friendly — your weapons hold fire. Press T or click an enemy to target it.</div>`:''}`;
   if(stOK)h+=`<div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(t.hull,t.d.hull)}<span class="v2">${Math.ceil(t.hull)}/${t.d.hull}${t.d.armor?` <span class="dim" title="front armor">⛨${Math.ceil(t.armor)}</span>`:''}</span></div>
      <div class="row"><span class="lab s">Shld</span>${bar(t.shield,t.d.shield,'sh')}<span class="v2">${t.shield.toFixed(0)}/${t.d.shield}${reinfAmt(t)?`<span style="color:#a5d8ff">+${reinfAmt(t).toFixed(0)}</span>`:''}</span></div></div>
      <div class="row dim sm">generator ${genLvl(t)?Math.round(genLvl(t)*100)+'%':'<span class="bad">OFF</span>'}</div>`;
@@ -1411,9 +1446,10 @@ function buildHUD(){if(!ships.length)return;const dec=phase==='decide';let h='',
   // ---- left panel: your fleet, your ship, its orders (Nov 21, David: your side on the left, the enemy on the right) ----
   h+=`<div class="panel"><h2 style="display:flex;align-items:center">Fleet command<button class="btn" data-act="forfeit" style="margin-left:auto;color:var(--bad);font-size:11px;padding:2px 7px;text-transform:none;letter-spacing:0" title="Give up this battle: the enemy wins. Click twice to confirm.">${Date.now()-ffArm<4000?'Confirm forfeit?':'🏳 Forfeit'}</button></h2>
    <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
+   ${ownS.some(x=>x.ai&&!x.dead)&&flagship()?`<div class="row" style="margin:3px 0 0;gap:3px;flex-wrap:wrap"><span class="dim sm" style="width:100%">Orders to every AI ship you own (from ${flagship().name}):</span><button class="btn" data-act="ordall:follow" title="Every AI ship you own keeps station on your ship (a wedge behind you) and fights your target">⇢ Follow me</button><button class="btn" data-act="ordall:attack" title="Every AI ship you own attacks the ship you are targeting (and switches when you switch)">⚔ My target</button><button class="btn" data-act="ordall:defend" title="Every AI ship you own escorts your ship and engages whatever comes closest to it">⛨ Defend me</button>${flagship().target&&!flagship().target.dead&&flagship().target.team===flagship().team?`<button class="btn" data-act="ordall:defendt" title="Every AI ship you own escorts the friendly ship you have targeted (${flagship().target.name})">⛨ Defend ${flagship().target.name}</button>`:''}<button class="btn" data-act="ordall:free" title="Cancel orders: every AI ship fights on its own judgment">◇ Free</button></div>`:''}
    ${ownS.length>1||(ownS[0]&&ownS[0].ai)?`<div class="tabs scroll" style="max-height:150px">${ownS.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
-     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label></div>`).join('')}</div>`:''}</div>`;
+     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label>${x.ai&&!x.dead&&flagship()?`<select class="ordsel" data-ord="${ships.indexOf(x)}" title="Orders for this AI ship">${['free','follow','attack','defend'].map(k=>`<option value="${k}" ${(x.order?x.order.k:'free')===k&&!(k==='defend'&&x.order&&x.order.a!==flagship().name)?'selected':''}>${k==='defend'?'Defend me':ORD_LBL[k]}</option>`).join('')}${flagship().target&&flagship().target.team===x.team&&flagship().target!==x&&!flagship().target.dead?`<option value="defendt" ${x.order&&x.order.k==='defend'&&x.order.a===flagship().target.name?'selected':''}>Defend ${flagship().target.name}</option>`:''}${x.order&&x.order.k==='defend'&&x.order.a!==flagship().name&&!(flagship().target&&x.order.a===flagship().target.name)?`<option value="keep" selected>${ordText(x)}</option>`:''}</select>`:''}${x.ai&&ordText(x)?`<div class="dim sm">${ordText(x)}</div>`:''}</div>`).join('')}</div>`:''}</div>`;
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
      ${own(s)&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
@@ -1489,6 +1525,8 @@ function critPrompt(s,v){let el=$('critbox');if(!el){el=document.createElement('
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close()}else if(ev.key==='Enter'){ev.preventDefault();go()}};
   addEventListener('keydown',kh,true);$('critno').onclick=close;$('crityes').onclick=go}
 function doAct0(a){const [k,v]=a.split(':');
+  if(k==='ordall'){const L=ships.filter(x=>own(x)&&x.ai&&!x.dead);let n=0;for(const x of L)if(setOrder(x,v))n++;
+    const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
     if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
   if(k==='go'){if(phase!=='decide')return;if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
@@ -1547,6 +1585,7 @@ function wireHUD(){if($('recSave'))$('recSave').onclick=saveRecord;
   document.querySelectorAll('[data-allai]').forEach(el=>el.addEventListener('click',()=>{const on=el.dataset.allai==='1';for(const x of ships)if(own(x)&&!x.dead){x.ai=on;x.queue=[]}
     P=on?null:mine()[0];log(on?'All ships under AI command':'All ships under your command','dim');
     if(on&&phase==='decide'){if(MP.role==='guest'){mpSent=false;mpSendOrders();return}for(const x of alive())if(own(x)){const a=aiDecide(x);x.queue=a.queue;x.fireChoice=a.fire}if(MP.role==='host'){P=mine()[0]||null;MP.ready[ME]=!P||MP.ready[ME];mpTryCommit()}else commit()}else buildHUD()}));
+  document.querySelectorAll('[data-ord]').forEach(el=>{el.addEventListener('click',e=>e.stopPropagation());el.addEventListener('change',()=>{const x=ships[+el.dataset.ord];if(el.value!=='keep'&&setOrder(x,el.value))log(`${x.name}: ${ordText(x)||'acting on its own'}`,'dim');buildHUD()})});
   document.querySelectorAll('[data-ai]').forEach(el=>el.addEventListener('change',()=>{const x=ships[+el.dataset.ai];x.ai=el.checked;x.queue=[];if(x.ai&&x===P){const o=mine();P=o[0]||P}if(!x.ai)P=x;log(`${x.name}: ${x.ai?'AI in command':'under your command'}`,'dim');buildHUD()}));
   document.querySelectorAll('[data-tgt]').forEach(el=>el.addEventListener('click',()=>{const x=ships[+el.dataset.tgt];if(P&&!x.dead){P.target=x;log(`${P.name} targeting ${x.name}`,'dim');buildHUD()}}))}
 
@@ -1705,6 +1744,7 @@ let SCEN=null,skirmBak=null;
 const CAMPAIGNS={sdi2:{name:'Second Dogahr Invasion — Part 2',side:'Martian',era:'dog2',blurb:'The Dogahr are back, and the Martian navy has only its TL2 refits and a handful of new Condors to stop them.',missions:['bloodynose']}};
 const SCENARIOS={
   bloodynose:{name:'Bloody Nose',era:'dog2',camp:'sdi2',mission:1,
+    command:{Martian:'albatross2',Dogahr:'lcruiser3'},   // Nov 22 (David): the ship you fly when you choose command-ship control
     blurb:'A Dogahr hunting group — a Light Cruiser, two Destroyers and a Frigate — has caught six Earthling freighters running for Mars. A Martian squadron of two Albatrosses and three Peregrines arrives to rescue them.',
     goal:{Martian:'Destroy the Dogahr hunting group and save as many freighters as you can.',Dogahr:'Destroy the freighters — and the Martian squadron that came to save them.',Earthling:'Command the six freighters: keep them alive while the Martian squadron (AI) deals with the Dogahr.'},
     sides:['Martian','Dogahr','Earthling'],
@@ -1718,15 +1758,30 @@ const SCENARIOS={
          2:{f:3,v:4,at:[[0,0],[3,-3],[3,3],[-3,-2],[-3,2],[5,0]]}},
     place(L){const n={};for(const sh of L){const c=this.lay[sh.slot];if(!c)continue;const j=n[sh.slot]=(n[sh.slot]||0);n[sh.slot]++;const [x,y]=c.at[j%c.at.length];
       const h=pixToHex(x*HS,y*HS);sh.q=sh.pq=h.q;sh.r=sh.pr=h.r;sh.px=hp(h.q,h.r);sh.ppx=null;sh.f=c.f;const d=fdir(c.f);sh.vq=d[0]*c.v;sh.vr=d[1]*c.v}},
-    result(){const fr=ships.filter(s=>s.d.freighter),ok=fr.filter(s=>!s.dead).length;return `Freighters saved: ${ok}/${fr.length}`}}};
+    result(){const fr=ships.filter(s=>s.d.freighter),ok=fr.filter(s=>!s.dead).length;return `Freighters saved: ${ok}/${fr.length}`},
+    /* Nov 22 (David): the Dogahr hunt the freighters until a Martian warship comes within their targeting-computer range, then turn to face the Martians */
+    aiTarget(s){if(s.team!==1)return null;const war=ships.filter(x=>!x.dead&&x.team===0&&!x.d.freighter);
+      if(!SCEN.engaged&&war.length)SCEN.engaged=ships.some(d=>!d.dead&&d.team===1&&war.some(m=>hexDist(d,m)<=TCR_TL[d.d.tl||4]));
+      const near=L=>{let b=null,bd=1e9;for(const x of L){const d=hexDist(s,x);if(d<bd){bd=d;b=x}}return b};
+      if(SCEN.engaged&&war.length)return s.target&&war.includes(s.target)?s.target:near(war);
+      const fr=ships.filter(x=>!x.dead&&x.team===0&&x.d.freighter);return s.target&&fr.includes(s.target)?s.target:near(fr)}}};
+const TCR_TL={1:6,2:8,3:12,4:12,5:14};   // targeting-computer range by tech level
 const campProg=()=>{try{return JSON.parse(localStorage.getItem('shtCampaign')||'{}')}catch(e){return {}}};
 function campDone(id){try{const p=campProg();p[id]=true;localStorage.setItem('shtCampaign',JSON.stringify(p))}catch(e){}}
-function startScenario(id,side,camp){const S=SCENARIOS[id];if(!S)return;
+/* Nov 22 (David): before a scenario, ask — full manual control, or fly only the command ship with the rest of your fleet on AI (fleet orders available) */
+function scenarioCtlPrompt(id,side,camp){const S=SCENARIOS[id],ck=S.command&&S.command[side];if(!ck){startScenario(id,side,camp,'manual');return}
+  const old=$('ctlpick');if(old)old.remove();const el=document.createElement('div');el.id='ctlpick';el.className='ctlpick';const nm=SHIPS[ck].name;
+  el.innerHTML=`<div class="ctlcard"><b style="font-size:17px">${S.name} — how do you want to command?</b>
+   <button class="btn" data-ctl="command"><b>⭐ Command ship only</b><br><span class="dim">You fly the ${nm}. The rest of your fleet is on AI — give them orders from Fleet command (follow me, attack my target, defend). You can still take any ship over.</span></button>
+   <button class="btn" data-ctl="manual"><b>🎛 Full manual control</b><br><span class="dim">You give orders to every ship yourself, every impulse.</span></button>
+   <button class="btn" data-ctl="x" style="text-align:center">Cancel</button></div>`;
+  document.body.appendChild(el);el.querySelectorAll('[data-ctl]').forEach(b=>b.onclick=()=>{el.remove();if(b.dataset.ctl!=='x')startScenario(id,side,camp,b.dataset.ctl)})}
+function startScenario(id,side,camp,ctl){const S=SCENARIOS[id];if(!S)return;if(!ctl)ctl='manual';
   if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode});
-  SCEN={id,side,camp:!!camp};era=S.era;startMode='stations';
+  SCEN={id,side,camp:!!camp,ctl};era=S.era;startMode='stations';
   SLOTS=[null,null,null,null,null,null,null,null];
   S.fleets.forEach((F,i)=>{const human=F.fac===side;SLOTS[i]=human?{kind:'human',owner:ME,team:F.team,name:'You'}:{kind:'ai',owner:null,team:F.team,name:F.name||''};
-    fleet[i]=F.ships.map(k=>({key:k,ai:!human}));fleetFaction[i]=F.fac;fleetTL[i]=F.tl;fleetForm[i]='line';startSpeed[i]=0});
+    const ci=human&&ctl==='command'&&S.command?F.ships.indexOf(S.command[side]):-1;fleet[i]=F.ships.map((k,j)=>({key:k,ai:!human||ci>=0&&j!==ci}));fleetFaction[i]=F.fac;fleetTL[i]=F.tl;fleetForm[i]='line';startSpeed[i]=0});
   for(let i=S.fleets.length;i<MAXSLOTS;i++)fleet[i]=[];
   const mp=$('modepick');if(mp)mp.remove();const fp=$('facpick');if(fp)fp.remove();
   initAudio();startMusic();start();
@@ -1752,10 +1807,10 @@ function openModePicker(){for(const id of ['modepick','facpick']){const o=$(id);
     if(b.dataset.mode==='skirmish'){el.remove();leaveScenario();$('start').style.display='flex';renderBuilder();openFactionPicker(mySlotIdx(),true);return}
     if(b.dataset.mode){view=b.dataset.mode;draw();return}
     if(b.hasAttribute('data-mback')){view='modes';draw();return}
-    if(b.dataset.mgo){startScenario(b.dataset.mgo,b.dataset.mside,false);return}
+    if(b.dataset.mgo){scenarioCtlPrompt(b.dataset.mgo,b.dataset.mside,false);return}
     if(b.hasAttribute('data-csave')){const blob=new Blob([JSON.stringify({game:'Space Hex Tactics campaign save',v:1,date:new Date().toISOString(),progress:campProg()},null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='space-hex-campaign.json';document.body.appendChild(a);a.click();a.remove();return}
     if(b.hasAttribute('data-cload')){const inp=document.createElement('input');inp.type='file';inp.accept='.json,application/json';inp.onchange=()=>{const f=inp.files[0];if(!f)return;f.text().then(t=>{try{const j=JSON.parse(t);if(!j||typeof j.progress!=='object')throw 0;const cur=campProg();localStorage.setItem('shtCampaign',JSON.stringify({...cur,...j.progress}));toast('Campaign progress loaded','good');draw()}catch(e){toast('That file is not a Space Hex campaign save','warnt')}})};inp.click();return}
-    if(b.dataset.cgo){startScenario(b.dataset.cgo,CAMPAIGNS[SCENARIOS[b.dataset.cgo].camp].side,true);return}})}
+    if(b.dataset.cgo){scenarioCtlPrompt(b.dataset.cgo,CAMPAIGNS[SCENARIOS[b.dataset.cgo].camp].side,true);return}})}
 /* Nov 21 (David): fleet lobby — up to 8 fleets (each human builds his own; the host / single player builds the AI fleets), each assigned to a team A–H */
 let selSlot=0,rightSel=1;
 const humans=()=>SLOTS.filter(x=>x&&x.kind==='human').map(x=>x.owner);   /* Nov 21 (David): any ship can be handed to another human player — two players can share one fleet */
@@ -1847,7 +1902,7 @@ function start(){if(MP.role==='guest')return;BID++;
   for(const sh of ships)sh.target=nearestEnemy(sh);
   if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
   for(const sh of ships){const v=startSpeed[sh.slot]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
-  if(SCEN&&SCENARIOS[SCEN.id].place){SCENARIOS[SCEN.id].place(ships);for(const sh of ships)sh.target=nearestEnemy(sh)}
+  if(SCEN&&SCENARIOS[SCEN.id].place){SCEN.engaged=false;SCENARIOS[SCEN.id].place(ships);for(const sh of ships)sh.target=nearestEnemy(sh)}
   P=mine()[0]||null;forfeited=[];ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
   const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;
   $('start').style.display='none';$('end').style.display='none';log(`${[...new Set(ships.map(s=>s.team))].sort((a,b)=>a-b).map(t=>'Team '+TLET[t]+' ('+ships.filter(s=>s.team===t).length+')').join(' vs ')}${SCEN?'':' at '+R.startDist+' hexes'}. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}.`,'warn');
@@ -1855,12 +1910,12 @@ function start(){if(MP.role==='guest')return;BID++;
   recStart();phase='decide';mpResetReady();if(!P&&!MP.on)commit();else if(MP.on&&mpAllReady())commit();buildHUD();net()}
 function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio,my=e.clientY*devicePixelRatio;let best=null,bd=40*devicePixelRatio;
   for(const x of alive()){const p=posOf(x);const d=Math.hypot(sx(p.x)-mx,sy(p.y)-my);if(d<bd){bd=d;best=x}}
-  if(!best)return;if(own(best)&&!best.ai)selectShip(best);else if(!fr(best)&&P&&!P.dead){P.target=best;log(`${P.name} targeting ${best.name}`,'dim');buildHUD()}}
-function cycleTarget(){if(!P)return;const f=enemiesOf(P);if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} targeting ${P.target.name}`,'dim');buildHUD()}
+  if(!best)return;if(own(best)&&!best.ai&&!e.shiftKey||best===P)selectShip(best);else if(P&&!P.dead){P.target=best;log(`${P.name} ${best.team===P.team?'inspecting':'targeting'} ${best.name}`,'dim');buildHUD()}}
+function cycleTarget(){if(!P||P.dead)return;const by=L=>L.sort((a,b)=>hexDist(P,a)-hexDist(P,b));const f=[...by(enemiesOf(P)),...by(ships.filter(x=>!x.dead&&x!==P&&x.team===P.team))];if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} ${P.target.team===P.team?'inspecting':'targeting'} ${P.target.name}`,'dim');buildHUD()}
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
   renderBuilder();openModePicker();$('tomodes').addEventListener('click',()=>{if(MP.role==='guest')return;openModePicker()});$('go').addEventListener('click',()=>{initAudio();startMusic();start()});
   $('endRec').addEventListener('click',()=>saveRecord());
-  $('rematch').addEventListener('click',()=>{if(MP.role==='guest')return;forfeited=[];if(SCEN){startScenario(SCEN.id,SCEN.side,SCEN.camp);return}initAudio();startMusic();start()});   /* Nov 21 (David): rematch — same fleets, teams and settings */
+  $('rematch').addEventListener('click',()=>{if(MP.role==='guest')return;forfeited=[];if(SCEN){startScenario(SCEN.id,SCEN.side,SCEN.camp,SCEN.ctl);return}initAudio();startMusic();start()});   /* Nov 21 (David): rematch — same fleets, teams and settings */
   $('again').addEventListener('click',()=>{$('end').style.display='none';$('start').style.display='flex';if(SCEN){leaveScenario();forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();openModePicker();return}for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&canEditSlot(i))fleet[i].length=0;forfeited=[];menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}renderBuilder();lobbyChanged();openFactionPicker(mySlotIdx(),true)});
   addEventListener('keydown',e=>{if(!ships.length||e.repeat||$('start').style.display!=='none')return;const k=e.key.toLowerCase();if(e.target.tagName==='SELECT')return;
     if(k==='enter'){e.preventDefault();doAct('go');return}
@@ -1958,7 +2013,7 @@ function mpApplySlot(pid,m){const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.ow
 const teamOfPid=pid=>{const sh=ships.find(x=>x.owner===pid);if(sh)return sh.team;const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===pid);return s?s.team:-1};
 function serShip(s,pid){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k==='hist'||k==='fireChoice')continue;o[k]=s[k]}
   o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.owner===pid?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
-  if(s.owner!==pid)o.queue=[];   // never reveal anyone else's orders
+  if(s.owner!==pid){o.queue=[];o.order=null}   // never reveal anyone else's orders
   return o}
 function serMissile(m,_,L){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:L.indexOf(m.target)},claim:m.claim?L.indexOf(m.claim):-1}}
 function mpSendState(){if(!MP.conns.length)return;
@@ -1993,11 +2048,11 @@ function mpApplyState(m){ME=m.me;MYTEAM=m.myteam;forfeited=m.ff||[];const first=
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>own(s)&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>own(s)&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight,order:s.order||null}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the other players…');buildHUD()}
 function mpApplyOrders(orders,pid){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.owner!==pid||s.dead)continue;
-    s.ai=o.ai;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.ai=o.ai;s.order=o.order&&o.order.k?{k:String(o.order.k),a:String(o.order.a||'')}:null;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
   MP.ready[pid]=true;mpTryCommit()}
 
