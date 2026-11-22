@@ -377,9 +377,11 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 // Nov 21 (David): every reactor 2 lower — energy allocation should matter more
 for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
-const REA_BOXES=20,REA_STEP=1/REA_BOXES;
+/* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
+const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
+const REA_N=s=>reaBoxes(s.d);
 function buildBoxes(s){const b=[];s.weapons.forEach((w,i)=>b.push({k:'w',i}));s.pd.forEach((p,i)=>b.push({k:'pd',i}));
-  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<REA_BOXES;i++)b.push({k:'rea'});   /* Nov 21 (David): 20 reactor boxes, each hit −5% output */
+  for(let i=0;i<3;i++)b.push({k:'eng'});for(let i=0;i<3;i++)b.push({k:'thrP'});for(let i=0;i<3;i++)b.push({k:'thrS'});for(let i=0;i<3;i++)b.push({k:'thrF'});for(let i=0;i<REA_N(s);i++)b.push({k:'rea'});
   for(let i=0;i<5;i++)b.push({k:'sen'});b.forEach((x,i)=>x.id=i);return b}
 // which zone of the ship an attack comes from: front 120°, rear 120°, port/starboard 60° flanks
 function hitZone(t,from){const b=norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f));const a=Math.abs(b);return a<=60*D2R?'front':a>=120*D2R?'rear':b<0?'port':'stbd'}
@@ -402,7 +404,7 @@ function sysHit(t,x){let msg;(t.damaged=t.damaged||[]).push(x);
   else if(x.k==='thrP'){t.dmgThrP=(t.dmgThrP||0)+1;msg=t.dmgThrP>=3?'port thrusters destroyed — cannot turn to starboard':`port thrusters damaged (turning to starboard +${t.dmgThrP*50}%)`}
   else if(x.k==='thrS'){t.dmgThrS=(t.dmgThrS||0)+1;msg=t.dmgThrS>=3?'starboard thrusters destroyed — cannot turn to port':`starboard thrusters damaged (turning to port +${t.dmgThrS*50}%)`}
   else if(x.k==='sen'){t.dmgSen=(t.dmgSen||0)+1;msg=sensRange(t)<=0?'SENSORS DESTROYED — blind to enemy shields, hull and weapons':`sensors damaged (weapon scan range ${sensRange(t)} hexes)`}
-  else{t.dmgRea=(t.dmgRea||0)+1;t.reactor=Math.max(0,t.reactor0*(1-REA_STEP*t.dmgRea));t.E=Math.min(t.E,t.reactor);msg=t.reactor<=1e-9?'REACTOR DEAD — ship is dead in the water':`reactor hit (output ${reaPct(t)}%)`}
+  else{t.dmgRea=(t.dmgRea||0)+1;t.reactor=Math.max(0,t.reactor0*(1-t.dmgRea/REA_N(t)));t.E=Math.min(t.E,t.reactor);msg=t.reactor<=1e-9?'REACTOR DEAD — ship is dead in the water':`reactor hit (output ${reaPct(t)}%)`}
   log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good',{s:ships.indexOf(t),g:`${t.name}: system damaged (out of scan range)`});if(own(t)&&!t.ai&&dcTeams(t)-(t.dc||[]).length>0){dcEvt.push(t.name);dcHide=''}}
 /* Nov 21 (David): a 3rd burn in one impulse is a critical burn — the burn happens, and the main engine takes one hit (as a system hit: one hull point) */
 function critBurn(s){const box=(s.boxes||[]).find(x=>x.k==='eng');log(`${s.name}: CRITICAL BURN — main engine overloaded`,own(s)?'bad':'good');if(!box)return;s.boxes.splice(s.boxes.indexOf(box),1);if(s.hull>1)s.hull-=1;sysHit(s,box)}
@@ -411,7 +413,7 @@ const dcTeams=s=>s.d.dcTeams||(s.d.big?2:1);
 /* Nov 21 (David): repairs take two turns; a reactor job brings 10% of full output (rounded up) back online */
 const DC_TIME=2*IMP;
 const reaPct=s=>Math.round(100*s.reactor/(s.reactor0||1));
-const reaPer=s=>2;   /* a reactor job restores 10% = two 5% boxes */
+const reaPer=s=>Math.ceil(REA_N(s)*.1-1e-9);   /* a reactor job restores 10% of the boxes, rounded up */
 const reaJobs=s=>(s.dc||[]).filter(j=>j.box.k==='rea').length+s.queue.filter(q=>q.type==='dc'&&(s.damaged||[]).some(b=>b.id===q.id&&b.k==='rea')).length;
 const reaUncov=s=>Math.max(0,(s.damaged||[]).filter(b=>b.k==='rea').length-reaPer(s)*reaJobs(s));
 const dcFree=s=>dcTeams(s)-(s.dc||[]).length-s.queue.filter(q=>q.type==='dc').length;
@@ -434,8 +436,8 @@ function dcFinish(s,job){const x=job.box;s.damaged=s.damaged.filter(b=>b!==x);
   if(x.k==='w'){const w=s.weapons[x.i];w.alive=true;if(w.T.kind!=='missile'&&w.T.kind!=='torp')w.state='idle';if(w.T.kind==='torp'){w.state='idle';w.stages=0;w.charging=false;w.holding=false}}
   else if(x.k==='pd'){s.pd[x.i].alive=true;s.pd[x.i].shots=0;s.pd[x.i].pending=[]}
   else if(x.k==='eng')s.dmgEng=Math.max(0,(s.dmgEng||0)-1);else if(x.k==='thrF')s.dmgThrF=Math.max(0,(s.dmgThrF||0)-1);else if(x.k==='thrP')s.dmgThrP=Math.max(0,(s.dmgThrP||0)-1);else if(x.k==='thrS')s.dmgThrS=Math.max(0,(s.dmgThrS||0)-1);else if(x.k==='sen')s.dmgSen=Math.max(0,(s.dmgSen||0)-1);
-  else{const more=s.damaged.filter(b=>b.k==='rea'&&!s.dc.some(j=>j!==job&&j.box===b)).slice(0,reaPer(s)-1);s.damaged=s.damaged.filter(b=>!more.includes(b));const n=1+more.length;s.dmgRea=Math.max(0,(s.dmgRea||0)-n);s.reactor=Math.max(0,s.reactor0*(1-REA_STEP*s.dmgRea));
-    s.boxes.push(x,...more);log(`${s.name}: damage control restored ${n*5}% reactor output (now ${reaPct(s)}%)`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(own(s)&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}return}
+  else{const more=s.damaged.filter(b=>b.k==='rea'&&!s.dc.some(j=>j!==job&&j.box===b)).slice(0,reaPer(s)-1);s.damaged=s.damaged.filter(b=>!more.includes(b));const n=1+more.length;s.dmgRea=Math.max(0,(s.dmgRea||0)-n);s.reactor=Math.max(0,s.reactor0*(1-s.dmgRea/REA_N(s)));
+    s.boxes.push(x,...more);log(`${s.name}: damage control restored ${Math.round(100*n/REA_N(s))}% reactor output (now ${reaPct(s)}%)`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(own(s)&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}return}
   s.boxes.push(x);log(`${s.name}: damage control restored ${boxName(s,x)}`,s.isPlayer?'good':'bad',{s:ships.indexOf(s),g:''});if(own(s)&&!s.ai&&(s.damaged||[]).length){dcEvt.push(s.name);dcHide=''}}
 function makeShip(key,q,r,f,team,ai,name,owner=(team===0?0:null)){const d=SHIPS[key];const reactor=d.reactor||R.reactor;
   const sh0={key,d,name,team,owner,ai,isPlayer:owner===ME,color:d.color,pq:q,pr:r,q,r,f,vq:0,vr:0,reactor,E:reactor,hull:d.hull,shield:d.shield,armor:d.armor||0,reinf:[],gen:d.noShield?{lvl:0,from:0}:{lvl:1,from:0},genLvl:d.noShield?0:1,
@@ -766,7 +768,7 @@ function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[
   for(const j of s.dc)h+=`<span class="chip">🔧${boxShort(s,j.box)} ${when(j.done)}${sd?`<button class="btn x" data-act="dccancel:${j.box.id}" title="recall the team (progress lost)">✕</button>`:''}</span>`;
   if(compact)return h+`<span class="dim">· click a damaged system on the diagram</span></div>`;
   const seen={};for(const x of dmg){if(s.dc.some(j=>j.box===x))continue;const nm=boxShort(s,x);(seen[nm]=seen[nm]||[]).push(x)}
-  for(const nm in seen){const x=seen[nm][0],q=s.queue.some(a=>a.type==='dc'&&seen[nm].some(b=>b.id===a.id));const lab=x.k==='rea'?`Reactor −${seen[nm].length*5}%`:`${nm}${seen[nm].length>1?' ×'+seen[nm].length:''}`;
+  for(const nm in seen){const x=seen[nm][0],q=s.queue.some(a=>a.type==='dc'&&seen[nm].some(b=>b.id===a.id));const lab=x.k==='rea'?`Reactor −${Math.round(100*seen[nm].length/REA_N(s))}%`:`${nm}${seen[nm].length>1?' ×'+seen[nm].length:''}`;
     h+=sd?`<button class="btn dcb ${q?'armed':''}" data-act="dc:${x.id}" ${q||canQueue(s,{type:'dc',id:x.id,cost:0})?'':'disabled'} title="${q?'team assigned':'assign a team to repair this'}">${q?'🔧':'✖'} ${lab}</button>`:`<span class="chip bad">✖ ${lab}</span>`}
   return h+`</div>`}
 function dmgLine(s){const pip=n=>'●'.repeat(n||0)+'○'.repeat(3-(n||0));const sysLeft=s.boxes.length,struct=Math.max(0,s.hull-sysLeft);const sr=sensRange(s);
@@ -1218,7 +1220,7 @@ function dgLayout(s){const d=s.d;if(d._dg)return d._dg;
   return d._dg={items,hull,inner}}
 const dgJob=(s,b)=>(s.dc||[]).some(j=>j.box===b)||s.queue.some(q=>q.type==='dc'&&q.id===b.id);
 const SYSN={eng:'Main engine',thrF:'Fore thrusters',thrP:'Port thrusters',thrS:'Starboard thrusters',rea:'Reactor',sen:'Sensors'};
-const SYSMAX={eng:3,thrF:3,thrP:3,thrS:3,rea:20,sen:5};
+const SYSMAX={eng:3,thrF:3,thrP:3,thrS:3,rea:20,sen:5};   /* rea is per ship: REA_N */
 const sysDmg=(s,k)=>({eng:s.dmgEng,thrF:s.dmgThrF,thrP:s.dmgThrP,thrS:s.dmgThrS,rea:s.dmgRea,sen:s.dmgSen}[k]||0);
 /* Nov 21 (David): damage-control diagram — only green (working) / red (damaged, click to repair), clear names, no charge states */
 function dcDiagram(s){const L=dgLayout(s),sd=phase==='decide'&&!s.ai;const poly=pts=>pts.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
@@ -1236,7 +1238,7 @@ function dcDiagram(s){const L=dgLayout(s),sd=phase==='decide'&&!s.ai;const poly=
     else{const k=it.k,n=sysDmg(s,k),mx=SYSMAX[k],jobs=(s.damaged||[]).filter(b=>b.k===k&&dgJob(s,b)).length,ok=!n;
       const nm={eng:'ENGINE',thrF:'FWD THR',thrP:'PORT THR',thrS:'STBD THR',rea:'REACTOR',sen:'SENSORS'}[k];
       const lab=ok?nm:k==='rea'?`${nm} ${reaPct(s)}%`:`${nm} ${n}/${mx}`;body=tag(lab,ok,jobs,6.2,30);
-      tip=`${SYSN[k]}${ok?' — working':(k==='rea'?` — ${n}/${REA_BOXES} hits (output ${reaPct(s)}%; each repair restores 10%)`:` — ${n}/${mx} hits`)+(k==='rea'?'':k==='sen'?` (scan range ${sensRange(s)} hexes)`:n>=mx?' (out)':` (+${Math.min(n,2)*50}% cost)`)+(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a repair team')}`;
+      tip=`${SYSN[k]}${ok?' — working':(k==='rea'?` — ${n}/${REA_N(s)} hits (output ${reaPct(s)}%; each repair restores ${Math.round(100*reaPer(s)/REA_N(s))}%)`:` — ${n}/${mx} hits`)+(k==='rea'?'':k==='sen'?` (scan range ${sensRange(s)} hexes)`:n>=mx?' (out)':` (+${Math.min(n,2)*50}% cost)`)+(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a repair team')}`;
       if(!ok&&sd)act=`sysclick:${k}`}
     g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${body}</g>`}
   return `<svg class="dgm m-repair" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}</svg>`}
@@ -1275,7 +1277,7 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
       const short={eng:'ENG',thrF:'FT',thrP:'PT',thrS:'ST',rea:'R',sen:'S'}[k];
       const val=k==='rea'?`${reaPct(s)}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
       body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs&&own?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
-      tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${reaPct(s)}% (${n}/${REA_BOXES} hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
+      tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${reaPct(s)}% (${n}/${REA_N(s)} hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/5 hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
       if(own&&sd&&n&&dgMode==='repair')act=`sysclick:${k}`}
     if(own&&sd)tip+=dgMode==='fire'?(it.t==='sys'?'':' · [Fire mode: click to arm/disarm if it can fire, otherwise load/pause/resume]'):' · [Repair mode: click a damaged system to send or recall a team]';
     g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${ring}${body}</g>`}
