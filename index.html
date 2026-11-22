@@ -404,7 +404,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={rfMs:1,msDef2:2,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -1051,11 +1051,16 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s))aiTorpCoil(s,r);return r}
+function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}return r}
 /* Nov 22 (David): Martian-doctrine ships fire their torpedoes together with the coilguns — whenever a coilgun takes a 50%+ shot, every torpedo bearing on the target with at least one stage's worth of charge goes too */
+/* Nov 22 (David: '7 is too far out to fire'): Martian-doctrine torpedoes fire only when both the torpedoes and the coilguns have 65%+ to hit
+   (coilguns destroyed: torpedoes alone at 65%+). The kill-shot rule (target nearly dead) is exempt. */
+function aiTorpGate(s,r){const t=s.target;if(!t||t.dead||!r.fire||s.killing)return;const coils=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.alive&&x.w.T.kind==='slug');
+  const cBest=coils.length?Math.max(...coils.map(x=>hitP(s,'w'+x.i,t))):1;
+  r.fire=r.fire.filter(k=>{if(k[0]!=='w')return true;const w=s.weapons[+k.slice(1)];if(w.T.kind!=='torp')return true;return hitP(s,k,t)>=.65-1e-9&&cBest>=.65-1e-9})}
 function aiTorpCoil(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)return;
-  const coil=r.fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='slug'&&hitP(s,k,t)>=.5);if(!coil)return;
-  s.weapons.forEach((w,i)=>{const k='w'+i;if(w.alive&&w.T.kind==='torp'&&!r.fire.includes(k)&&torpStored(w)>=w.T.perTurn-1e-9&&canFireMount(s,k,t)){r.fire.push(k);if(w.stages>=3)s.alphaDone=true}})}
+  const coil=r.fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='slug'&&hitP(s,k,t)>=.65-1e-9);if(!coil)return;
+  s.weapons.forEach((w,i)=>{const k='w'+i;if(w.alive&&w.T.kind==='torp'&&!r.fire.includes(k)&&torpStored(w)>=w.T.perTurn-1e-9&&canFireMount(s,k,t)&&hitP(s,k,t)>=.65-1e-9){r.fire.push(k);if(w.stages>=3)s.alphaDone=true}})}
 /* Blokai AI and the Plasma-charged Coilgun Round: against a target with no shields (and no reinforcement), with the coilgun at 50%+, fire lance + coilgun together — the plasma goes off inside the hull */
 /* Nov 22 (David: 'do what makes the most sense') — Blokai PCCG doctrine:
    no shields → PCCG (plasma goes off inside); shields up at 7+ hexes → PCCG (sure ⅓ burst beats a faded lance); shields up inside 7 → lance and coilgun separately;
@@ -1073,10 +1078,13 @@ function aiPCR(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)ret
 function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   const threat=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24)||enemiesOf(s).some(e=>hexDist(e,s)<=30&&e.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0));
   const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,2-p.shots-p.pending.length):0),0):0;
-  let rate=upkeepCost(s);const cap=income(s)-.75;let E=s.E;const out=[];let dropBurn=false;
+  /* Nov 22 (David: 'the AI sucks at missile defense'): under missile threat, keep one full PD refill per turn out of the weapon-charging budget,
+     and don't spend banked energy below a full PD refill plus a small reinforcement float (flag msDef2) */
+  const pdLive=!s.d.pdKind?s.pd.filter(p=>p.alive).length:0,md2=AIV.msDef2&&threat&&pdLive;
+  let rate=upkeepCost(s);const cap=income(s)-.75-(md2?pdLive*2*AIV.msDef2/IMP:0);let E=s.E;const out=[];let dropBurn=false;
   /* Nov 22 (David, fix 1): banked energy counts — a drain the reactor can't carry may still start if stored energy (above the PD reserve)
      covers the shortfall for that weapon's whole cycle. (The Dogahr Destroyer left its coilgun empty for 30 impulses sitting on 5 energy.) */
-  let bank=Math.max(0,s.E-pdNeed);
+  let bank=Math.max(0,s.E-pdNeed-(md2?pdLive*2+4*AIV.msDef2:0));
   for(const x of q){
     if(x.type==='start'){const w=s.weapons[x.i];const n=w?(w.T.kind==='ap'?AP_IMP:w.T.kind==='torp'?IMP:cycleImp(s,w)):0;const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/n:w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
       if(dr){const over=Math.max(0,rate+dr-cap)-Math.max(0,rate-cap);if(over>1e-9){const need=over*n;if(!AIV.bank||bank<need-1e-9)continue;bank-=need}rate+=dr;out.push(x);continue}}
@@ -1257,7 +1265,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     // Dogahr (Nov 18, David): reinforce liberally whenever an enemy is within 15 hexes, layer up to the full base shield (the 2× cap);
     // Martians: their guns eat the energy — only against inbound missiles, with plenty to spare, and a thin layer
     const want=AIV.reinf2?(dog?(inbound||brace||d<=(AIV.rfFloor?10:15)):mid?(inbound||brace||d<=6&&!idleGuns):inbound):(inbound||(d<=10&&!idleGuns)||brace||AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5);
-    if(want){const layer=AIV.reinf2?(dog?1:mid?.4:(AIV.r8&&inbound?.4:.2)):.4;const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*layer-reinfAmt(s)));const n=Math.floor(room);
+    if(want){const layer=AIV.reinf2?(dog?1:mid?.4:(AIV.r8&&inbound?(AIV.rfMs||.4):.2)):.4;const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*layer-reinfAmt(s)));const n=Math.floor(room);
       const gunFloor=AIV.rfFloor?s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind!=='missile'&&w.T.kind!=='torp'?w.T.cost||0:0),0)/2:0;   // keep half a full gun reload in hand
       const keep=AIV.reinf2?(dog?(brace?0:Math.max(gunFloor,inbound?2:idleGuns?99:Math.max(2,s.reactor0/4))):(AIV.r8&&inbound?4:12)):(brace?0:s.mode==='charge'?6:dog?4:2);
       const dres=AIV.r5&&!brace?2*drainNow(s):0;   // keep two impulses of weapon charging in hand so reloads don't stall
