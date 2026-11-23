@@ -321,6 +321,10 @@ SHIPS.chemcru={...CHEM,cls:'Cruiser',weight:88,name:'Chemantar Cruiser',short:'C
 SHIPS.chemff={...CHEM,cls:'Attack Frigate',weight:40,name:'Chemantar Attack Frigate',short:'Chem Frigate',hull:52,shield:22,big:false,reactor:19,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[-17.4,-7.4],[11.2,-7.4],[13.1,-7.2],[14.9,-6.4],[16.4,-5.3],[17.6,-3.7],[18.4,-1.9],[18.6,0],[18.4,1.9],[17.6,3.7],[16.4,5.3],[14.9,6.4],[13.1,7.2],[11.2,7.4],[-17.4,7.4]],lines:[[-16,0,15,0]],dots:[[13,0],[-4,-5],[-4,5]],
     weapons:[['ST','S'],['ST','S'],['SL','ALL'],['SL','ALL'],...rep(2,['MS','ALL'])],pd:['FX','ALL']};
+// Nov 22 (David): Chemantar Destroyer — the Attack Frigate's hull, longer; 4 missiles; its two 360° light lasers become one LS + one RS. Torpedoes and PD as the frigate (Claude's reading). Destroyer-class durability/reactor.
+SHIPS.chemdd={...SHIPS.chemff,cls:'Destroyer',weight:60,name:'Chemantar Destroyer',short:'Chem Destroyer',hull:64,shield:28,reactor:22,genCost:5,genRegen:2,
+    shape:SHIPS.chemff.shape.map(p=>[p[0]*1.3,p[1]]),lines:[[-20.8,0,19.5,0]],dots:[[17,0],[-5,-5],[-5,5]],
+    weapons:[['ST','S'],['ST','S'],['SL','LS'],['SL','RS'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};
 SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnought',short:'Dreadnought',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:300,shield:100,big:true,pivotMax:1,dcTeams:3,reactor:82,genCost:20,genRegen:8,doctrine:'hunt',
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
@@ -442,6 +446,7 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
    if(done.has(d.shape)){const v=done.get(d.shape);d.shape=v.shape;d.lines=v.lines;d.dots=v.dots;continue}
    const s0=d.shape;if(!s0)continue;
    if(b==='chemff')add(d,rect(-23,-4,5,10.5));
+   else if(b==='chemdd')add(d,rect(-29,-5,5,10.5));
    else if(b==='chemart'){sx(d,1.3);add(d,wing(-4,13.5,8,18))}
    else if(b==='chemdbl'){sx(d,1.3);const w=wing(-4,34.5,8,18);add(d,w)}
    else if(b==='chemcru')add(d,wing(-2,12,8,18));
