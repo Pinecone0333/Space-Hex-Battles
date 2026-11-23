@@ -465,7 +465,7 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
     if(VF[b]){const pts=d.shape.filter(Boolean),xs=pts.map(p=>p[0]),x0=Math.min(...xs),L=Math.max(...xs)-x0,w=Math.max(.9,L*.02),cys=VF[b][1]||[0],xa=x0+L*VF[b][0],small=VF[b][2];
       for(const cy of cys){const ys=pts.filter(p=>Math.abs(p[1]-cy)<w*2).map(p=>p[0]),xr=x0+.6;
         const ww=small?w*.7:w;add(d,[[[xa,cy-ww],[xa,cy+ww],[xr,cy+ww],[xr,cy-ww]]])}
-      if(small){const e=Math.max(...pts.filter(p=>p[0]<=xa).map(p=>Math.abs(p[1]))),sp=L*.065,tc=L*.06;   /* Nov 23 (David): small flat wings to match — quadrilaterals like the Martian flares: swept leading edge, short tip edge parallel to the hull, trailing edge on the stern */
+      if(small){const e=Math.max(...pts.filter(p=>p[0]<=xa).map(p=>Math.abs(p[1]))),sp=L*.09,tc=L*.06;   /* Nov 23 (David): small flat wings to match — quadrilaterals like the Martian flares: swept leading edge, short tip edge parallel to the hull, trailing edge on the stern */
         add(d,[[[xa,e-1],[x0+tc,e+sp],[x0,e+sp],[x0,e-1]],[[xa,-(e-1)],[x0,-(e-1)],[x0,-(e+sp)],[x0+tc,-(e+sp)]]])}}}
    d.shape=orient(d.shape);done.set(s0,{shape:d.shape,lines:d.lines,dots:d.dots})}}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
