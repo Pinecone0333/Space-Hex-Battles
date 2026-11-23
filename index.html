@@ -341,6 +341,11 @@ SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvett
   weapons:[['SC','S'],['SL','LS'],['SL','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL']};   // Nov 22 (David): 2 missile launchers; about half a frigate's size, so half a frigate's durability (12/55 → 6/28)
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
+// ---- Si'gian (Nov 23, David): octagonal bulb, Hunibler-style neck, straight wings ending in gun pods. Silver (a bit darker than Blokai/Billyon). Sleek and agile. ----
+FACTIONS["Si'gian"]={color:'#8c949e',blurb:'Sleek, agile lance raiders: octagonal bulb, neck and gun-pod wings'};
+SHIPS.sigcl={faction:"Si'gian",cls:'Light Cruiser',weight:78,name:"Si'gian Light Cruiser",short:"Si'gian CL",color:'#8c949e',laser:'#4fe3ff',torp:'#8af0ff',hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,agile:true,doctrine:'hunt',
+    shape:[[-17.0,-22.0],[-17.0,-18.0],[-17.0,-16.0],[-17.0,16.0],[-17.0,18.0],[-17.0,22.0],[-2.0,22.0],[-2.0,20.8],[11.0,20.8],[11.0,17.2],[-2.0,17.2],[-2.0,16.0],[-9.0,16.0],[-9.0,3.0],[12.0,3.0],[12.0,3.3],[17.9,8.0],[26.1,8.0],[32.0,3.3],[32.0,-3.3],[26.1,-8.0],[17.9,-8.0],[12.0,-3.3],[12.0,-3.0],[-9.0,-3.0],[-9.0,-16.0],[-2.0,-16.0],[-2.0,-17.2],[11.0,-17.2],[11.0,-20.8],[-2.0,-20.8],[-2.0,-22.0]],lines:[],dots:[[22,0]],
+    weapons:[['MPL','S'],['MC','S'],['MC','S'],['SL','RS'],['SL','LS'],['SL','ALL'],['SL','ALL']],pd:['FX','FX','ALL']};
 // ---- Billyon (Nov 23, David): boomerang hulls — one graceful curve, the middle of the curve is the bow. Sleek (5% harder to hit, 90% class hull). Placeholder AI. ----
 FACTIONS.Billyon={color:'#d4d9e0',blurb:'Sleek, agile boomerang hulls, all-round laser batteries, splitter missiles that swamp point defense'};
 SHIPS.billcl={faction:'Billyon',cls:'Light Cruiser',weight:78,name:'Billyon Light Cruiser',short:'Billyon CL',color:'#d4d9e0',laser:'#ff8c1a',torp:'#ffa94d',agile:true,hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,doctrine:'hunt',
@@ -474,7 +479,7 @@ function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
 // Nov 20 (David): max pivot per impulse, in 30° steps — cruisers 60°, small ships 90°; Hunibler/Hunifer cruisers 90°, their small ships 120°; Dreadnought 30°
 const rotQ=s=>s.queue.reduce((a,x)=>a+(x.type==='pivot'?x.dir:x.type==='burn'?(BURNS[x.a].turn||0):0),0);   // net rotation queued this impulse, in 30° steps
-const maxPiv=s=>s.d.pivotMax??(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'||s.d.faction==='Billyon'?(s.d.big?3:4):(s.d.big?2:3));
+const maxPiv=s=>s.d.pivotMax??(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'||s.d.faction==='Billyon'||s.d.faction==="Si'gian"?(s.d.big?3:4):(s.d.big?2:3));
 const foreMul=s=>[1,1.5,2,Infinity][s.dmgThrF||0];   // Nov 20 (David): fore thrusters fire the reverse burn
 /* Nov 22 (David): evasive maneuvering — jerky port + starboard thruster jinks that leave the ship in its hex. Costs one 30° pivot each way (with thruster damage); not in an impulse with a pivot. That impulse, direct fire by AND against the ship is 30% less accurate. */
 const evadeCost=s=>pivotCost(s,1)+pivotCost(s,-1);
@@ -1230,7 +1235,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     else if(s.mode==='brace'){want=AIV.r6?{range:16,radial:.7,orbit:7,maxClose:10}:{range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   /* Nov 21: can't out-brake a fast torpedo charge (reverse only every other impulse) — slide sideways off its nose line instead, keep shooting */   // can't outrun it: face it, reinforce, shoot
     else if(hot&&!AIV.dStand){want={range:15,radial:1,orbit:2};face=a;prio=['lasers','coils']}
     else if(hot){want={range:9,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
-    else if(AIV.r5&&(s.d.faction==='Hunibler'||s.d.faction==='Hunifer')){   // nimble raiders: dive in when the spinal punch is ready, pull out to ~9 while it reloads
+    else if(AIV.r5&&(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'||s.d.faction==="Si'gian")){   // nimble raiders: dive in when the spinal punch is ready, pull out to ~9 while it reloads
       const spR=s.weapons.some(w=>w.alive&&w.arc==='S'&&w.state==='ready');s.mode=spR?'strike':'reload';
       want=spR?{range:3,radial:1.4,orbit:.4,chase:true,maxClose:14}:{range:13,radial:1.1,orbit:1.5,chase:true,maxClose:10};face=a;prio=['coils','lances','lasers']}
     else if(AIV.r5&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')){   // artillery (Chemantar): close to ~6 (65%) with the lance ready, hang back at ~10 while it charges
