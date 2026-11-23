@@ -456,11 +456,17 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  for(const k in SHIPS){const d=SHIPS[k],b=k.replace(/[0-9]+[a-z]?$/,'')in SHIPS?k.replace(/[0-9]+[a-z]?$/,''):k;
    if(done.has(d.shape)){const v=done.get(d.shape);d.shape=v.shape;d.lines=v.lines;d.dots=v.dots;continue}
    const s0=d.shape;if(!s0)continue;
-   if(b==='chemff')add(d,rect(-23,-4,5,10.5));
-   else if(b==='chemdd')add(d,rect(-29,-5,5,10.5));
+   if(b==='chemff'){add(d,rect(-23,-4,5,10.5));sx(d,.8)}   // Nov 23 (David): small Chemantar ships were too long — 80% length
+   else if(b==='chemdd'){add(d,rect(-29,-5,5,10.5));sx(d,.8)}
    else if(b==='chemart')sx(d,1.3);
    else if(b==='chemdbl')sx(d,1.3);
    else if(b==='golthan'||b==='golthandd'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]]);if(b==='golthandd'){d.shape=d.shape.map(p=>p&&[p[0]*.75,p[1]*.75]);d.lines=d.lines.map(l=>l.map(v=>v*.75));d.dots=d.dots.map(p=>[p[0]*.75,p[1]*.75])}}
+   {const VF={condor:[.34],albatross:[.34],peregrine:[.34],earlyff:[.34],earlyffl:[.34],earlyca:[.34],chemart:[.24,0,1],chemcru:[.24,0,1],chemdbl:[.24,[-21,21],1]};   /* Nov 23 (David): vertical (dorsal/ventral) wings seen edge-on — a thin strip on the centreline over the rear of the hull, no further back than the stern */
+    if(VF[b]){const pts=d.shape.filter(Boolean),xs=pts.map(p=>p[0]),x0=Math.min(...xs),L=Math.max(...xs)-x0,w=Math.max(.9,L*.02),cys=VF[b][1]||[0],xa=x0+L*VF[b][0],small=VF[b][2];
+      for(const cy of cys){const ys=pts.filter(p=>Math.abs(p[1]-cy)<w*2).map(p=>p[0]),xr=x0+.6;
+        const ww=small?w*.7:w;add(d,[[[xa,cy-ww],[xa,cy+ww],[xr,cy+ww],[xr,cy-ww]]])}
+      if(small){const e=Math.max(...pts.filter(p=>p[0]<=xa).map(p=>Math.abs(p[1]))),sp=L*.08;   /* Nov 23 (David): small flat wings to match — swept from the fin's front to the stern */
+        add(d,[[[xa,e-1],[x0,e+sp],[x0,e-1]],[[xa,-(e-1)],[x0,-(e-1)],[x0,-(e+sp)]]])}}}
    d.shape=orient(d.shape);done.set(s0,{shape:d.shape,lines:d.lines,dots:d.dots})}}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
 const reaBoxes=d=>d.reaBoxes||(/Dreadnought/.test(d.name)?30:/Heavy Cruiser|Double/.test(d.name)?20:d.big?15:10);
