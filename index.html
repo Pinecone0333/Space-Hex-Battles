@@ -342,8 +342,8 @@ SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvett
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 // ---- Billyon (Nov 23, David): boomerang hulls — one graceful curve, the middle of the curve is the bow. Sleek (5% harder to hit, 90% class hull). Placeholder AI. ----
-FACTIONS.Billyon={color:'#2ee6c8',blurb:'Sleek boomerang hulls, all-round laser batteries, splitter missiles that swamp point defense'};
-SHIPS.billcl={faction:'Billyon',cls:'Light Cruiser',weight:78,name:'Billyon Light Cruiser',short:'Billyon CL',color:'#2ee6c8',laser:'#ff5ad1',torp:'#ff8be0',hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,doctrine:'hunt',
+FACTIONS.Billyon={color:'#7a808a',blurb:'Sleek, agile boomerang hulls, all-round laser batteries, splitter missiles that swamp point defense'};
+SHIPS.billcl={faction:'Billyon',cls:'Light Cruiser',weight:78,name:'Billyon Light Cruiser',short:'Billyon CL',color:'#7a808a',laser:'#ff8c1a',torp:'#ffa94d',agile:true,hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,doctrine:'hunt',
     shape:[[-8.0, -30.0], [-1.1, -25.7], [4.7, -21.4], [9.5, -17.1], [13.2, -12.9], [15.9, -8.6], [17.5, -4.3], [18.0, 0.0], [17.5, 4.3], [15.9, 8.6], [13.2, 12.9], [9.5, 17.1], [4.7, 21.4], [-1.1, 25.7], [-8.0, 30.0], [-12.9, 27.9], [-7.7, 23.9], [-3.2, 19.9], [0.5, 15.9], [3.3, 12.0], [5.4, 8.0], [6.6, 4.0], [7.0, 0.0], [6.6, -4.0], [5.4, -8.0], [3.3, -12.0], [0.5, -15.9], [-3.2, -19.9], [-7.7, -23.9], [-12.9, -27.9]],lines:[],dots:[[4,0]],
     weapons:[...rep(4,['ML','ALL']),['ST','S'],['ST','S'],...rep(4,['SPM','ALL'])],pd:['FX','FX','ALL']};
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -474,7 +474,7 @@ function boxValid(t,x,from,zone){const side=norm(Math.atan2(from.y-t.px.y,from.x
 const engMul=s=>[1,1.5,2,Infinity][s.dmgEng||0];
 // Nov 20 (David): max pivot per impulse, in 30° steps — cruisers 60°, small ships 90°; Hunibler/Hunifer cruisers 90°, their small ships 120°; Dreadnought 30°
 const rotQ=s=>s.queue.reduce((a,x)=>a+(x.type==='pivot'?x.dir:x.type==='burn'?(BURNS[x.a].turn||0):0),0);   // net rotation queued this impulse, in 30° steps
-const maxPiv=s=>s.d.pivotMax??(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'?(s.d.big?3:4):(s.d.big?2:3));
+const maxPiv=s=>s.d.pivotMax??(s.d.faction==='Hunibler'||s.d.faction==='Hunifer'||s.d.faction==='Billyon'?(s.d.big?3:4):(s.d.big?2:3));
 const foreMul=s=>[1,1.5,2,Infinity][s.dmgThrF||0];   // Nov 20 (David): fore thrusters fire the reverse burn
 /* Nov 22 (David): evasive maneuvering — jerky port + starboard thruster jinks that leave the ship in its hex. Costs one 30° pivot each way (with thruster damage); not in an impulse with a pivot. That impulse, direct fire by AND against the ship is 30% less accurate. */
 const evadeCost=s=>pivotCost(s,1)+pivotCost(s,-1);
