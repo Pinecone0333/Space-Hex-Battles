@@ -333,6 +333,9 @@ FACTIONS.Golthan={color:'#a0703c',blurb:'Stealth broadside cruisers: Run Dark fr
 SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:42,doctrine:'hunt',broadside:true,
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
+// Nov 22 (David): Golthan Destroyer — the Heavy Cruiser's outline at 75%. 4 Small Lasers (2 360°, 1 LS, 1 RS), 2 Small Coilguns (spinal), 4 missiles. PD 1 FX + 1 360° (standard destroyer; Claude's pick). Destroyer class durability/reactor; Run Dark like the Heavy Cruiser.
+SHIPS.golthandd={...SHIPS.golthan,cls:'Destroyer',weight:60,name:'Golthan Destroyer',short:'Golthan DD',hull:64,shield:28,reactor:22,genCost:5,genRegen:2,big:false,
+    weapons:[['SL','ALL'],['SL','ALL'],['SL','LS'],['SL','RS'],...rep(2,['SC','S']),...rep(4,['MS','ALL'])],pd:['FX','ALL']};
 /* Nov 22 (David): Dogahr Corvette — the TL4 corvette benchmark, one size below a light frigate (11 / 52 / 17). Stats are Claude's picks on the class ladder. */
 SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvette',short:'Dogahr CV',hull:28,shield:12,reactor:16,genCost:2.5,genRegen:1,frigate:true,
   /* Nov 22 (David): hexagonal hull — the Dogahr Frigate's prow (10 wide) at the front, flaring slightly out to each side, then shorter angles in to a rear edge parallel to and as long as the front */
@@ -450,7 +453,7 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
    else if(b==='chemart'){sx(d,1.3);add(d,wing(-4,13.5,8,18))}
    else if(b==='chemdbl'){sx(d,1.3);const w=wing(-4,34.5,8,18);add(d,w)}
    else if(b==='chemcru')add(d,wing(-2,12,8,18));
-   else if(b==='golthan'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]])}
+   else if(b==='golthan'||b==='golthandd'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]]);if(b==='golthandd'){d.shape=d.shape.map(p=>p&&[p[0]*.75,p[1]*.75]);d.lines=d.lines.map(l=>l.map(v=>v*.75));d.dots=d.dots.map(p=>[p[0]*.75,p[1]*.75])}}
    else if(W[b])add(d,wing(...W[b]));
    d.shape=orient(d.shape);done.set(s0,{shape:d.shape,lines:d.lines,dots:d.dots})}}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
