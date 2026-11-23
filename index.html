@@ -972,7 +972,7 @@ function mpResetReadyKeep(){const old=MP.ready||{};mpResetReady();for(const k in
 const mpAllReady=()=>Object.values(MP.ready||{}).every(Boolean);
 const nTeams=()=>new Set(ships.map(s=>s.team)).size;
 const teamsAlive=()=>[...new Set(ships.filter(s=>!s.dead).map(s=>s.team))].sort((a,b)=>a-b);
-function checkEnd(){if(teamsAlive().length>1)return false;phase='over';recEnd();stopMusic();net();const hd=fx.reduce((a,f)=>f.type==='hulk'?Math.max(a,f.d):a,0);if(hd>0)setTimeout(showEnd,(hd+1.3)*1000);else showEnd();buildHUD();return true}   // let the last explosion play before the end screen
+function checkEnd(){if(teamsAlive().length>1)return false;if(COOP&&COOPW&&teamsAlive().length===1&&teamsAlive()[0]===0&&coopNext()){buildHUD();net();return false}phase='over';recEnd();stopMusic();net();const hd=fx.reduce((a,f)=>f.type==='hulk'?Math.max(a,f.d):a,0);if(hd>0)setTimeout(showEnd,(hd+1.3)*1000);else showEnd();buildHUD();return true}   // let the last explosion play before the end screen
 /* Nov 21: forfeit = a player's ships withdraw (removed from the battle); the battle ends when one team is left */
 let ffArm=0,forfeited=[];
 function doForfeit(pid){if(phase==='over'||!ships.length)return;const L=ships.filter(s=>!s.dead&&s.owner===pid);if(!L.length)return;for(const s of L){s.dead=true;s.withdrew=true;s.deadT=T}if(!forfeited.includes(pid))forfeited.push(pid);
@@ -2055,11 +2055,13 @@ function renderBuilder(){renderHistory();{let ch=false;for(let i=0;i<MAXSLOTS;i+
   tb.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><b>Fleets &amp; teams</b><span class="dim sm">${used}/${MAXSLOTS} fleets · same team = allies · click a fleet to show it on the right</span>${canManage()&&used<MAXSLOTS?`<button class="btn" id="addai" style="margin-left:auto">+ Add AI fleet</button>`:''}</div><div>${SLOTS.map((s,i)=>s?card(i):'').join('')}</div>${MP.on?`<div class="dim sm">${MP.role==='host'?'Players join with your code; you set teams and build the AI fleets.':'The host sets teams and builds the AI fleets; build your own fleet on the left.'}</div>`:''}`;
 
   const eraSel=`<label title="Era: limits which factions and tech levels can be fielded"><span class="dim">Era</span> <select id="era" ${MP.role==='guest'?'disabled':''}>${Object.entries(ERAS).map(([k,E])=>`<option value="${k}" ${era===k?'selected':''}>${E.name}</option>`).join('')}</select></label>${ERAS[era].allow?`<div class="dim sm" style="flex-basis:100%;text-align:center">${Object.entries(ERAS[era].allow).map(([f,l])=>`<span style="color:${FACTIONS[f].color}">${f}</span> TL${l.join('/')}`).join(' · ')}${(ERAS[era].extra||[]).map(k=>' · plus '+SHIPS[k].name).join('')} · other factions: pick their tech level by hand</div>`:''}`;
-  const smSel=eraSel+` <label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
+  const coopSel=`<label title="Co-op scenario: every human player gets a heavy cruiser of their chosen faction and fights scripted waves together. Fleets built here are ignored."><span class="dim">Co-op</span> <select id="coop" ${MP.role==='guest'?'disabled':''}><option value="">— none —</option>${Object.entries(COOPS).map(([k,C])=>`<option value="${k}" ${COOP===k?'selected':''}>${C.name}</option>`).join('')}</select></label>${COOP?`<div class="dim sm" style="flex-basis:100%;text-align:center;color:#ffb84d">${COOPS[COOP].blurb} Pick your faction; your ships are chosen for you.</div>`:''}`;
+  const smSel=coopSel+' '+eraSel+` <label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
   $('forms').innerHTML=smSel;
   $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();lobbyChanged()};
   $('era').onchange=e=>{era=e.target.value;tlManual.fill(false);for(let i=0;i<MAXSLOTS;i++)if(canEditSlot(i))fleetTL[i]=eraDefault(i);renderBuilder();lobbyChanged()};
   $('cmode').onchange=e=>{chargeMode=e.target.value;renderBuilder();lobbyChanged()};
+  $('coop').onchange=e=>{COOP=e.target.value;renderBuilder();lobbyChanged()};
   document.querySelectorAll('#builder [data-sspeed],#teamsbar [data-sspeed]').forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;lobbyChanged()}});
   box.querySelectorAll('[data-form]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{fleetForm[+b.dataset.form]=b.value;lobbyChanged()}});
   tb.querySelectorAll('[data-steam]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{SLOTS[+b.dataset.steam].team=+b.value;renderBuilder();lobbyChanged()}});
@@ -2076,10 +2078,46 @@ function renderBuilder(){renderHistory();{let ch=false;for(let i=0;i<MAXSLOTS;i+
   box.querySelectorAll('[data-facpick]').forEach(b=>b.onclick=()=>openFactionPicker(+b.dataset.facpick));bindShipTips(box);const tipEl=$('shiptip');if(tipEl)tipEl.style.display='none';
   box.querySelectorAll('[data-tl]').forEach(b=>b.onchange=()=>{const i=+b.dataset.tl;fleetTL[i]=+b.value;tlManual[i]=+b.value>0;if(tlBreaks(fleetFaction[i],fleetTL[i]))toast(`⚠ ${fleetFaction[i]} TL${fleetTL[i]} breaks the rules of the ${ERAS[era].name}`,'warnt');renderBuilder();lobbyChanged()});
   const teamsWithShips=new Set(SLOTS.map((s,i)=>s&&fleet[i].length?s.team:null).filter(x=>x!=null));
-  $('go').disabled=teamsWithShips.size<2||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':teamsWithShips.size<2?'Need fleets on at least two teams':'Launch battle ▶'}
+  const coopOK=COOP&&coopPlayers().length>0;$('go').disabled=!coopOK&&teamsWithShips.size<2||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':coopOK?'Launch “'+COOPS[COOP].name+'” ▶':teamsWithShips.size<2?'Need fleets on at least two teams':'Launch battle ▶'}
 let BID=0;
 function updRanim(){const b=$('ranim');if(b){b.textContent='Anim: '+(reducedAnim?'reduced':'full');b.classList.toggle('aion',reducedAnim)}}
-function start(){if(MP.role==='guest')return;BID++;setTimeout(()=>{reducedAnim=ships.length>6;updRanim()},0);
+/* ---- Nov 23 (David): co-op scenario "Defeat the Cementers!" — every human player gets a heavy cruiser of the faction they picked; three Chemantar waves
+   attack in turn, and after each wave every player gets a frigate of their faction. Beat all three waves to win. Works online (each player on their own device) and offline. ---- */
+let COOP='',COOPW=0;
+const COOPS={cementers:{name:'Defeat the Cementers!',blurb:'Co-op: each player flies a heavy cruiser of their own faction against three Chemantar waves. After each wave, every player gets a frigate.',
+  waves:n=>[[['chemff',n+1]],[['chemcru',n-1],['chemff',2]],[['chemcru',n-2],['chemart',n-2],['chemff',2]]]}};
+const coopBase=f=>Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&!SHIPS[k].freighter&&!/[0-9][a-z]?$/.test(k));
+const coopTL=f=>{const L=coopBase(f),tls=[...new Set(L.map(k=>SHIPS[k].tl||4))];const t=tls.includes(4)?4:Math.max(...tls);return L.filter(k=>(SHIPS[k].tl||4)===t)};   // the faction's TL4 ships (Blokai: TL5)
+const coopNear=(f,pts,big)=>coopTL(f).map(k=>[k,Math.abs((PTS3[ptsClass(k)]||0)-pts),SHIPS[k].weight]).sort((a,b)=>a[1]-b[1]||(big?b[2]-a[2]:a[2]-b[2]))[0][0];
+const coopCA=f=>coopNear(f,PTS3['Heavy Cruiser'],true);   // a heavy cruiser, or the nearest class to one (by points)
+const coopFF=f=>coopNear(f,PTS3['Frigate'],false);        // a frigate, or the nearest class to one
+const coopPlayers=()=>SLOTS.map((s,i)=>s&&s.kind==='human'?i:-1).filter(i=>i>=0);
+function coopPrep(){const C=COOPS[COOP],hs=coopPlayers();COOPW=1;
+  for(let i=0;i<MAXSLOTS;i++){if(hs.includes(i)){SLOTS[i].team=0;fleet[i]=[{key:coopCA(fleetFaction[i]),ai:false}];fleetTL[i]=4;startSpeed[i]=0;fleetForm[i]='line'}else if(SLOTS[i]&&SLOTS[i].kind==='ai'){SLOTS[i]=null;fleet[i]=[]}}
+  const ai=SLOTS.findIndex(x=>!x);SLOTS[ai]={kind:'ai',owner:null,team:1,name:'The Cementers'};fleetFaction[ai]='Chemantar';fleetTL[ai]=4;fleetForm[ai]='line';startSpeed[ai]=4;
+  fleet[ai]=[];for(const [k,n] of C.waves(hs.length)[0])for(let j=0;j<n;j++)fleet[ai].push({key:k,ai:true})}
+function coopNext(){const C=COOPS[COOP],hs=coopPlayers(),W=C.waves(hs.length);if(COOPW>=W.length)return false;
+  const mineT=ships.filter(s=>!s.dead&&s.team===0);if(!mineT.length)return false;
+  const cx=mineT.reduce((a,s)=>a+s.px.x,0)/mineT.length,cy=mineT.reduce((a,s)=>a+s.px.y,0)/mineT.length;
+  const cnt={};for(const s of ships)cnt[s.key]=(cnt[s.key]||0)+1;const nm=k=>{cnt[k]=(cnt[k]||0)+1;return SHIPS[k].short+' '+cnt[k]};
+  const used=new Set(ships.filter(s=>!s.dead).map(s=>s.q+','+s.r));
+  const put=(X,Y)=>{let h=pixToHex(X,Y);for(let g=0;g<40&&used.has(h.q+','+h.r);g++)h=pixToHex(X+(g%5-2)*HX*1.6,Y+Math.floor(g/5+1)*HX*1.6);used.add(h.q+','+h.r);return h};
+  const ang=Math.random()*Math.PI*2,ux=Math.cos(ang),uy=Math.sin(ang),dist=26*HX*SQ3,toC=Math.atan2(-uy,-ux);let bf=0,bd=9;for(let f=0;f<NF;f++){const dd=Math.abs(norm(fAng(f)-toC));if(dd<bd-1e-9){bd=dd;bf=f}}
+  const load=sh=>{for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2;sh.target=nearestEnemy(sh)};
+  /* reinforcements: one frigate per player, arriving beside that player's ship (or the group) */
+  const rf=[];for(const i of hs){const own_=ships.find(s=>!s.dead&&s.slot===i),k=coopFF(fleetFaction[i]);const bx=own_?own_.px.x:cx,by=own_?own_.px.y:cy;
+    const h=put(bx-ux*HX*4,by-uy*HX*4);const sh=makeShip(k,h.q,h.r,bf===undefined?0:(bf+NF/2)%NF,0,false,nm(k),SLOTS[i].owner);sh.slot=i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;sh.f=(bf+NF/2)%NF;ships.push(sh);rf.push(sh)}
+  /* the next wave, in a line abreast 26 hexes out, closing at 4 */
+  const wl=[];for(const [k,n] of W[COOPW])for(let j=0;j<Math.max(0,n);j++)wl.push(k);
+  const ai=SLOTS.findIndex(x=>x&&x.kind==='ai'),lx=-uy,ly=ux;
+  wl.forEach((k,j)=>{const o=(j-(wl.length-1)/2)*3*HX*1.5;const h=put(cx+ux*dist+lx*o,cy+uy*dist+ly*o);const sh=makeShip(k,h.q,h.r,bf,1,true,nm(k),null);sh.slot=ai;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;const d=fdir(bf);sh.vq=d[0]*4;sh.vr=d[1]*4;ships.push(sh)});
+  for(const sh of [...rf,...ships.filter(s=>!s.dead&&s.team===1)])load(sh);
+  COOPW++;
+  if(!P||P.dead)P=mine().find(s=>!s.dead)||null;
+  log(`WAVE ${COOPW} of ${W.length}: ${wl.length} Chemantar ship${wl.length>1?'s':''} inbound (${Object.entries(wl.reduce((a,k)=>(a[k]=(a[k]||0)+1,a),{})).map(([k,n])=>n+'× '+SHIPS[k].name).join(', ')})`,'warn');
+  for(const s of rf)log(`Reinforcements: ${s.name} (${s.d.name}) joins ${(SLOTS[s.slot]&&SLOTS[s.slot].name)||'the fleet'}`,'good');
+  toast(`Wave ${COOPW} of ${W.length} incoming — reinforcements have arrived`);return true}
+function start(){if(MP.role==='guest')return;if(COOP)coopPrep();else COOPW=0;BID++;setTimeout(()=>{reducedAnim=ships.length>6;updRanim()},0);
   /* Nov 21 (David): up to 8 fleets; each team starts on its own bearing around the centre (2 teams: facing each other as before); fleets on the same team stand side by side */
     const act=[];for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&fleet[i]&&fleet[i].length)act.push(i);
   const mi=mySlotIdx();MYTEAM=SLOTS[mi]?SLOTS[mi].team:0;
@@ -2198,9 +2236,9 @@ function mpSend(m){if(MP.role==='guest'){if(MP.conn&&MP.conn.open)MP.conn.send(m
 
 // ---- lobby ----
 const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai,cmd:x.cmd}));
-function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode,era})}
+function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode,era,coop:COOP})}
 function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);const keep=mi>=0?{f:fleet[mi],fac:fleetFaction[mi],tl:fleetTL[mi],form:fleetForm[mi],sp:startSpeed[mi]}:null;
-  SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;const prevEra=era;era=ERAS[m.era]?m.era:'open';
+  SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;COOP=m.coop||'';const prevEra=era;era=ERAS[m.era]?m.era:'open';
   for(let i=0;i<MAXSLOTS;i++){fleet[i]=(m.fleets[i]||[]).map(x=>({...x}));fleetFaction[i]=m.fac[i];fleetTL[i]=m.tl[i];fleetForm[i]=m.form[i];startSpeed[i]=m.speed[i]}
   const ni=mySlotIdx();if(keep&&ni===mi&&mpLastSlot){if(prevEra!==era){keep.tl=(fleetFaction[ni]=keep.fac,eraDefault(ni));tlManual[ni]=false;setTimeout(mpSendMySlot,0)}fleet[ni]=keep.f;fleetFaction[ni]=keep.fac;fleetTL[ni]=keep.tl;fleetForm[ni]=keep.form;startSpeed[ni]=keep.sp}   // my own slot: keep my local edits (the host echoes them back)
   if(MP.pre&&SLOTS[ni]&&SLOTS[ni].owner===ME){const q=MP.pre;MP.pre=null;fleetFaction[ni]=q.fac;fleetTL[ni]=q.tl;fleet[ni]=q.fleet;fleetForm[ni]=q.form;startSpeed[ni]=q.sp;setTimeout(mpSendMySlot,0)}   // keep the faction (and ships) picked before joining
