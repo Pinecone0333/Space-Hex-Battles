@@ -207,6 +207,8 @@ WT.MAP={name:'Medium Antiproton Lance',ab:'APL(m)',grp:'aplances',kind:'ap',acc:
 WT.HAP={name:'Heavy Antiproton Lance',ab:'APL(h)',grp:'aplances',kind:'ap',acc:'torp',cost:30,dmg:60};
 const AP_IMP=2*IMP;
 const torpHot=(s,e)=>(s.torpMem||{})[e.name]!==false||!AIV.tmem||T-((s.torpSeen||{})[e.name]??-99)>=IMP;   // a turn after seeing torpedoes fire, assume they've recharged enough to matter
+/* Nov 22 (David): lance damage falloff stretched ×1.5 with the targeting computers — hex r uses the old band at r/1.5 (PL(h): 0–2 60, 3–5 51, 6–8 40, 9–11 29, 12–14 20, 15–19 11, 20+ 4) */
+for(const k in WT)if(WT[k].dmgR){const o=WT[k].dmgR;WT[k].dmgR=Array.from({length:Math.ceil(o.length*1.5)},(_,r)=>o[Math.min(o.length-1,Math.floor(r/1.5))])}
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: the shorter-ranged targeting computer (damage reduction removed Nov 22)
 /* Nov 22 (David): NO damage reduction at lower tech levels — TL4 is the baseline; TL1/TL2 weapons differ only in their shorter targeting computers */
@@ -991,7 +993,7 @@ function autoFireSel(s,t){return [] }
 // AI keeps enough energy back to renew the shield generator when renewal is near (shields collapse if it lapses)
 function genReserve(s){const u=upkeepCost(s)-income(s);return u>0?u+.25:0}   // keep enough to pay next impulse's drains
 /* r9 (Nov 21, David): turn nose-on by time, not distance — true when the target, at the current closing speed, reaches 6 hexes (torpedo 65%) within 3 impulses. Against fast attackers (double burns) the fixed 4-hex rule left no time to rotate. */
-function turnIn(s,t,d){if(!t)return false;const Vt=hp(t.vq,t.vr),Vs=hp(s.vq,s.vr),dx=t.px.x-s.px.x,dy=t.px.y-s.px.y,L=Math.hypot(dx,dy)||1;const vc=-((Vt.x-Vs.x)*dx+(Vt.y-Vs.y)*dy)/L/HS;return vc>0&&(d-6)/(vc/IMP)<=3}
+function turnIn(s,t,d){if(!t)return false;const Vt=hp(t.vq,t.vr),Vs=hp(s.vq,s.vr),dx=t.px.x-s.px.x,dy=t.px.y-s.px.y,L=Math.hypot(dx,dy)||1;const vc=-((Vt.x-Vs.x)*dx+(Vt.y-Vs.y)*dy)/L/HS;return vc>0&&(d-9)/(vc/IMP)<=3}   // Nov 22: torpedo 65% band now ends at ~9 hexes (was 6)
 // pivot direction for the AI: the short way if those thrusters work, otherwise the long way round (thrusters on that side destroyed)
 function aiPivotDir(s,fd){if(!fd)return 0;const d=Math.sign(fd);return isFinite(pivotCost(s,d))?d:isFinite(pivotCost(s,-d))?-d:0}
 // AINEW[team]=false runs the previous AI for that side (testing only)
@@ -1102,10 +1104,10 @@ function aiTorpCoil(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fir
    hold one impulse when the target's shields+reinforcement are ≤10 and this ship's lasers are firing at it now (they may knock the shields out first). */
 function aiPCR(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)return;const d=hexDist(s,t),sh=t.shield+reinfAmt(t);
   pcrPairs(s).forEach((p,i)=>{if(!pcrReady(s,i)||!canFireMount(s,'pcr'+i,t))return;const parts=k=>k==='w'+p.l||k==='w'+p.c;
-    if(sh<=0){if(hitP(s,'pcr'+i,t)>=.3||d>=7){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}return}
+    if(sh<=0){if(hitP(s,'pcr'+i,t)>=.3||d>=10){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}return}
     const lasersNow=r.fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='beam');
     if(sh<=10&&lasersNow){r.fire=r.fire.filter(k=>!parts(k));return}   // hold the mount: shields may be gone next impulse
-    if(d>=7&&pcrBurstP(s,d)>=.5){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}})}
+    if(d>=10&&pcrBurstP(s,d)>=.5){r.fire=r.fire.filter(k=>!parts(k));r.fire.push('pcr'+i)}})}
 /* AI round 7 (Nov 21, from David's records): keep point defense fed.
    (a) never start more charge-over-time drain than the reactor can carry (keeps ~0.75/impulse spare);
    (b) while enemy missiles are inbound or an enemy launcher with ammo is within 30 hexes, keep enough energy to refill every PD mount;
@@ -1155,11 +1157,11 @@ function dogWave(s,t,n,d){if(!n)return 0;const seen=scanWeapons(t,s.team);
 /* Golthan AI (Nov 21): run dark while the enemy is off the bow and the guns are quiet; deploy missiles at range, light them close in */
 function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.target:null;s.msDeploy=false;s.mslLight=false;if(!t){s.dark=false;return}const d=hexDist(s,t);
   const firing=(r.fire||[]).some(k=>!(k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='missile'));
-  s.dark=genLvl(s)>=1-1e-9&&d<=18&&inBow(s,t)&&!firing&&!darkBroken(s)&&s.E-upkeepCost(s)>=genCost(s)/IMP*2;
+  s.dark=genLvl(s)>=1-1e-9&&d<=27&&inBow(s,t)&&!firing&&!darkBroken(s)&&s.E-upkeepCost(s)>=genCost(s)/IMP*2;
   const dm=missiles.filter(m=>!m.dead&&m.dorm&&m.owner===s),nf=(r.fire||[]).filter(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind==='missile').length;
-  s.msDeploy=!dm.length&&d>7?Math.floor(nf/2):0;   /* keep half of a salvo back as a dark reserve */
+  s.msDeploy=!dm.length&&d>10?Math.floor(nf/2):0;   /* keep half of a salvo back as a dark reserve */
   const wave=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner===s&&m.target===t&&Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=4);
-  s.mslLight=dm.length>0&&(d<=7||wave||s.hull<s.d.hull*.4||dm.some(m=>Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=6))}   /* light the reserve as the first wave arrives (PD busy), up close, or before dying */
+  s.mslLight=dm.length>0&&(d<=10||wave||s.hull<s.d.hull*.4||dm.some(m=>Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=6))}   /* light the reserve as the first wave arrives (PD busy), up close, or before dying */
 // AI round 5 (Nov 21, David): doctrine families. Martian doctrine: Martians and Earthlings. Dogahr doctrine (torpedo stand-off, nose avoidance,
 // liberal reinforcement): Dogahr and, for now, Golthan. Everyone else hunts without the Dogahr's torpedo-shyness and reinforces only when it matters.
 const MDOC=s=>s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>s.d.faction==='Dogahr'||s.d.faction==='Golthan';
@@ -1189,58 +1191,58 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   else if(s.d.doctrine==='alpha'){
     // Martian: stay out of the fight while charging; once every gun is loaded and torpedoes are full, close and fire everything at once
     s.mode=s.alphaDone&&torps.length&&!AIV.extend?'brawl':(torps.length?torps.every(ready):guns.every(ready))?'attack':'charge';
-    s.holdImp=AIV.mhold&&s.mode==='attack'&&d<=9?(s.holdImp||0)+1:0;   // impulses spent holding fire for the alpha strike
+    s.holdImp=AIV.mhold&&s.mode==='attack'&&d<=13?(s.holdImp||0)+1:0;   // impulses spent holding fire for the alpha strike
     if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
-    else if(s.mode==='attack'){want=AIV.fast?{range:1,radial:1.5,maxClose:12,orbit:d>6?2.5:0}:AIV.r5&&!MDOC(s)?{range:1,radial:1.3,maxClose:10}:{range:1,radial:1.2};face=d>4&&!(AIV.r9&&turnIn(s,t,d))?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
-    else if(AIV.crip&&(s.hull<s.d.hull*.5||s.reactor<s.reactor0*.6)&&torps.length){want={range:18,radial:1.2,orbit:.5};face=a-side*Math.PI/2;prio=['torps'];reserve=6;s.crip=true}   // crippled: open the range and spend only on torpedoes, generator and engines
-    else{want={range:15,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
+    else if(s.mode==='attack'){want=AIV.fast?{range:1,radial:1.5,maxClose:12,orbit:d>6?2.5:0}:AIV.r5&&!MDOC(s)?{range:1,radial:1.3,maxClose:10}:{range:1,radial:1.2};face=d>6&&!(AIV.r9&&turnIn(s,t,d))?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
+    else if(AIV.crip&&(s.hull<s.d.hull*.5||s.reactor<s.reactor0*.6)&&torps.length){want={range:27,radial:1.2,orbit:.5};face=a-side*Math.PI/2;prio=['torps'];reserve=6;s.crip=true}   // crippled: open the range and spend only on torpedoes, generator and engines
+    else{want={range:22,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
   }else if(s.d.doctrine==='hunt'||s.d.doctrine==='brawl'){
     // Dogahr: hunt at mid range; if an enemy within 12 hexes has full torpedoes, stand off at 10 (torpedoes only 45% there)
-    const hot=!s.d.noStandoff&&(!AIV.r5||DDOC(s))&&enemiesOf(s).some(e=>{if(hexDist(e,s)>12)return false;const mem=s.torpMem||(s.torpMem={});
+    const hot=!s.d.noStandoff&&(!AIV.r5||DDOC(s))&&enemiesOf(s).some(e=>{if(hexDist(e,s)>18)return false;const mem=s.torpMem||(s.torpMem={});
       if(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)){mem[e.name]=e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=3);if(mem[e.name])delete (s.torpSeen||{})[e.name];else if(AIV.tmem&&e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=1))return true}return torpHot(s,e)});
     s.mode=hot?'standoff':'hunt';
     const hotE=e=>torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp');
-    s.hotNear=enemiesOf(s).some(e=>hexDist(e,s)<=15&&hotE(e));
-    if(AIV.brace&&hot&&enemiesOf(s).some(e=>hexDist(e,s)<=12&&hotE(e))&&(sepRate<-6||d<=7))s.mode='brace';
+    s.hotNear=enemiesOf(s).some(e=>hexDist(e,s)<=22&&hotE(e));
+    if(AIV.brace&&hot&&enemiesOf(s).some(e=>hexDist(e,s)<=18&&hotE(e))&&(sepRate<-6||d<=10))s.mode='brace';
     if(s.d.sniper){   // Blokai (Nov 18, David): out-range the enemy, wear it down, then dive in for the lance kill
       const sh=t.shield+reinfAmt(t),guns=t.weapons.filter(w=>w.alive&&w.T.kind!=='missile').length,guns0=t.weapons.filter(w=>w.T.kind!=='missile').length;
       const weak=sh<t.d.shield*.25||t.hull<t.d.hull*.5||guns<=guns0*.4;
       // window: the enemy's big punch is spent (no full torpedo, most launchers reloading) — go in with the lance while it recharges
       const tT=t.weapons.filter(w=>w.alive&&w.T.kind==='torp'),tM=t.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);
       const spent=(!tT.length||tT.every(w=>w.stages<3))&&tM.filter(w=>w.state==='ready').length<=tM.length*.3&&(tT.length||tM.length);
-      if(weak)s.dove=true;s.mode=(s.dove||spent&&d<=14)&&!t.dead?'dive':'snipe';
+      if(weak)s.dove=true;s.mode=(s.dove||spent&&d<=21)&&!t.dead?'dive':'snipe';
       if(s.mode==='dive'){want={range:2,radial:1.2,orbit:.3,chase:true,maxClose:14};face=a;prio=['lances','coils','lasers']}
-      else{want={range:s.d.standRange||11,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lances','coils','lasers']}}   // load the lance first (holding is free), lasers with what's left
-    else if(s.mode==='brace'){want=AIV.r6?{range:11,radial:.7,orbit:7,maxClose:10}:{range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   /* Nov 21: can't out-brake a fast torpedo charge (reverse only every other impulse) — slide sideways off its nose line instead, keep shooting */   // can't outrun it: face it, reinforce, shoot
-    else if(hot&&!AIV.dStand){want={range:10,radial:1,orbit:2};face=a;prio=['lasers','coils']}
-    else if(hot){want={range:6,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
+      else{want={range:s.d.standRange||16,radial:1.2,orbit:1,chase:true,maxClose:10};face=a;prio=['lances','coils','lasers']}}   // load the lance first (holding is free), lasers with what's left
+    else if(s.mode==='brace'){want=AIV.r6?{range:16,radial:.7,orbit:7,maxClose:10}:{range:6,radial:.3,orbit:0};face=a;prio=['lasers','coils']}   /* Nov 21: can't out-brake a fast torpedo charge (reverse only every other impulse) — slide sideways off its nose line instead, keep shooting */   // can't outrun it: face it, reinforce, shoot
+    else if(hot&&!AIV.dStand){want={range:15,radial:1,orbit:2};face=a;prio=['lasers','coils']}
+    else if(hot){want={range:9,radial:.8,orbit:2.5};face=a;prio=['lasers','coils']}   // stay out of its nose arc (see nose avoidance below) rather than backing off
     else if(AIV.r5&&(s.d.faction==='Hunibler'||s.d.faction==='Hunifer')){   // nimble raiders: dive in when the spinal punch is ready, pull out to ~9 while it reloads
       const spR=s.weapons.some(w=>w.alive&&w.arc==='S'&&w.state==='ready');s.mode=spR?'strike':'reload';
-      want=spR?{range:3,radial:1.4,orbit:.4,chase:true,maxClose:14}:{range:9,radial:1.1,orbit:1.5,chase:true,maxClose:10};face=a;prio=['coils','lances','lasers']}
+      want=spR?{range:3,radial:1.4,orbit:.4,chase:true,maxClose:14}:{range:13,radial:1.1,orbit:1.5,chase:true,maxClose:10};face=a;prio=['coils','lances','lasers']}
     else if(AIV.r5&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')){   // artillery (Chemantar): close to ~6 (65%) with the lance ready, hang back at ~10 while it charges
       const apR=s.weapons.some(w=>w.alive&&w.T.kind==='ap'&&w.state==='ready');s.mode=apR?'hunt':'reload';
-      want=apR?{range:6,radial:1.2,orbit:.8,chase:true,maxClose:12}:{range:10,radial:1,orbit:1.2,chase:true,maxClose:10};face=a;prio=['aplances','lasers','coils']}
-    else{want={range:s.d.prefRange||6,radial:1.2,orbit:1,chase:true,maxClose:12};face=a;prio=['lasers','coils']}   // mid-range: chase from afar, back away if the enemy closes inside 4
+      want=apR?{range:9,radial:1.2,orbit:.8,chase:true,maxClose:12}:{range:15,radial:1,orbit:1.2,chase:true,maxClose:10};face=a;prio=['aplances','lasers','coils']}
+    else{want={range:(s.d.prefRange||6)*1.5,radial:1.2,orbit:1,chase:true,maxClose:12};face=a;prio=['lasers','coils']}   // mid-range: chase from afar, back away if the enemy closes inside 4
     if(s.d.broadside)face=a-side*Math.PI/2;   // side-mounted guns (Hunibler): keep the target abeam; the spinal-aim pivot takes over when spinal weapons are ready
   }else if(s.d.doctrine==='torpRun'&&torps.length){
     const full=torps.every(w=>w.stages>=3);if(full)s.mode='run';else if(s.mode==='run'&&torps.every(w=>w.stages===0))s.mode='stand';if(!s.mode)s.mode='stand';
     if(s.mode==='run'){want={range:1,radial:1.2};face=a;prio=['torps','coils','lasers'];reserve=4}
-    else{want={range:7,radial:.6,orbit:2};face=a-side*Math.PI/2;prio=torps.some(w=>w.stages>=2)?['torps','coils','lasers']:['torps','lasers']}
+    else{want={range:10,radial:.6,orbit:2};face=a-side*Math.PI/2;prio=torps.some(w=>w.stages>=2)?['torps','coils','lasers']:['torps','lasers']}
   }else{
     let run=false;for(const e of enemiesOf(s)){const h=e.hist,old=h.length>IMP?h[h.length-IMP-1]:null;if(!old)continue;const ed=hexDist(e,s);const closing=hexDist(old,s)-ed;
-      if(closing>=4&&ed<=14&&Math.abs(relBearing(e,s))<35*D2R&&e.weapons.some(w=>w.alive&&w.T.kind==='torp'))run=true}
+      if(closing>=4&&ed<=21&&Math.abs(relBearing(e,s))<35*D2R&&e.weapons.some(w=>w.alive&&w.T.kind==='torp'))run=true}
     if(run&&s.d.doctrine==='kite'&&!(s.evadeCool>T)){s.evadeUntil=T+6;s.evadeCool=T+18}   // break away briefly, then re-engage
     if(s.evadeUntil>T){want={range:d+5,radial:1.2,orbit:2};face=a+side*110*D2R;prio=['lasers','coils']}
-    else{want={range:s.d.prefRange||6,radial:.6,orbit:1};face=a;prio=['lasers','coils']}}
+    else{want={range:(s.d.prefRange||6)*1.5,radial:.6,orbit:1};face=a;prio=['lasers','coils']}}
   // hang back (Nov 20, from David's record): a crippled Dogahr doesn't dive into an intact enemy — it holds at range and fights with what it has left (missiles, long shots)
   {const guns=x=>x.weapons.filter(w=>w.T.kind!=='missile'),frac=x=>{const g=guns(x);return g.length?g.filter(w=>w.alive).length/g.length:1};
    const cripS=s.reactor<=s.reactor0*.6||s.hull<=s.d.hull*.5||frac(s)<=.5,healthyT=t.hull>=t.d.hull*.7&&frac(t)>=.6&&t.reactor>=t.reactor0*.7;
    s.hangBack=AIV.hangback&&s.d.faction==='Dogahr'&&cripS&&healthyT;
-   if(s.hangBack){want={range:13,radial:1.1,orbit:.6,maxClose:8};if(s.mode==='hunt'||s.mode==='dive')s.mode='standoff'}}
+   if(s.hangBack){want={range:20,radial:1.1,orbit:.6,maxClose:8};if(s.mode==='hunt'||s.mode==='dive')s.mode='standoff'}}
   // kill shot (Nov 18): target's shields gone and hull low — close in and shoot everything with a real chance
   s.killing=AIV.kill&&t.shield+reinfAmt(t)<6&&(t.hull<=Math.max(30,t.d.hull*.3)||t.reactor<=t.reactor0*.3)&&s.mode!=='brace';
   if(s.killing&&s.d.doctrine!=='alpha'){const tHot=torpHot(s,t)&&t.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=3);
-    want={range:tHot?5:3,radial:1.3,orbit:tHot?1.5:.3,chase:true,maxClose:14};face=a;if(s.mode==='snipe')s.mode='dive'}
+    want={range:tHot?7:3,radial:1.3,orbit:tHot?1.5:.3,chase:true,maxClose:14};face=a;if(s.mode==='snipe')s.mode='dive'}
   // energy triage (Nov 18): nothing loaded — load a gun before spending on burns, pivots or PD
   const gc=w=>w.T.kind==='torp'?w.T.perTurn/IMP*3:w.T.kind==='ap'?w.T.cost/AP_IMP*3:drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
   const armedNow=s.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&(w.state==='ready'||w.state==='cycling'||w.charging||w.holding||w.T.kind==='torp'&&w.stages>0));
@@ -1254,25 +1256,25 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     s.pd.forEach((pp,i)=>{while(have()<need&&s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}})}
   // weapons before manoeuvre when the target is in range and guns sit empty (an energy-starved ship otherwise spends everything on burns)
   if(prio&&!prio.includes('lances'))prio=[...prio,'lances'];if(prio&&!prio.includes('rails'))prio=[...prio,'rails'];if(prio&&!prio.includes('aplances'))prio=['aplances',...prio];
-  if(AIV.wfirst&&d<=12&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
+  if(AIV.wfirst&&d<=18&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'||AIV.apfix&&g==='aplances'?0:AIV.pdBudget&&s.mode==='charge'?reserve:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
   const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance'||w.T.kind==='ap')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
-  const wantNose=AIV.align&&spReady&&(d<=(s.d.faction==='Dogahr'?10:9)||AIV.r9&&s.mode==='attack'&&d<=12&&turnIn(s,t,d))&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&(d<=6||AIV.r9&&turnIn(s,t,d))||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=6&&torps.some(w=>w.stages>=3));
+  const wantNose=AIV.align&&spReady&&(d<=(s.d.faction==='Dogahr'?15:13)||AIV.r9&&s.mode==='attack'&&d<=18&&turnIn(s,t,d))&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&(d<=9||AIV.r9&&turnIn(s,t,d))||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=9&&torps.some(w=>w.stages>=3));
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
-  const noseFoes=(AIV.r5?!DDOC(s):s.d.faction==='Martian')||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=10&&torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
+  const noseFoes=(AIV.r5?!DDOC(s):s.d.faction==='Martian')||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=15&&torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
   const look=2/IMP;
   const posPen=(Vn,fn)=>{const sp={x:s.px.x+Vn.x*look,y:s.px.y+Vn.y*look};let pen=0;
     if(wantNose){const Vt1=hp(t.vq,t.vr),tp={x:t.px.x+Vt1.x*look,y:t.px.y+Vt1.y*look};const an=Math.atan2(tp.y-sp.y,tp.x-sp.x);
       let off=9;for(let k=-2;k<=2;k++)off=Math.min(off,Math.abs(norm(an-fAng((fn+k+NF)%NF)))+Math.abs(k)*4*D2R);pen+=Math.max(0,off-13*D2R)/(60*D2R)*1.4}
-    for(const e of noseFoes){const Ve=hp(e.vq,e.vr),ep={x:e.px.x+Ve.x*look,y:e.px.y+Ve.y*look};const dd=Math.hypot(sp.x-ep.x,sp.y-ep.y)/HS;if(dd>9)continue;
-      const off=Math.abs(norm(Math.atan2(sp.y-ep.y,sp.x-ep.x)-fAng(e.f)));if(off<40*D2R)pen+=(40*D2R-off)/(40*D2R)*1.6*(1.3-dd/9)}
+    for(const e of noseFoes){const Ve=hp(e.vq,e.vr),ep={x:e.px.x+Ve.x*look,y:e.px.y+Ve.y*look};const dd=Math.hypot(sp.x-ep.x,sp.y-ep.y)/HS;if(dd>13)continue;
+      const off=Math.abs(norm(Math.atan2(sp.y-ep.y,sp.x-ep.x)-fAng(e.f)));if(off<40*D2R)pen+=(40*D2R-off)/(40*D2R)*1.6*(1.3-dd/13)}
     return pen};
   // navigation: steer velocity toward a desired velocity relative to the target
   const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;let Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};let ordNav=false;if(isAI(s)){const ov=orderVd(s);if(ov){Vd=ov;ordNav=true}}{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:9)||s.mode==='hunt'&&d>(s.d.prefRange||6)+4||s.mode==='snipe'&&(d<8||d>15)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4||ordNav&&em>1;
+  const urgent=s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:13)||s.mode==='hunt'&&d>(s.d.prefRange||6)*1.5+6||s.mode==='snipe'&&(d<12||d>22)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4||ordNav&&em>1;
   const pen0=posPen(V,s.f);const navOK=!starved||d<3;
   if(navOK&&(em>=(urgent?.75:1.5)||pen0>.35)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent||pen0>.6?0:Math.min(8,s.reactor/4))){let best=null,bv=em+pen0;
     // Nov 20: agile ships can pivot first and then burn along the new facing (all within the ship's rotation limit per impulse)
@@ -1295,7 +1297,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       let done=0;for(let i=0;i<n;i++)if(isFinite(pivotCost(s,dir))&&s.E-qCost(s)-genReserve(s)>=pivotCost(s,dir)&&queue(s,{type:'pivot',dir,cost:pivotCost(s,dir)}))done++;
       if(!done)for(const x of pv)s.queue.push(x)}}   // couldn't afford it: keep the navigation pivots
   // weapons by priority, keeping a little energy back for manoeuvres
-  const desperate=AIV.lastGasp&&d<=10&&!s.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&(w.state==='ready'||w.state==='cycling'||w.charging||w.holding));
+  const desperate=AIV.lastGasp&&d<=15&&!s.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&(w.state==='ready'||w.state==='cycling'||w.charging||w.holding));
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'||desperate||AIV.apfix&&g==='aplances'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
@@ -1307,7 +1309,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const brace=s.mode==='brace',dog=AIV.r5?DDOC(s):s.d.faction!=='Martian',mid=AIV.r5&&!DDOC(s)&&!MDOC(s);
     // Dogahr (Nov 18, David): reinforce liberally whenever an enemy is within 15 hexes, layer up to the full base shield (the 2× cap);
     // Martians: their guns eat the energy — only against inbound missiles, with plenty to spare, and a thin layer
-    const want=AIV.reinf2?(dog?(inbound||brace||d<=(AIV.rfFloor?10:15)):mid?(inbound||brace||d<=6&&!idleGuns):inbound):(inbound||(d<=10&&!idleGuns)||brace||AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5);
+    const want=AIV.reinf2?(dog?(inbound||brace||d<=(AIV.rfFloor?15:22)):mid?(inbound||brace||d<=9&&!idleGuns):inbound):(inbound||(d<=15&&!idleGuns)||brace||AIV.hotReinf&&s.hotNear&&s.E>s.reactor*.5);
     if(want){const layer=AIV.reinf2?(dog?1:mid?.4:(AIV.r8&&inbound?(AIV.rfMs||.4):.2)):.4;const room=Math.min(2,s.d.shield*2-s.shield-reinfAmt(s),Math.max(0,s.d.shield*layer-reinfAmt(s)));const n=Math.floor(room);
       const gunFloor=AIV.rfFloor?s.weapons.reduce((a,w)=>a+(w.alive&&w.T.kind!=='missile'&&w.T.kind!=='torp'?w.T.cost||0:0),0)/2:0;   // keep half a full gun reload in hand
       const keep=AIV.reinf2?(dog?(brace?0:Math.max(gunFloor,inbound?2:idleGuns?99:Math.max(2,s.reactor0/4))):(AIV.r8&&inbound?4:12)):(brace?0:s.mode==='charge'?6:dog?4:2);
@@ -1326,7 +1328,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     let lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='beam'&&canFireMount(s,k,t));if(!s.weapons.some(w=>w.alive&&w.T.kind==='beam'))lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='slug'&&canFireMount(s,k,t));
     const ref=torps.length?tk:lk;const best=ref.reduce((m,k)=>Math.max(m,hitP(s,k,t)),0);
     const pen=s.d.accPen||0;const hurt=AIV.mhold&&(s.shield+reinfAmt(s))<s.d.shield*.3&&s.hull<s.d.hull*.8;
-    const trig=s.killing&&best>=.15||AIV.r6&&best>=.65-pen-1e-6||best>=.85-pen-1e-6||AIV.trig65&&best>=.65-pen-1e-6&&d<=7||best>=.65-pen-1e-6&&sepRate>.25||s.holdImp>=8&&best>=.75-pen-1e-6||(s.holdImp>=14||hurt)&&best>=.65-pen-1e-6;   // the longer it's held off (or the more it's hurt), the lower the bar
+    const trig=s.killing&&best>=.15||AIV.r6&&best>=.65-pen-1e-6||best>=.85-pen-1e-6||AIV.trig65&&best>=.65-pen-1e-6&&d<=10||best>=.65-pen-1e-6&&sepRate>.25||s.holdImp>=8&&best>=.75-pen-1e-6||(s.holdImp>=14||hurt)&&best>=.65-pen-1e-6;   // the longer it's held off (or the more it's hurt), the lower the bar
     if(s.mode==='brawl'){keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
         if(K==='missile'){if(d<=16)fire.push(key);return}
         if(K==='torp'){if(w.stages>=1&&pp>=.65-pen-1e-6)fire.push(key);return}
@@ -1358,15 +1360,15 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       const dm=K==='lance'?lanceDmg(w.T,hexDist(x,y)):K==='torp'?(w.stages>=1?torpDmg(w):0):w.T.dmg;return dm*hitP(x,key,y)};
     const out=fire.reduce((a,k)=>a+expD(s,k,t),0);
     const known=e=>!DDOC(s)||hexDist(e,s)<=sensRange(s)||torpHot(s,e);
-    let inc=0;for(const e of enemiesOf(s)){if(hexDist(e,s)>9||e.dead)continue;const nose=Math.abs(relBearing(e,s))<=Math.PI*40/180;
+    let inc=0;for(const e of enemiesOf(s)){if(hexDist(e,s)>13||e.dead)continue;const nose=Math.abs(relBearing(e,s))<=Math.PI*40/180;
       e.weapons.forEach((w,k)=>{if(!w.alive||w.T.kind==='missile')return;const key='w'+k,big=w.T.kind==='torp'||w.T.kind==='lance'||w.T.kind==='ap';
         const rdy=w.T.kind==='torp'?w.stages>=1&&known(e):w.state==='ready';if(!rdy)return;if(canFireMount(e,key,s)||big&&nose)inc+=expD(e,key,s)})}
     const piv=qHas(s,'pivot');
     if(inc>=20&&inc>out&&isFinite(c)){if(piv)s.queue=s.queue.filter(x=>x.type!=='pivot'&&x.type!=='burn');if(s.E-qCost(s)>=c)queue(s,{type:'evade',cost:c})}
     else if(!piv&&isFinite(c)&&s.E-qCost(s)-c>=Math.min(3,s.reactor0/10)){
       const gunsOut=fire.some(k=>k[0]==='w'&&s.weapons[+k.slice(1)].T.kind!=='missile');
-      const tlHi=enemiesOf(s).filter(e=>hexDist(e,s)<=14).reduce((m,e)=>Math.max(m,e.d.tl||4),0);
-      if((s.d.tl||4)<tlHi&&d>4&&!gunsOut&&enemiesOf(s).some(e=>hexDist(e,s)<=12&&e.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&w.state==='ready')))queue(s,{type:'evade',cost:c})}}
+      const tlHi=enemiesOf(s).filter(e=>hexDist(e,s)<=21).reduce((m,e)=>Math.max(m,e.d.tl||4),0);
+      if((s.d.tl||4)<tlHi&&d>6&&!gunsOut&&enemiesOf(s).some(e=>hexDist(e,s)<=18&&e.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&w.state==='ready')))queue(s,{type:'evade',cost:c})}}
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
 // ---- UI ----
