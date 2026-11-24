@@ -171,8 +171,11 @@ const mkTable=fn=>Array.from({length:61},(_,r)=>Math.max(.005,Math.round(fn(r)*1
    onto that tech level's computer (hex r reads base hex r×12/max, interpolated; 5% steps, TL5 whole percents); beyond it the floor (lasers 10%, others 5%). */
 const LASER_ACC=r=>r<=1?1:r<=3?.9:r<=5?.8:r<=7?.7:r<=9?.6:r<=11?.5:r<=12?.4:.1;
 const COIL_TBL=[.95,.95,.85,.85,.75,.75,.65,.6,.5,.45,.35,.25,.15];const COIL_ACC=r=>r<=12?COIL_TBL[r]:.05;   // David's coilgun table (12-hex base curve)
-const BASE={laser:Array.from({length:61},(_,r)=>LASER_ACC(r)),coil:Array.from({length:61},(_,r)=>COIL_ACC(r)),torp:Array.from({length:61},(_,r)=>LASER_ACC(r)-.05)};
-BASE.rail=BASE.coil.map((p,r)=>r<=12?Math.min(1,+(p+.05).toFixed(2)):.05);   // railgun turrets: the coilgun curve +5 (a turret, not a spinal mount)
+/* Nov 23 (David): no −5 for spinal weapons any more; turret weapons get +5 instead. Spinal weapons (torpedoes, lances, coilguns) use the base curves
+   (torpedoes/lances = the old laser curve, coilguns = the old railgun curve); turrets (lasers, offensive PD, railgun turrets) are those curves +5 (max 100). */
+const up5=v=>Math.min(1,+(v+.05).toFixed(2));
+const BASE={torp:Array.from({length:61},(_,r)=>r<=12?LASER_ACC(r):.05),coil:Array.from({length:61},(_,r)=>r<=12?up5(COIL_ACC(r)):.05)};
+BASE.laser=BASE.torp.map((p,r)=>r<=12?up5(p):.1);BASE.rail=BASE.coil.map((p,r)=>r<=12?up5(p):.05);
 const shrinkTo=(A,max,add=0,floor=.05,whole=false)=>A.map((p,r)=>{if(r>max)return floor;const x=r*12/max,i=Math.floor(x),f=x-i,v=A[Math.min(A.length-1,i)]*(1-f)+A[Math.min(A.length-1,i+1)]*f;return Math.min(1,whole?Math.ceil((v+add)*100-1e-6)/100:Math.round((v+add)*20)/20)});
 const TCR_TL={1:9,2:12,3:18,4:18,5:21};   // targeting-computer range by tech level (Nov 22: was 6 / 8 / 12 / 12 / 14)
 const ACC={};
