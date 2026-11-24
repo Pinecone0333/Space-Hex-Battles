@@ -189,7 +189,7 @@ const WT={
   SL:{name:'Small Laser',ab:'LC(s)',grp:'lasers',kind:'beam',acc:'laser',dmg:4,cost:2},
   ML:{name:'Medium Laser',ab:'LC(m)',grp:'lasers',kind:'beam',acc:'laser',dmg:6,cost:3},
   HL:{name:'Heavy Laser',ab:'LC(h)',grp:'lasers',kind:'beam',acc:'laser',dmg:8,cost:4},
-  XL:{name:'Superheavy Laser',ab:'LC(sh)',grp:'lasers',kind:'beam',acc:'laser',dmg:10,cost:5},   // Nov 24 (David): for the Motoran Heavy Cruiser — next step up the laser ladder (4/6/8/10)
+  NL:{name:'Mini Laser',ab:'LC(xs)',grp:'lasers',kind:'beam',acc:'laser',dmg:2,cost:1},   // Nov 24 (David): lighter than the Small Laser — the Motoran Heavy Cruiser packs 16 (the brief Superheavy Laser was removed)
   SC:{name:'Small Coilgun',ab:'CG(s)',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
   MC:{name:'Medium Coilgun',ab:'CG(m)',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
   HC:{name:'Heavy Coilgun',ab:'CG(h)',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
@@ -218,7 +218,7 @@ for(const k in WT)if(WT[k].dmgR){const o=WT[k].dmgR;WT[k].dmgR=Array.from({lengt
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: the shorter-ranged targeting computer (damage reduction removed Nov 22)
 /* Nov 22 (David): NO damage reduction at lower tech levels — TL4 is the baseline; TL1/TL2 weapons differ only in their shorter targeting computers */
-for(const k of ['SL','ML','HL','XL','SC','MC','HC','XC','TC','ST','MT','HT','XT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
+for(const k of ['NL','SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','XT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
 // TL1 weapons (Nov 19, David): the TL1 targeting computer (2/3 damage removed Nov 22); the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'RG(s)',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
@@ -372,12 +372,12 @@ SHIPS.dcorvette={...SHIPS.dfrigate,cls:'Corvette',weight:30,name:'Dogahr Corvett
 // ---- tech levels: everything above is tech level 4 (shielded refits of ships not originally built for shields) ----
 // TL3: no shield generator; reactor reduced by what the generator used to cost.  TL2 (Martian): TL3 hull, reactor 15% weaker again, TL2 weapons.
 // ---- Motoran (Nov 24, David): triangular bow on a rounded-rectangle stern, wings swept all the way back plus a vertical wing (four wings). Lighter purple than the Chemantar; fire green. Placeholder AI. ----
-FACTIONS.Motoran={color:'#b98cff',blurb:'Lance cruisers with screwdriver bows, superheavy laser batteries and missiles'};
-// Heavy Cruiser: the bow triangle is shaped like a flathead screwdriver head (tapers, runs nearly straight, ends in a flat blade edge — the lance emitter). Heavy Plasma Lance (spinal), 4 Superheavy Lasers (2 FX, 1 RS, 1 LS), 4 missiles.
+FACTIONS.Motoran={color:'#b98cff',blurb:'Lance cruisers with screwdriver bows, swarms of mini lasers on the broadsides, missiles'};
+// Heavy Cruiser: the bow is a screwdriver — a shoulder tapering into a shaft, then a slightly wider triangular tip that comes to a point (not a flathead). Heavy Plasma Lance (spinal), 16 Mini Lasers (8 RS, 8 LS), 4 missiles.
 // Hull/shields/reactor at standard heavy-cruiser level and PD 2 FX + 1 360° (Claude's picks).
 SHIPS.motca={faction:'Motoran',cls:'Heavy Cruiser',weight:100,name:'Motoran Heavy Cruiser',short:'Motoran CA',color:'#b98cff',laser:'#7dff5a',torp:'#a6ff8a',hull:150,shield:50,big:true,reactor:42,genCost:10,genRegen:4,doctrine:'hunt',
-    shape:[[-40.0,-32.0],[-26.0,-10.0],[-25.9,-10.0],[-26.0,-9.0],[-26.0,9.0],[-25.9,10.0],[-26.0,10.0],[-40.0,32.0],[-32.0,32.0],[-12.1,13.0],[0.0,13.0],[0.8,12.9],[1.9,12.5],[2.5,12.1],[3.0,11.7],[20.0,6.0],[30.0,4.5],[34.0,4.5],[34.0,-4.5],[30.0,-4.5],[20.0,-6.0],[3.0,-11.7],[2.5,-12.1],[1.9,-12.5],[0.8,-12.9],[0.0,-13.0],[-12.1,-13.0],[-32.0,-32.0],null,[-9,-1.4],[-9,1.4],[-40,1.4],[-40,-1.4]],lines:[[4,0,30,0],[-2,-11,-2,11]],dots:[[30,0],[-14,-6],[-14,6]],
-    weapons:[['HPL','S'],['XL','FX'],['XL','FX'],['XL','RS'],['XL','LS'],...rep(4,['MS','ALL'])],pd:['FX','FX','ALL']};
+    shape:[[-40.0,-32.0],[-26.0,-10.0],[-25.9,-10.0],[-26.0,-9.0],[-26.0,9.0],[-25.9,10.0],[-26.0,10.0],[-40.0,32.0],[-32.0,32.0],[-12.1,13.0],[0.0,13.0],[0.8,12.9],[1.5,12.7],[2.2,12.3],[3.1,11.5],[3.7,10.5],[3.9,9.8],[4.0,9.3],[9.0,5.5],[21.0,5.5],[24.0,7.0],[40.0,0.0],[24.0,-7.0],[21.0,-5.5],[9.0,-5.5],[4.0,-9.3],[3.9,-9.8],[3.7,-10.5],[3.1,-11.5],[2.2,-12.3],[1.5,-12.7],[0.8,-12.9],[0.0,-13.0],[-12.1,-13.0],[-32.0,-32.0],null,[-9,-1.4],[-9,1.4],[-40,1.4],[-40,-1.4]],lines:[[4,0,34,0],[-2,-11,-2,11]],dots:[[32,0],[-14,-6],[-14,6]],
+    weapons:[['HPL','S'],...rep(8,['NL','RS']),...rep(8,['NL','LS']),...rep(4,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- Si'gian (Nov 23, David): octagonal bulb, Hunibler-style neck, straight wings ending in gun pods. Silver (a bit darker than Blokai/Billyon). Sleek and agile. ----
 FACTIONS["Si'gian"]={color:'#8c949e',blurb:'Sleek, agile lance raiders: octagonal bulb, neck and gun-pod wings'};
 SHIPS.sigcl={faction:"Si'gian",cls:'Light Cruiser',weight:78,name:"Si'gian Light Cruiser",short:"Si'gian CL",color:'#8c949e',laser:'#ffd23f',torp:'#ffe680',hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,agile:true,doctrine:'hunt',
