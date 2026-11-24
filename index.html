@@ -279,8 +279,8 @@ SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Des
 SHIPS.earthcl={faction:'Earthling',cls:'Light Cruiser',weight:78,name:'Earthling Light Cruiser',short:'Earthling CL',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:90,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,doctrine:'alpha',
     shape:SHIPS.earthling.shape.map(p=>[...p]),lines:SHIPS.earthling.lines.map(l=>[...l]),dots:SHIPS.earthling.dots.map(p=>[...p]),   // Nov 23 (David): the existing Earthling sprite
     weapons:[['HT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
-// Nov 23 (David): the Earthling Heavy Cruiser becomes a "fat boi" — same length, 40% wider
-{const E=SHIPS.earthling,k=1.4;E.shape=E.shape.map(p=>[p[0],p[1]*k]);E.lines=E.lines.map(l=>[l[0],l[1]*k,l[2],l[3]*k]);E.dots=E.dots.map(p=>[p[0],p[1]*k])}
+// Nov 23 (David): the Earthling Heavy Cruiser's "fat boi" look — the original hull overlapping a broad rectangle that runs from near (not at) the bow back past mid-ship: the superheavy torpedo slung under the nose
+{const E=SHIPS.earthling;E.shape=E.shape.concat([null,[28,-8],[28,8],[-16,8],[-16,-8]]);E.dots=E.dots.concat([[24,0]])}
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
 FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
