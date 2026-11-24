@@ -2214,7 +2214,7 @@ function updRanim(){const b=$('ranim');if(b){b.textContent='Anim: '+(reducedAnim
    attack in turn, and after each wave every player gets a frigate of their faction. Beat all three waves to win. Works online (each player on their own device) and offline. ---- */
 let COOP='',COOPW=0;
 const COOPS={cementers:{name:'Defeat the Cementers!',blurb:'Co-op: each player (and any AI allies) picks a faction and a ship and fights four Chemantar waves. After each wave, every player gets a frigate.',
-  waves:n=>[[['chemff',n+1]],[['chemcru',n-1],['chemff',2]],[['chemcru',n-2],['chemart',n-2],['chemff',2]],[['chemdbl',1],['chemcru',2],['chemff',2]]]}};   // Nov 23 (David): final wave 4 — Double Artillery Cruiser, 2 Cruisers, 2 Attack Frigates
+  waves:n=>[[['chemff',n+1]],[['chematk',n-1],['chemff',2]],[['chematk',n-2],['chemart',n-2],['chemff',2]],[['chemdbl',1],['chematk',2],['chemff',2]]]}};   // Nov 23 (David): final wave 4 — Double Artillery Cruiser, 2 cruisers, 2 Attack Frigates. Nov 24 (David): the cruisers are Attack Cruisers, not full Cruisers
 const coopBase=f=>Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&!SHIPS[k].freighter&&!/[0-9][a-z]?$/.test(k));
 const coopTL=f=>{const L=coopBase(f),tls=[...new Set(L.map(k=>SHIPS[k].tl||4))];const t=tls.includes(4)?4:Math.max(...tls);return L.filter(k=>(SHIPS[k].tl||4)===t)};   // the faction's TL4 ships (Blokai: TL5)
 const coopNear=(f,pts,big)=>coopTL(f).map(k=>[k,Math.abs((PTS3[ptsClass(k)]||0)-pts),SHIPS[k].weight]).sort((a,b)=>a[1]-b[1]||(big?b[2]-a[2]:a[2]-b[2]))[0][0];
