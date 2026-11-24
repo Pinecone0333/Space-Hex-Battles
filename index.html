@@ -280,7 +280,7 @@ SHIPS.earthcl={faction:'Earthling',cls:'Light Cruiser',weight:78,name:'Earthling
     shape:SHIPS.earthling.shape.map(p=>[...p]),lines:SHIPS.earthling.lines.map(l=>[...l]),dots:SHIPS.earthling.dots.map(p=>[...p]),   // Nov 23 (David): the existing Earthling sprite
     weapons:[['HT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
 // Nov 23 (David): the Earthling Heavy Cruiser's "fat boi" look — the original hull overlapping a broad rectangle that runs from near (not at) the bow back past mid-ship: the superheavy torpedo slung under the nose
-{const E=SHIPS.earthling;E.shape=E.shape.concat([null,[28,-8],[28,8],[-16,8],[-16,-8]]);E.dots=E.dots.concat([[24,0]])}
+// (applied in the outline touch-ups block, after every derived ship has copied the plain hull)
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
 FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
@@ -468,7 +468,8 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  for(const k in SHIPS){const d=SHIPS[k],b=k.replace(/[0-9]+[a-z]?$/,'')in SHIPS?k.replace(/[0-9]+[a-z]?$/,''):k;
    if(done.has(d.shape)){const v=done.get(d.shape);d.shape=v.shape;d.lines=v.lines;d.dots=v.dots;continue}
    const s0=d.shape;if(!s0)continue;
-   if(b==='chemff'){add(d,rect(-23,-4,5,10.5));sx(d,.8)}   // Nov 23 (David): small Chemantar ships were too long — 80% length
+   if(b==='earthling'){add(d,[[[28,-8],[28,8],[-16,8],[-16,-8]]]);d.dots=d.dots.concat([[24,0]])}   // Nov 23 (David): superheavy torpedo slung under the nose
+   else if(b==='chemff'){add(d,rect(-23,-4,5,10.5));sx(d,.8)}   // Nov 23 (David): small Chemantar ships were too long — 80% length
    else if(b==='chemdd'){add(d,rect(-29,-5,5,10.5));sx(d,.8)}
    else if(b==='chemart')sx(d,1.3);
    else if(b==='chemdbl')sx(d,1.3);
