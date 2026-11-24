@@ -352,6 +352,7 @@ SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan He
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
 // Nov 22 (David): Golthan Destroyer — the Heavy Cruiser's outline at 75%. 4 Small Lasers (2 360°, 1 LS, 1 RS), 2 Small Coilguns (spinal), 4 missiles. PD 1 FX + 1 360° (standard destroyer; Claude's pick). Destroyer class durability/reactor; Run Dark like the Heavy Cruiser.
 SHIPS.golthandd={...SHIPS.golthan,cls:'Destroyer',weight:60,name:'Golthan Destroyer',short:'Golthan DD',hull:64,shield:28,reactor:22,genCost:5,genRegen:2,big:false,
+    shape:SHIPS.golthan.shape.map(p=>[...p]),lines:SHIPS.golthan.lines.map(l=>[...l]),dots:SHIPS.golthan.dots.map(p=>[...p]),   // Nov 24: its own copy — sharing the cruiser's outline object made the 75% shrink below get skipped
     weapons:[['SL','ALL'],['SL','ALL'],['SL','LS'],['SL','RS'],...rep(2,['SC','S']),...rep(4,['MS','ALL'])],pd:['FX','ALL']};
 // Nov 24 (David): Golthan Frigate — the egg with fins swept back (Nov 22 sketch), front of the egg flattened too, vertical fin. 4 Small Lasers (2 360°, 1 RS, 1 LS), 4 missiles, no coilguns (as given). Frigate-class hull/reactor (Claude's pick, as the Earthling Frigate); PD 1 FX + 1 360°; Run Dark like the other Golthan.
 SHIPS.golthanff={...SHIPS.golthan,cls:'Frigate',weight:55,name:'Golthan Frigate',short:'Golthan FF',hull:55,shield:24,reactor:20,genCost:5,genRegen:2,big:false,frigate:true,
@@ -487,7 +488,8 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
    else if(b==='golthanff')add(d,[[[-3,-.9],[-3,.9],[-25.8,.9],[-25.8,-.9]]]);   // Nov 24 (David): Golthan Frigate vertical fin — centreline strip from mid-egg back past the stern, its end flush with the side fins' rearmost corners
    else if(b==='chemart')sx(d,1.3);
    else if(b==='chemdbl')sx(d,1.3);
-   else if(b==='golthan'||b==='golthandd'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]]);if(b==='golthandd'){d.shape=d.shape.map(p=>p&&[p[0]*.75,p[1]*.75]);d.lines=d.lines.map(l=>l.map(v=>v*.75));d.dots=d.dots.map(p=>[p[0]*.75,p[1]*.75])}}
+   else if(b==='golthan'||b==='golthandd'){d.shape=d.shape.map(p=>p&&[(p[0]<-20?-42:p[0])+5,p[1]]);d.lines=d.lines.map(l=>[(l[0]<-20?-40:l[0])+5,l[1],l[2]+5,l[3]]);d.dots=d.dots.map(p=>[(p[0]<-11?-26:p[0])+5,p[1]]);if(b==='golthandd'){d.shape=d.shape.filter(p=>!p||Math.abs(p[0]+5.8)>.05).map(p=>p&&p[0]>-5.5?[p[0],p[1]*.78]:p);d.dots=d.dots.map(p=>p[0]>-5.5?[p[0],p[1]*.78]:p);   /* Nov 24 (David): slim egg — the destroyer's bow egg 22% narrower, stern unchanged */
+     d.shape=d.shape.map(p=>p&&[p[0]*.75,p[1]*.75]);d.lines=d.lines.map(l=>l.map(v=>v*.75));d.dots=d.dots.map(p=>[p[0]*.75,p[1]*.75])}}
    {const VF={condor:[.34],albatross:[.34],peregrine:[.34],mdestroyer:[.34],earlyff:[.34],earlyffl:[.34],earlyca:[.34],chemart:[.24,0,1],chemcru:[.24,0,1],chemdbl:[.24,[-21,21],1]};   /* Nov 23 (David): vertical (dorsal/ventral) wings seen edge-on — a thin strip on the centreline over the rear of the hull, no further back than the stern */
     if(VF[b]){const pts=d.shape.filter(Boolean),xs=pts.map(p=>p[0]),x0=Math.min(...xs),L=Math.max(...xs)-x0,w=Math.max(.9,L*.02),cys=VF[b][1]||[0],xa=x0+L*VF[b][0],small=VF[b][2];
       for(const cy of cys){const ys=pts.filter(p=>Math.abs(p[1]-cy)<w*2).map(p=>p[0]),xr=x0+.6;
