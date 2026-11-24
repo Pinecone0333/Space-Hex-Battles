@@ -559,8 +559,9 @@ const dcOpen=s=>(s.damaged||[]).filter(x=>x.k!=='rea'&&!(s.dc||[]).some(j=>j.box
 const dcAvail=s=>!s.dead&&!s.ai&&!s.aiDC&&own(s)&&dcFree(s)>0&&dcOpen(s)>0;
 function boxName(s,x){return x.k==='w'?`${s.weapons[x.i].T.name} (${s.weapons[x.i].arc})`:x.k==='pd'?`PD (${s.pd[x.i].arc})`:x.k==='eng'?'Main engine':x.k==='thrF'?'Fore thrusters':x.k==='thrP'?'Port thrusters':x.k==='thrS'?'Starboard thrusters':x.k==='sen'?'Sensors':'Reactor'}
 const boxShort=(s,x)=>x.k==='w'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].arc}`:x.k==='pd'?`PD ${s.pd[x.i].arc==='ALL'?'360':s.pd[x.i].arc}`:{eng:'Engine',thrF:'Fore thr',thrP:'Port thr',thrS:'Stbd thr',sen:'Sensors',rea:'Reactor'}[x.k];
-// ---- sensors: scan an enemy's weapons within range (10 hexes, −2 per sensor hit); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
-const sensRange=s=>Math.max(0,Math.round(10-10*(s.dmgSen||0)/(s.senN0||5)));
+// ---- sensors: scan an enemy's weapons within range (18 hexes since Nov 24; each of the 5 sensor hits takes off a fifth); with no sensors left you can't read enemy shields or hull either. Your fleet shares what it sees. ----
+const SENS_R=18;   // Nov 24 (David): sensor range 18 hexes (was 10); each sensor hit still takes off an equal share
+const sensRange=s=>Math.max(0,Math.round(SENS_R-SENS_R*(s.dmgSen||0)/(s.senN0||5)));
 /* Nov 21 (David): Golthan Run Dark. Costs the full generator drain again, needs the generator at 100% and shields up. Cuts direct-fire hit chance by 30% (Nov 22; was halved) from attackers within 60 deg of the bow. Firing breaks it for the next 4 impulses. */
 const darkBroken=s=>s.darkFiredT!=null&&T>s.darkFiredT&&T<=s.darkFiredT+4;
 const darkOn=s=>!!(s.dark&&s.d.runDark&&!s.dead&&genLvl(s)>=1-1e-9&&s.shield+reinfAmt(s)>0&&!darkBroken(s));
@@ -1550,7 +1551,8 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
     if(it.t==='w'){const w=s.weapons[it.i],K=w.T.kind,box=(s.damaged||[]).find(b=>b.k==='w'&&b.i===it.i),job=box&&dgJob(s,box);
       const bears=w.alive&&t&&inArc(s,w.arc,t),armed=own&&s.fireSel&&s.fireSel.has('w'+it.i);
       let fill='#1a2230',stroke='#55606e',dash='',frac=0,lab=w.T.ab,col='#c9d3de';
-      if(!w.alive){fill='#2a0d0d';stroke='#ff4d4d';lab=job?'🔧':'✕';col=job?'#9fd0ff':'#ff6b6b';tip=`${w.T.name} (${w.arc}) — DESTROYED${own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''}`}
+      if(!w.alive){fill='url(#dmgH)';stroke='#9aa4ae';dash='2 1.5';lab=job?'🔧':'✕';col=job?'#9fd0ff':'#e4e8ec';   /* Nov 24 (David): damage shown as grey hatched wreckage — red now means an enemy weapon is ready */
+        tip=`${w.T.name} (${w.arc}) — DESTROYED${own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''}`}
       else if(!seeW){fill='#1a2230';stroke='#3a4452';lab='?';tip=`${w.T.name} (${w.arc}) — not scanned`}
       else{const N=K==='ap'?AP_IMP:K==='torp'?IMP:cycleImp(s,w);
         if(K==='torp'){frac=w.stages/3;const hot=w.stages>=3;fill=hot?'#173d22':w.stages?'#2e2410':'#1a2230';stroke=w.charging?'#ffc04d':hot?'#4cff7a':w.stages?'#ffc04d':'#55606e';dash=w.charging?'3 2':'';
@@ -1568,22 +1570,23 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
       if(own&&t&&w.alive&&dgMode==='fire'&&canFireMount(s,'w'+it.i,t))body+=`<text y="${it.r<8?it.r+7:15}" font-size="6.5" font-family="monospace" text-anchor="middle" fill="${armed?'#fff':'#ffd24d'}">${sixths(hitP(s,'w'+it.i,t))}</text>`;
       if(armed)ring=it.r<8?`<rect x="${-it.r-2.5}" y="${-it.r-2.5}" width="${2*it.r+5}" height="${2*it.r+5}" rx="2" fill="none" stroke="#fff" stroke-width="1.4"/>`:`<rect x="${-Math.max(24,lab.length*5.2+6)/2-2.5}" y="-9" width="${Math.max(24,lab.length*5.2+6)+5}" height="18" rx="4" fill="none" stroke="#fff" stroke-width="1.6"/>`}
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
-      const shots=p.alive&&seeW?p.shots:0;const foe=!fr(s),fill=!p.alive?'#2a0d0d':!seeW?'#1a2230':shots?(foe?'#3d1416':'#173d22'):p.pending.length?'#2e2410':'#1a2230',stroke=!p.alive?'#ff4d4d':!seeW?'#3a4452':shots?(foe?'#ff4d4d':'#4cff7a'):p.pending.length?'#ffc04d':'#55606e';
-      body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?'#ff6b6b':shots?(foe?'#ffd0d0':'#c8ffd8'):'#c9d3de'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;if(foe&&shots&&p.alive)body=`<g class="hotglow">${body}</g>`;
+      const shots=p.alive&&seeW?p.shots:0;const foe=!fr(s),fill=!p.alive?'url(#dmgH)':!seeW?'#1a2230':shots?(foe?'#3d1416':'#173d22'):p.pending.length?'#2e2410':'#1a2230',stroke=!p.alive?'#9aa4ae':!seeW?'#3a4452':shots?(foe?'#ff4d4d':'#4cff7a'):p.pending.length?'#ffc04d':'#55606e';
+      body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?'#e4e8ec':shots?(foe?'#ffd0d0':'#c8ffd8'):'#c9d3de'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;if(foe&&shots&&p.alive)body=`<g class="hotglow">${body}</g>`;
       tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
       if(own&&s.fireSel&&s.fireSel.has('pd'+it.i))ring=`<circle r="${it.r+2.5}" fill="none" stroke="#fff" stroke-width="1.3"/>`;
       if(own&&sd)act=`pdclick:${it.i}`}
     else{const k=it.k,n=sysDmg(s,k),mx=k==='sen'?(s.senN0||5):k==='rea'?REA_N(s):SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
-      const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n?'#ff4d4d':'#4cff7a';
+      const vis=own||seeW;const bad=vis&&n>0,col=!vis?'#55606e':n?'#e4e8ec':'#4cff7a';
       const short={eng:'ENG',thrF:'FT',thrP:'PT',thrS:'ST',rea:'R',sen:'S'}[k];
       const val=k==='rea'?`${reaPct(s)}%`:k==='sen'?`${sensRange(s)}`:'●'.repeat(mx-n)+'○'.repeat(n);
-      body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="#10161f" stroke="${jobs&&own?'#5ab0ff':col}" stroke-width="1"/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
+      body=`<rect x="${-it.r-4}" y="-6" width="${2*it.r+8}" height="12" rx="2" fill="${bad?'url(#dmgH)':'#10161f'}" stroke="${jobs&&own?'#5ab0ff':bad?'#9aa4ae':col}" stroke-width="1" ${bad?'stroke-dasharray="2 1.5"':''}/><text y="3" font-size="${k==='rea'||k==='sen'?7.5:6.5}" font-family="monospace" text-anchor="middle" fill="${col}">${short}${vis&&(k==='rea'||k==='sen')?' '+val:''}${vis&&!(k==='rea'||k==='sen')&&n?' '+n:''}${jobs?'🔧':''}</text>`;
       tip=`${SYSN[k]} — ${!vis?'not scanned':k==='rea'?`output ${reaPct(s)}% (${n}/${REA_N(s)} hits)`:k==='sen'?`scan range ${sensRange(s)} hexes (${n}/${s.senN0||5} hits)`:`${n}/3 hits${n?` (+${Math.min(n,2)*50}%${n>=3?', out':''})`:''}`}${own&&n?(jobs?` · ${jobs} repair team${jobs>1?'s':''} working (click to recall)`:' · click to send a damage-control team'):''}`;
       if(own&&sd&&n&&dgMode==='repair')act=`sysclick:${k}`}
     if(own&&sd)tip+=dgMode==='fire'?(it.t==='sys'?'':' · [Fire mode: click to arm/disarm if it can fire, otherwise load/pause/resume]'):' · [Repair mode: click a damaged system to send or recall a team]';
     g+=`<g transform="translate(${it.x.toFixed(1)},${it.y.toFixed(1)})" ${act?`data-act="${act}" style="cursor:pointer"`:''}><title>${tip}</title>${ring}${body}</g>`}
   const note=!own&&!seeW?`<text x="${DG.W/2}" y="${DG.H-4}" font-size="9" text-anchor="middle" fill="#7a8796">weapons not scanned</text>`:'';
-  return `<svg class="dgm ${own&&sd?'m-'+dgMode:''}" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${g}${note}</svg>`}
+  const defs=`<defs><pattern id="dmgH" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="4" height="4" fill="#1b1f24"/><rect width="1.6" height="4" fill="#4a525b"/></pattern></defs>`;
+  return `<svg class="dgm ${own&&sd?'m-'+dgMode:''}" width="${DG.W}" height="${DG.H}" viewBox="0 0 ${DG.W} ${DG.H}">${defs}${g}${note}</svg>`}
 // smart clicks on your own diagram (no firing — that stays on the Fire buttons)
 function dcToggle(s,box){const job=(s.dc||[]).find(j=>j.box===box);if(job)return queue(s,{type:'dccancel',id:box.id,cost:0});
   const qi=s.queue.findIndex(q=>q.type==='dc'&&q.id===box.id);if(qi>=0){s.queue.splice(qi,1);return true}
