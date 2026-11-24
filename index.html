@@ -275,10 +275,12 @@ SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthl
 SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Destroyer',short:'Earthling DD',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:64,shield:28,big:false,reactor:22,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[27,0],[-13.5,10.5],[-21,19.5],[-26.2,19.5],[-21.8,7.5],[-21.8,-7.5],[-26.2,-19.5],[-21,-19.5],[-13.5,-10.5]],lines:[[-21.8,0,22.5,0],[-15,-4.5,7.5,-2.2],[-15,4.5,7.5,2.2]],dots:[[10.5,-3.8],[10.5,3.8],[-10.5,-6.8],[-10.5,6.8]],
     weapons:[['MT','S'],['MC','S'],['SL','RX'],['SL','RX'],['SL','LX'],['SL','LX'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};   // Nov 18: heavy cruiser loadout downsized; Nov 23 (David): lasers down to Small like every other destroyer
-// Nov 23 (David): Earthling Light Cruiser — heavy torpedo, medium coilgun, 4 medium lasers on the heavy cruiser's arcs, 6 missiles. Light-cruiser class; PD 2 FX + 1 360° (Claude's pick). Outline: the Earthling hull at 85%.
+// Nov 23 (David): Earthling Light Cruiser — heavy torpedo, medium coilgun, 4 medium lasers on the heavy cruiser's arcs, 6 missiles. Light-cruiser class; PD 2 FX + 1 360° (Claude's pick). Outline: the original Earthling sprite (the Heavy Cruiser was widened).
 SHIPS.earthcl={faction:'Earthling',cls:'Light Cruiser',weight:78,name:'Earthling Light Cruiser',short:'Earthling CL',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:90,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,doctrine:'alpha',
-    shape:SHIPS.earthling.shape.map(p=>[p[0]*.85,p[1]*.85]),lines:SHIPS.earthling.lines.map(l=>l.map(v=>v*.85)),dots:SHIPS.earthling.dots.map(p=>[p[0]*.85,p[1]*.85]),
+    shape:SHIPS.earthling.shape.map(p=>[...p]),lines:SHIPS.earthling.lines.map(l=>[...l]),dots:SHIPS.earthling.dots.map(p=>[...p]),   // Nov 23 (David): the existing Earthling sprite
     weapons:[['HT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
+// Nov 23 (David): the Earthling Heavy Cruiser becomes a "fat boi" — same length, 40% wider
+{const E=SHIPS.earthling,k=1.4;E.shape=E.shape.map(p=>[p[0],p[1]*k]);E.lines=E.lines.map(l=>[l[0],l[1]*k,l[2],l[3]*k]);E.dots=E.dots.map(p=>[p[0],p[1]*k])}
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
 FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
