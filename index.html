@@ -367,9 +367,11 @@ FACTIONS.Billyon={color:'#d4d9e0',blurb:'Sleek, agile boomerang hulls, all-round
 SHIPS.billcl={faction:'Billyon',cls:'Light Cruiser',weight:78,name:'Billyon Light Cruiser',short:'Billyon CL',color:'#d4d9e0',laser:'#ff8c1a',torp:'#ffa94d',agile:true,hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,doctrine:'hunt',
     shape:[[-8.0,-30.0],[-1.1,-25.7],[4.7,-21.4],[9.5,-17.1],[13.2,-12.9],[15.9,-8.6],[17.5,-4.3],[18.0,0.0],[17.5,4.3],[15.9,8.6],[13.2,12.9],[9.5,17.1],[4.7,21.4],[-1.1,25.7],[-8.0,30.0],[-15.4,27.9],[-10.9,23.9],[-7.1,19.9],[-4.0,15.9],[-1.6,12.0],[0.1,8.0],[1.2,4.0],[1.5,0.0],[1.2,-4.0],[0.1,-8.0],[-1.6,-12.0],[-4.0,-15.9],[-7.1,-19.9],[-10.9,-23.9],[-15.4,-27.9]],lines:[],dots:[[12.5,0]],
     weapons:[...rep(4,['ML','ALL']),['ST','S'],['ST','S'],...rep(4,['SPM','ALL'])],pd:['FX','FX','ALL']};
+/* Nov 23 (David): a TL4 ship automatically gets a TL3 version; any other tech level only when David says so. TL2 versions exist for these ships only: */
+const TL2_SHIPS=['albatross','peregrine','earthling','earthdd'];
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
   SHIPS[k+'3']={...d,tl:3,name:d.name+' (TL3)',short:d.short+' III',shield:0,noShield:true,reactor:r3,weight:d.weight-.1};
-  if(d.faction==='Martian'||d.faction==='Earthling')SHIPS[k+'2']=   /* Nov 21 (David): Earthlings get TL2 too */{...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
+  if(TL2_SHIPS.includes(k))SHIPS[k+'2']=   /* Nov 21 (David): Earthlings get TL2 too */{...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
     weapons:d.weapons.map(([w,a])=>[WT[w+'2']?w+'2':w,a])}}
 
 delete SHIPS.condor2;   /* Nov 22 (David): the Condor does not exist below TL3 */
