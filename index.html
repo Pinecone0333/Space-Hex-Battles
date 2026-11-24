@@ -468,7 +468,7 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
  for(const k in SHIPS){const d=SHIPS[k],b=k.replace(/[0-9]+[a-z]?$/,'')in SHIPS?k.replace(/[0-9]+[a-z]?$/,''):k;
    if(done.has(d.shape)){const v=done.get(d.shape);d.shape=v.shape;d.lines=v.lines;d.dots=v.dots;continue}
    const s0=d.shape;if(!s0)continue;
-   if(b==='earthling'){add(d,[[[28,-8],[28,8],[-16,8],[-16,-8]]]);d.dots=d.dots.concat([[24,0]])}   // Nov 23 (David): superheavy torpedo slung under the nose
+   if(b==='earthling'){d.shape=[[36.0,0.0],[18.0,12.0],[-18.0,18.0],[-28.0,30.0],[-35.0,30.0],[-29.0,12.0],[-29.0,-12.0],[-35.0,-30.0],[-28.0,-30.0],[-18.0,-18.0],[18.0,-12.0]];add(d,[[[31.0,-6.5],[26.2,-6.5],[31.0,-3.3]],[[31.0,6.5],[31.0,3.3],[26.2,6.5]]])}   // Nov 23 (David): fatter pentagonal hull (wider than the Light Cruiser); the superheavy torpedo slung under the nose shows only where it peeks out past the bow
    else if(b==='chemff'){add(d,rect(-23,-4,5,10.5));sx(d,.8)}   // Nov 23 (David): small Chemantar ships were too long — 80% length
    else if(b==='chemdd'){add(d,rect(-29,-5,5,10.5));sx(d,.8)}
    else if(b==='chemart')sx(d,1.3);
