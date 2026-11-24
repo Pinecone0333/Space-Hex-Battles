@@ -197,6 +197,7 @@ const WT={
   ST:{name:'Small Energy Torpedo',ab:'ET(s)',grp:'torps',kind:'torp',acc:'torp',perTurn:3},
   MT:{name:'Medium Energy Torpedo',ab:'ET(m)',grp:'torps',kind:'torp',acc:'torp',perTurn:4},
   HT:{name:'Heavy Energy Torpedo',ab:'ET(h)',grp:'torps',kind:'torp',acc:'torp',perTurn:5},
+  XT:{name:'Superheavy Energy Torpedo',ab:'ET(sh)',grp:'torps',kind:'torp',acc:'torp',perTurn:6},   // Nov 23 (David): next step up — 6 per turn, full 36
   // Plasma Lance (Nov 17, David): loads like lasers (ready one turn after paying), holds free, torpedo accuracy; damage falls off with range (index = hexes, 13+ uses the last entry)
   SPL:{name:'Small Plasma Lance',ab:'PL(s)',grp:'lances',kind:'lance',acc:'torp',cost:9,dmgR:[36,36,31,31,24,24,17,17,12,12,7,7,7,3]},
   MPL:{name:'Medium Plasma Lance',ab:'PL(m)',grp:'lances',kind:'lance',acc:'torp',cost:12,dmgR:[48,48,40,40,32,32,24,24,16,16,8,8,8,3]},
@@ -213,7 +214,7 @@ for(const k in WT)if(WT[k].dmgR){const o=WT[k].dmgR;WT[k].dmgR=Array.from({lengt
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: the shorter-ranged targeting computer (damage reduction removed Nov 22)
 /* Nov 22 (David): NO damage reduction at lower tech levels — TL4 is the baseline; TL1/TL2 weapons differ only in their shorter targeting computers */
-for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
+for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','XT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
 // TL1 weapons (Nov 19, David): the TL1 targeting computer (2/3 damage removed Nov 22); the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'RG(s)',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
@@ -270,10 +271,14 @@ FACTIONS.Earthling={color:'#3d8bff',blurb:'Balanced: torpedo, coilgun, lasers an
 SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthling Heavy Cruiser',short:'Earthling',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,big:true,doctrine:'alpha',
     shape:[[36,0],[-18,14],[-28,26],[-35,26],[-29,10],[-29,-10],[-35,-26],[-28,-26],[-18,-14]],
     lines:[[-29,0,30,0],[-20,-6,10,-3],[-20,6,10,3]],dots:[[14,-5],[14,5],[-14,-9],[-14,9]],
-    weapons:[['HT','S'],['HC','S'],['HL','RX'],['HL','RX'],['HL','LX'],['HL','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
+    weapons:[['XT','S'],['HC','S'],['HL','RX'],['HL','RX'],['HL','LX'],['HL','LX'],...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};   // Nov 23 (David): superheavy torpedo, 8 missiles
 SHIPS.earthdd={faction:'Earthling',cls:'Destroyer',weight:60,name:'Earthling Destroyer',short:'Earthling DD',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:64,shield:28,big:false,reactor:22,genCost:5,genRegen:2,doctrine:'alpha',
     shape:[[27,0],[-13.5,10.5],[-21,19.5],[-26.2,19.5],[-21.8,7.5],[-21.8,-7.5],[-26.2,-19.5],[-21,-19.5],[-13.5,-10.5]],lines:[[-21.8,0,22.5,0],[-15,-4.5,7.5,-2.2],[-15,4.5,7.5,2.2]],dots:[[10.5,-3.8],[10.5,3.8],[-10.5,-6.8],[-10.5,6.8]],
-    weapons:[['MT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};   // Nov 18: heavy cruiser loadout downsized to medium, one fewer FX PD, 4 missiles
+    weapons:[['MT','S'],['MC','S'],['SL','RX'],['SL','RX'],['SL','LX'],['SL','LX'],...rep(4,['MS','ALL'])],pd:['FX','ALL']};   // Nov 18: heavy cruiser loadout downsized; Nov 23 (David): lasers down to Small like every other destroyer
+// Nov 23 (David): Earthling Light Cruiser — heavy torpedo, medium coilgun, 4 medium lasers on the heavy cruiser's arcs, 6 missiles. Light-cruiser class; PD 2 FX + 1 360° (Claude's pick). Outline: the Earthling hull at 85%.
+SHIPS.earthcl={faction:'Earthling',cls:'Light Cruiser',weight:78,name:'Earthling Light Cruiser',short:'Earthling CL',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:90,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,doctrine:'alpha',
+    shape:SHIPS.earthling.shape.map(p=>[p[0]*.85,p[1]*.85]),lines:SHIPS.earthling.lines.map(l=>l.map(v=>v*.85)),dots:SHIPS.earthling.dots.map(p=>[p[0]*.85,p[1]*.85]),
+    weapons:[['HT','S'],['MC','S'],['ML','RX'],['ML','RX'],['ML','LX'],['ML','LX'],...rep(6,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
 FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
