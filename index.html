@@ -535,8 +535,8 @@ for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
    /* Nov 24 (David): ships of the same class should be roughly the same size on the map. Measured every outline's footprint by class and scaled the outliers toward
       their class (target: within about ±20% of the class median footprint): the Blokai (all four were far too small), the Hunibler and Hunifer Cruisers, Si'gian
       Light Cruiser, Earthling Destroyer and Frigate (small), and the oversized Martian Destroyer, Peregrine and Golthan Frigate. Left alone on purpose: the Billyon
-      Light Cruiser (David: smaller than a normal light-cruiser hull) and the small Chemantar ships (David shortened them to 80% on Nov 23). */
-   {const SZ={blokai:1.22,blokaicl:1.2,blokaidd:1.32,blokaiff:1.38,hunold:1.1,hunifer:1.1,sigcl:1.1,earthdd:1.1,earthff:1.12,mdestroyer:.78,peregrine:.8,golthanff:.8},z=SZ[b];
+      Light Cruiser (David: smaller than a normal light-cruiser hull). The small Chemantar ships keep their shorter proportions but are scaled up to other races' size (David). */
+   {const SZ={blokai:1.22,blokaicl:1.2,blokaidd:1.32,blokaiff:1.38,hunold:1.1,hunifer:1.1,sigcl:1.1,earthdd:1.1,earthff:1.12,mdestroyer:.78,peregrine:.8,golthanff:.8,chemdd:1.14,chemff:1.12},z=SZ[b];
     if(z){const sp=q=>q&&[q[0]*z,q[1]*z];d.shape=d.shape.map(sp);if(d.lines)d.lines=d.lines.map(l=>l.map(v=>v*z));if(d.dots)d.dots=d.dots.map(sp);if(d.inner)d.inner=d.inner.map(sp)}}
    d.shape=orient(d.shape);done.set(s0,{shape:d.shape,lines:d.lines,dots:d.dots})}}
 /* Nov 21 (David): reactor boxes by size — small ships 10, medium (cruisers) 15, heavy cruisers 20, Dreadnought 30; each hit takes 1/n of output */
