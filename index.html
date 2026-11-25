@@ -486,7 +486,8 @@ const hexDist=(a,b)=>{const dq=a.q-b.q,dr=a.r-b.r;return (Math.abs(dq)+Math.abs(
 function hexRound(q,r){let x=q,z=r,y=-x-z;let rx=Math.round(x),ry=Math.round(y),rz=Math.round(z);const dx=Math.abs(rx-x),dy=Math.abs(ry-y),dz=Math.abs(rz-z);
   if(dx>dy&&dx>dz)rx=-ry-rz;else if(dy>dz)ry=-rx-rz;else rz=-rx-ry;return{q:rx,r:rz}}
 function pixToHex(x,y){const q=x/(HX*1.5);return hexRound(q,y/(HX*SQ3)-q/2)}
-function relBearing(s,t){const A=hp(s.q,s.r),B=hp(t.q,t.r);return norm(Math.atan2(B.y-A.y,B.x-A.x)-fAng(s.f))}
+function relBearing(s,t){const A=s.px||hp(s.q,s.r),B=t.px||hp(t.q,t.r);   /* Nov 25 (David's co-op bug): bearings use where ships actually are (the drawn position), not their rounded hex centres — at close range the rounding could swing a target out of a spinal arc it was visibly inside */
+  return norm(Math.atan2(B.y-A.y,B.x-A.x)-fAng(s.f))}
 function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[arc];if(hw>=180)return true;return Math.abs(norm(relBearing(s,t)-c*D2R))<=hw*D2R+1e-6}
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
