@@ -883,7 +883,8 @@ function commit(){
       sp:Array.from({length:n},(_,i)=>({a:Math.random()*Math.PI*2,v:.5+Math.random(),l:.4+Math.random()*.8,c:['#ffffff','#fff1a8','#ffd04d','#ff9a3c'][i%4],deb:i%5===0}))}}   // Nov 24 (David): coilguns use the railgun streak, in coilgun gold
     else if(sh.kind==='torp')f={type:'etorp',x1:A.x,y1:A.y,x2:tx,y2:ty,t:1.6,max:1.6,col:sh.s.d.torp,r:2.2+sh.dmg/14,snd:['torp',vol]};   // Nov 24 (David): energy torpedo — a fast ball of light with a trail, flash on arrival
     else if(sh.kind==='pd'&&sh.s.d.pdKind==='chain')f={type:'chain',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.6,max:.6,color:'#ffd27a',snd:['chain',vol]};
-    else if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:sh.dmg>8?3:2,snd:[sh.kind==='pd'?'pd':sh.dmg>8?'laserH':'laserM',vol]};
+    else if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:1.4,n:sh.kind==='pd'?1:sh.dmg>=12?4:sh.dmg>=8?3:sh.dmg>=6?2:1,   /* Nov 25 (David): no thick beams — small lasers fire from a one-barrel cannon, medium two, heavy three (Titan four) */
+      snd:[sh.kind==='pd'?'pd':sh.dmg>8?'laserH':'laserM',vol]};
     else if(sh.kind==='pcr'||sh.kind==='pcrh')f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.8,max:.8,col:'#ffd23a',r:4.5,snd:['rail',vol]};   // plasma-charged slug
     else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:sh.kind==='ap'?.6:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:sh.kind==='ap'?'#f2e8ff':'#ffe066',r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'||sh.kind==='ap'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
     f.d=d;fx.push(f);endT=Math.max(endT,d+f.max)});
@@ -1936,7 +1937,8 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
     if(f.type==='chain'){const k=1-f.t/f.max,x1=sx(f.x1),y1=sy(f.y1),X2=sx(f.x2),Y2=sy(f.y2);ctx.save();ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=4*dpr;   // chain gun: a stream of tracer rounds
       for(let i=0;i<7;i++){const u=k*1.6-i*.09;if(u<0||u>1)continue;ctx.globalAlpha=.9;ctx.beginPath();ctx.arc(x1+(X2-x1)*u,y1+(Y2-y1)*u,1.4*dpr,0,7);ctx.fill()}
       ctx.restore()}
-    if(f.type==='beam'){ctx.globalAlpha=a;ctx.strokeStyle=f.color;ctx.lineWidth=f.w*dpr;ctx.shadowColor=f.color;ctx.shadowBlur=10*dpr;ctx.beginPath();ctx.moveTo(sx(f.x1),sy(f.y1));ctx.lineTo(sx(f.x2),sy(f.y2));ctx.stroke();ctx.shadowBlur=0}
+    if(f.type==='beam'){ctx.globalAlpha=a;ctx.strokeStyle=f.color;ctx.lineWidth=f.w*dpr;ctx.shadowColor=f.color;ctx.shadowBlur=8*dpr;const X1=sx(f.x1),Y1=sy(f.y1),X2=sx(f.x2),Y2=sy(f.y2),L=Math.hypot(X2-X1,Y2-Y1)||1,nx=-(Y2-Y1)/L,ny=(X2-X1)/L,n=f.n||1,g=3.2*dpr*Math.max(1,cam.s*.6);
+      ctx.beginPath();for(let i=0;i<n;i++){const o=(i-(n-1)/2)*g;ctx.moveTo(X1+nx*o,Y1+ny*o);ctx.lineTo(X2+nx*o,Y2+ny*o)}ctx.stroke();ctx.shadowBlur=0}   // one thin beam per barrel, side by side
     else if(f.type==='bolt'){const k=1-a;const x=f.x1+(f.x2-f.x1)*k,y=f.y1+(f.y2-f.y1)*k;ctx.globalAlpha=1;ctx.fillStyle=f.col+'66';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*2.2*dpr,0,7);ctx.fill();ctx.fillStyle='#fffbe8';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*dpr,0,7);ctx.fill()}
     else if(f.type==='p'){ctx.globalAlpha=Math.min(1,f.t*2);ctx.fillStyle=f.color;ctx.fillRect(sx(f.x),sy(f.y),2*dpr,2*dpr)}
     else if(f.type==='ghost'){ctx.globalAlpha=1;drawMissile(f.x,f.y,f.h,f.col,f.ic)}
