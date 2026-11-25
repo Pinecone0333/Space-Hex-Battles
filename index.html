@@ -190,6 +190,7 @@ const WT={
   SL:{name:'Small Laser',ab:'LC(s)',grp:'lasers',kind:'beam',acc:'laser',dmg:4,cost:2},
   ML:{name:'Medium Laser',ab:'LC(m)',grp:'lasers',kind:'beam',acc:'laser',dmg:6,cost:3},
   HL:{name:'Heavy Laser',ab:'LC(h)',grp:'lasers',kind:'beam',acc:'laser',dmg:8,cost:4},
+  TIL:{name:'Titan Laser',ab:'LC(t)',grp:'lasers',kind:'beam',acc:'laser',dmg:12,cost:6},   // Nov 24 (David): for the Blokai Frigate — two steps past Heavy on the laser ladder (4/6/8/[10]/12)
   SC:{name:'Small Coilgun',ab:'CG(s)',grp:'coils',kind:'slug',acc:'coil',dmg:6,cost:3},
   MC:{name:'Medium Coilgun',ab:'CG(m)',grp:'coils',kind:'slug',acc:'coil',dmg:10,cost:5},
   HC:{name:'Heavy Coilgun',ab:'CG(h)',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
@@ -219,7 +220,7 @@ for(const k in WT)if(WT[k].dmgR){const o=WT[k].dmgR;WT[k].dmgR=Array.from({lengt
 const lanceDmg=(W,d)=>Math.round(W.dmgR[Math.min(Math.round(d),W.dmgR.length-1)]*(W.dmgMul||1));
 // tech level 2 weapons: the shorter-ranged targeting computer (damage reduction removed Nov 22)
 /* Nov 22 (David): NO damage reduction at lower tech levels — TL4 is the baseline; TL1/TL2 weapons differ only in their shorter targeting computers */
-for(const k of ['SL','ML','HL','SC','MC','HC','XC','TC','ST','MT','HT','XT','TT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
+for(const k of ['SL','ML','HL','TIL','SC','MC','HC','XC','TC','ST','MT','HT','XT','TT','SPL','MPL','HPL','SAP','MAP','HAP']){const b=WT[k];WT[k+'2']={...b,name:b.name+' (TL2)',acc:b.acc+'2',tl2:true}}
 // TL1 weapons (Nov 19, David): the TL1 targeting computer (2/3 damage removed Nov 22); the railgun turret is a TL1 design (3 dmg / 2 energy)
 WT.SC1={...WT.SC,name:'Small Coilgun (TL1)',acc:'coil1',tl1:true};
 WT.RG={name:'Small Railgun Turret',ab:'RG(s)',grp:'rails',kind:'slug',acc:'rail1',dmg:3,cost:2,fx:'rail',tl1:true};
@@ -450,6 +451,12 @@ SHIPS.blokaidd={faction:'Blokai',cls:'Destroyer',weight:60,name:'Blokai Destroye
     shape:[[4.6,-5.1],[2.5,-7.7],[-0.4,-9.8],[-3.9,-11.2],[-7.7,-11.9],[-11.6,-11.9],[-15.4,-10.9],[-18.7,-9.2],[-21.3,-6.9],[-23.1,-4.1],[-23.9,-1.0],[-23.1,4.1],[-21.3,6.9],[-18.7,9.2],[-15.4,10.9],[-11.6,11.9],[-7.7,11.9],[-3.9,11.2],[-0.4,9.8],[2.5,7.7],[4.6,5.1],[6.0,3.8],[6.0,3.6],[6.8,4.2],[8.0,4.9],[9.1,5.4],[10.1,5.7],[11.1,5.9],[12.1,5.9],[13.0,5.8],[13.9,5.5],[14.7,5.0],[15.5,4.4],[16.2,3.6],[16.9,2.7],[9.0,2.7],[9.0,0.9],[16.9,0.9],[16.9,-0.9],[9.0,-0.9],[9.0,-2.7],[16.9,-2.7],[16.2,-3.6],[15.5,-4.4],[14.7,-5.0],[13.9,-5.5],[13.0,-5.8],[12.1,-5.9],[11.1,-5.9],[10.1,-5.7],[9.1,-5.4],[8.0,-4.9],[6.8,-4.2],[6.0,-3.6],[6.0,-3.8]],
     lines:[[-22.5,0,4.5,0],[-18,-6.8,-3,-6.8],[-18,6.8,-3,6.8]],dots:[[.8,-6],[.8,6],[-9,-9.4],[-9,9.4]],
     pcr:true,weapons:[['MPL','S'],['MC','S'],['SL','FX'],['SL','FX'],['SL','RS'],['SL','LS']],pd:['FX','FX','ALL','ALL','ALL']};
+// Nov 24 (David): Blokai Frigate — the Destroyer with frigate durability (Blokai 1.5× shields) and a spine-mounted Titan Laser in place of the plasma lance; slightly smaller outline with a much narrower fork.
+SHIPS.blokaiff={faction:'Blokai',cls:'Frigate',weight:55,name:'Blokai Frigate',short:'Blokai FF',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:55,shield:36,big:false,frigate:true,tl:5,
+    reactor:25,genCost:5,genRegen:3,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,accShift:2,
+    shape:[[4.0,-4.4],[2.1,-6.7],[-0.3,-8.5],[-3.4,-9.8],[-6.7,-10.3],[-10.1,-10.3],[-13.3,-9.4],[-16.2,-8.0],[-18.5,-6.0],[-20.0,-3.6],[-20.7,-0.9],[-20.0,3.6],[-18.5,6.0],[-16.2,8.0],[-13.3,9.4],[-10.1,10.3],[-6.7,10.3],[-3.4,9.8],[-0.3,8.5],[2.1,6.7],[4.0,4.4],[5.2,3.2],[5.2,1.7],[5.9,2.0],[6.9,2.3],[7.9,2.6],[8.8,2.7],[9.6,2.8],[10.5,2.8],[11.3,2.8],[12.0,2.6],[12.7,2.4],[13.4,2.1],[14.0,1.7],[14.6,1.3],[7.8,1.3],[7.8,0.4],[14.6,0.4],[14.6,-0.4],[7.8,-0.4],[7.8,-1.3],[14.6,-1.3],[14.0,-1.7],[13.4,-2.1],[12.7,-2.4],[12.0,-2.6],[11.3,-2.8],[10.5,-2.8],[9.6,-2.8],[8.8,-2.7],[7.9,-2.6],[6.9,-2.3],[5.9,-2.0],[5.2,-1.7],[5.2,-3.2]],
+    lines:[[-19.5,0,3,0],[-15.6,-5.9,-2.6,-5.9],[-15.6,5.9,-2.6,5.9]],dots:[[.7,-5.2],[.7,5.2],[-7.8,-8.1],[-7.8,8.1]],
+    weapons:[['TIL','S'],['MC','S'],['SL','FX'],['SL','FX'],['SL','RS'],['SL','LS']],pd:['FX','ALL','ALL','ALL']};   // hull/shields/reactor at frigate level (shields 1.5×, reactor +5 like the DD); one PD fewer than the DD (Claude's picks)
 // ---- hex geometry (flat-top axial) ----
 const DIRS=[[0,-1],[1,-1],[1,0],[0,1],[-1,1],[-1,0]];
 const hp=(q,r)=>({x:HX*1.5*q,y:HX*SQ3*(r+q/2)});
