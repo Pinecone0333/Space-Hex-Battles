@@ -1937,7 +1937,7 @@ function drawMissile(x,y,h,col,ic,kind){const dpr=devicePixelRatio;const ms=Math
 /* Nov 24 (David): one jink left, one jink right, then it stops — replayed when the order is queued and again on the impulse it is carried out */
 function jinkP(s){const key=s.evadeT===T?'T'+T:'Q',now=performance.now()/1000;if(s.jinkKey!==key){s.jinkKey=key;s.jinkT0=now}return (now-s.jinkT0)/1.3}
 function drawJink(s,pos,ang){const p=Math.min(1,jinkP(s)),e=Math.sin(Math.PI*p),j=-Math.sin(2*Math.PI*p)*e*1.4,v=-Math.cos(2*Math.PI*p)*(p<.06||p>.94?0:1),nx=Math.cos(ang+Math.PI/2),ny=Math.sin(ang+Math.PI/2);
-  const P2={x:pos.x+nx*j*HX*.28,y:pos.y+ny*j*HX*.28},a2=ang+j*.1;drawShip(s,P2,a2,1);
+  const P2={x:pos.x+nx*j*HX*.28,y:pos.y+ny*j*HX*.28},a2=ang;drawShip(s,P2,a2,1);   /* no yaw — the hull slides sideways only (Nov 24, David) */
   const dpr=devicePixelRatio,sc=Math.max(cam.s*.75,.35*dpr),ys=s.d.shape.filter(Boolean),hw=Math.max(...ys.map(p=>Math.abs(p[1]))),xs=ys.map(p=>p[0]),x0=Math.min(...xs),x1=Math.max(...xs),side=v>0?-1:1,str=Math.min(1,Math.abs(v)*1.3);
   if(str<.15)return;ctx.save();ctx.translate(sx(P2.x),sy(P2.y));ctx.rotate(a2);ctx.scale(sc,sc);ctx.globalAlpha=.85*str;
   for(const fx_ of [x0+(x1-x0)*.25,x0+(x1-x0)*.7]){const L=(11+Math.random()*7)*str,y=side*(hw*.95);const g=ctx.createLinearGradient(fx_,y,fx_,y+side*L);g.addColorStop(0,'#ffffff');g.addColorStop(.4,'#9fd8ff');g.addColorStop(1,'#9fd8ff00');
