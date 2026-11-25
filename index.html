@@ -188,7 +188,7 @@ for(const k of ['laser','coil','torp','rail']){const fl=k==='laser'?.1:.05;
 const sixths=p=>Math.round(p*100)+'%';
 const TCR={laser:10,coil:6,torp:10,laser2:8,coil2:6,torp2:8,laser1:6,coil1:6,torp1:6,rail1:6};
 const accAt=(k,r)=>ACC[k][Math.min(Math.round(r),60)];
-const ARCS={RX:[30,90],LX:[-30,90],S:[0,15],F:[0,30],FX:[0,120],LS:[-90,90],RS:[90,90],FH:[0,90],RH:[180,90],ALL:[0,180]};
+const ARCS={RX:[30,90],LX:[-30,90],S:[0,15],F:[0,30],FX:[0,120],LS:[-90,90],RS:[90,90],FH:[0,90],RH:[180,90],ALL:[0,180],SR30:[15,30],SL30:[-15,30]};
 const WT={
   SL:{name:'Small Laser',ab:'LC(s)',grp:'lasers',kind:'beam',acc:'laser',dmg:4,cost:2},
   ML:{name:'Medium Laser',ab:'LC(m)',grp:'lasers',kind:'beam',acc:'laser',dmg:6,cost:3},
@@ -199,6 +199,7 @@ const WT={
   HC:{name:'Heavy Coilgun',ab:'CG(h)',grp:'coils',kind:'slug',acc:'coil',dmg:14,cost:7},
   XC:{name:'Superheavy Coilgun',ab:'CG(sh)',grp:'coils',kind:'slug',acc:'coil',dmg:18,cost:9},
   TC:{name:'Titan Coilgun',ab:'CG(t)',grp:'coils',kind:'slug',acc:'coil',dmg:22,cost:11},   // one more step: 22 dmg / 11 energy   // Nov 18: next step up the coilgun scale (+4 dmg, +2 energy)
+  LB:{name:'Medium Laser Battery Cannon',ab:'LB(m)',grp:'lasers',kind:'beam',acc:'laser',dmg:18,cost:0,mag:1,battery:true,reloadTurns:3,bar:2},   // Nov 25 (David): Baangzon disposable laser battery — fires like a powerful laser (hits like a fully loaded small energy torpedo) but draws nothing from the reactor; loaded like a missile. Magazine/reload: Claude's pick
   MS:{name:'Missile Launcher',ab:'MS',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:4},
   SPM:{name:'Splitter Missile Launcher',ab:'MS(sp)',grp:'missiles',kind:'missile',dmg:2,split:4,splitAt:10,cost:0,mag:4},   // Nov 23 (David): splits into 4 small missiles (2 dmg each) within 10 hexes of the target
   MR:{name:'Missile Rack',ab:'MR',grp:'missiles',kind:'missile',dmg:12,cost:0,mag:2,noReload:true},   /* Nov 22 (David): 2 missiles, fired like a launcher, never reloaded */
@@ -231,6 +232,7 @@ WT.MRG={name:'Medium Railgun Turret',ab:'RG(m)',grp:'rails',kind:'slug',acc:'rai
 WT.SL1={...WT.SL,name:'Small Laser (TL1)',acc:'laser1',tl1:true};
 WT.MC1={...WT.MC,name:'Medium Coilgun (TL1)',acc:'coil1',tl1:true};
 /* Nov 22 (David): every existing weapon is also available at TL4 — railgun turrets with the TL4 computer (coilgun table +5) */
+WT.SCT={...WT.SC,name:'Small Coilgun Turret',ab:'CG(s)T',acc:'rail'};   // Nov 25 (David): Baangzon 360° turret on top — turret accuracy (coilgun +5)
 WT.RG4={...WT.RG,name:'Small Railgun Turret (TL4)',acc:'rail',tl1:false};WT.MRG4={...WT.MRG,name:'Medium Railgun Turret (TL4)',acc:'rail',tl1:false};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
@@ -388,6 +390,13 @@ FACTIONS.Motoran={color:'#b98cff',blurb:'Lance cruisers with screwdriver bows, h
 SHIPS.motca={faction:'Motoran',cls:'Heavy Cruiser',weight:100,name:'Motoran Heavy Cruiser',short:'Motoran CA',color:'#b98cff',laser:'#7dff5a',torp:'#a6ff8a',hull:150,shield:50,big:true,reactor:42,genCost:10,genRegen:4,doctrine:'hunt',
     shape:[[-40.0,-32.0],[-26.0,-10.0],[-25.9,-10.0],[-26.0,-9.0],[-26.0,9.0],[-25.9,10.0],[-26.0,10.0],[-40.0,32.0],[-35.0,32.0],[-19.5,13.0],[0.0,13.0],[0.8,12.9],[1.9,12.5],[2.5,12.1],[3.1,11.6],[36.0,0.0],[3.1,-11.6],[2.5,-12.1],[1.9,-12.5],[0.8,-12.9],[0.0,-13.0],[-19.5,-13.0],[-35.0,-32.0],null,[-1,-2],[36,0],[-1,2],null,[-17,-5.7],[-17,-4.3],[-40,-4.3],[-40,-5.7],null,[-17,4.3],[-17,5.7],[-40,5.7],[-40,4.3]],lines:[[-2,-11,-2,11]],dots:[[-7,-8],[-7,8],[-12,0]],
     weapons:[['HPL','S'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(4,['MS','ALL'])],pd:['FX','FX','ALL']};
+// ---- Baangzon Pirates (Nov 25, David): Alpha Quadrant raiders. Grey hulls with overlapping plates toward the stern; fire light blue. Disposable laser batteries (loaded like missiles, no reactor draw) plus missiles. ----
+FACTIONS['Baangzon Pirates']={color:'#7d858f',blurb:'Raiders with disposable laser batteries, missiles and shingled grey hulls'};
+// Medium Raider (light cruiser): 2 Medium Laser Battery Cannons spinal+30° right, 2 spinal+30° left (18 dmg each), 4 missiles, a 360° small coilgun turret on top.
+// Hull/shields at standard light-cruiser level; reactor 24 (CL 28 less 4, since the batteries never draw power); PD 2 FX + 1 360° (Claude's picks).
+SHIPS.baangraid={faction:'Baangzon Pirates',cls:'Light Cruiser',weight:78,name:'Baangzon Medium Raider',short:'Baangzon Raider',color:'#7d858f',laser:'#7fd4ff',torp:'#a8e4ff',hull:90,shield:35,big:true,reactor:24,genCost:7.5,genRegen:3,doctrine:'hunt',
+    shape:[[24.2,0.0],[24.0,-1.7],[23.3,-3.4],[22.2,-5.1],[20.5,-6.8],[18.2,-8.3],[14.2,-10.0],[9.2,-11.4],[4.3,-12.4],[4.3,-13.2],[3.6,-13.3],[-2.8,-14.4],[-7.8,-15.1],[-7.8,-15.9],[-10.0,-16.2],[-17.1,-17.1],[-24.2,-17.5],[-24.2,17.5],[-17.1,17.1],[-10.0,16.2],[-7.8,15.9],[-7.8,15.1],[-2.8,14.4],[3.6,13.3],[4.3,13.2],[4.3,12.4],[9.2,11.4],[14.2,10.0],[18.2,8.3],[20.5,6.8],[22.2,5.1],[23.3,3.4],[24.0,1.7]],lines:[[4.3,-12.3,5.7,-11.1],[5.7,-11.1,7.0,-9.9],[7.0,-9.9,8.3,-8.6],[8.3,-8.6,9.5,-7.4],[9.5,-7.4,10.5,-6.2],[10.5,-6.2,11.4,-4.9],[11.4,-4.9,12.2,-3.7],[12.2,-3.7,12.8,-2.5],[12.8,-2.5,13.3,-1.2],[13.3,-1.2,13.5,0.0],[13.5,0.0,13.3,1.2],[13.3,1.2,12.8,2.5],[12.8,2.5,12.2,3.7],[12.2,3.7,11.4,4.9],[11.4,4.9,10.5,6.2],[10.5,6.2,9.5,7.4],[9.5,7.4,8.3,8.6],[8.3,8.6,7.0,9.9],[7.0,9.9,5.7,11.1],[5.7,11.1,4.3,12.3],[-7.8,-15.1,-6.0,-13.6],[-6.0,-13.6,-4.4,-12.1],[-4.4,-12.1,-2.8,-10.6],[-2.8,-10.6,-1.5,-9.0],[-1.5,-9.0,-0.2,-7.5],[-0.2,-7.5,0.9,-6.0],[0.9,-6.0,1.9,-4.6],[1.9,-4.6,2.7,-3.0],[2.7,-3.0,3.3,-1.5],[3.3,-1.5,3.6,0.0],[3.6,0.0,3.3,1.5],[3.3,1.5,2.7,3.0],[2.7,3.0,1.9,4.6],[1.9,4.6,0.9,6.0],[0.9,6.0,-0.2,7.5],[-0.2,7.5,-1.5,9.0],[-1.5,9.0,-2.8,10.6],[-2.8,10.6,-4.4,12.1],[-4.4,12.1,-6.0,13.6],[-6.0,13.6,-7.8,15.1],[-20.6,-17.2,-18.6,-15.5],[-18.6,-15.5,-16.6,-13.8],[-16.6,-13.8,-14.7,-12.1],[-14.7,-12.1,-13.1,-10.3],[-13.1,-10.3,-11.6,-8.6],[-11.6,-8.6,-10.2,-6.9],[-10.2,-6.9,-9.1,-5.2],[-9.1,-5.2,-8.1,-3.4],[-8.1,-3.4,-7.5,-1.7],[-7.5,-1.7,-7.1,0.0],[-7.1,0.0,-7.5,1.7],[-7.5,1.7,-8.1,3.4],[-8.1,3.4,-9.1,5.2],[-9.1,5.2,-10.2,6.9],[-10.2,6.9,-11.6,8.6],[-11.6,8.6,-13.1,10.3],[-13.1,10.3,-14.7,12.1],[-14.7,12.1,-16.6,13.8],[-16.6,13.8,-18.6,15.5],[-18.6,15.5,-20.6,17.2]],dots:[[-2,0]],
+    weapons:[['LB','SR30'],['LB','SR30'],['LB','SL30'],['LB','SL30'],['SCT','ALL'],...rep(4,['MS','ALL'])],pd:['FX','FX','ALL']};
 // ---- Si'gian (Nov 23, David): octagonal bulb, Hunibler-style neck, straight wings ending in gun pods. Silver (a bit darker than Blokai/Billyon). Sleek and agile. ----
 FACTIONS["Si'gian"]={color:'#8c949e',blurb:'Sleek, agile lance raiders: octagonal bulb, neck and gun-pod wings'};
 SHIPS.sigcl={faction:"Si'gian",cls:'Light Cruiser',weight:78,name:"Si'gian Light Cruiser",short:"Si'gian CL",color:'#8c949e',laser:'#ffd23f',torp:'#ffe680',hull:81,shield:35,big:true,reactor:28,genCost:7.5,genRegen:3,evade:.05,agile:true,doctrine:'hunt',
@@ -864,8 +873,8 @@ function commit(){
     if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true,split:w.T.split||0}));if(own(s))sfx('missile',.35);continue}
       s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg,split:w.T.split||0}));sfx('missile',fr(s)?1:.65);continue}
-    let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.paid=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else w.state='idle';
-    const tE=K==='torp'?+(dmg/2).toFixed(2):undefined;fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,fx:w.T.fx,dmg,tE,...shotRoll(s,key,t)})}};
+    let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.paid=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else if(w.T.battery){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='reloading';w.readyT=T+IMP*(w.T.reloadTurns||R.magReloadTurns);w.wasReload=true}}else w.state='idle';
+    const tE=K==='torp'?+(dmg/2).toFixed(2):undefined;fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,fx:w.T.fx,bar:w.T.bar,dmg,tE,...shotRoll(s,key,t)})}};
   for(const s of alive()){if(!s.mslLight)continue;s.mslLight=false;const t=tgt(s);if(!t)continue;let n=0;
     for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
     if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',fr(s)?1:.65);if(own(s))log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
@@ -883,7 +892,7 @@ function commit(){
       sp:Array.from({length:n},(_,i)=>({a:Math.random()*Math.PI*2,v:.5+Math.random(),l:.4+Math.random()*.8,c:['#ffffff','#fff1a8','#ffd04d','#ff9a3c'][i%4],deb:i%5===0}))}}   // Nov 24 (David): coilguns use the railgun streak, in coilgun gold
     else if(sh.kind==='torp')f={type:'etorp',x1:A.x,y1:A.y,x2:tx,y2:ty,t:1.6,max:1.6,col:sh.s.d.torp,r:2.2+sh.dmg/14,snd:['torp',vol]};   // Nov 24 (David): energy torpedo — a fast ball of light with a trail, flash on arrival
     else if(sh.kind==='pd'&&sh.s.d.pdKind==='chain')f={type:'chain',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.6,max:.6,color:'#ffd27a',snd:['chain',vol]};
-    else if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:sh.dmg>=12?4.5:1.4,n:sh.kind==='pd'?1:sh.dmg>=12?1:sh.dmg>=8?3:sh.dmg>=6?2:1,   /* Nov 25 (David): no thick beams — small lasers fire from a one-barrel cannon, medium two, heavy three; the Titan Laser is one BEEG beam */
+    else if(sh.kind==='beam'||sh.kind==='pd')f={type:'beam',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.9,max:.9,color:sh.kind==='pd'?'#e8f6ff':sh.s.d.laser,w:sh.kind==='pd'?1:sh.bar?1.4:sh.dmg>=12?4.5:1.4,n:sh.kind==='pd'?1:sh.bar?sh.bar:sh.dmg>=12?1:sh.dmg>=8?3:sh.dmg>=6?2:1,   /* Nov 25 (David): no thick beams — small lasers fire from a one-barrel cannon, medium two, heavy three; the Titan Laser is one BEEG beam */
       snd:[sh.kind==='pd'?'pd':sh.dmg>8?'laserH':'laserM',vol]};
     else if(sh.kind==='pcr'||sh.kind==='pcrh')f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.8,max:.8,col:'#ffd23a',r:4.5,snd:['rail',vol]};   // plasma-charged slug
     else{const dur=sh.kind==='torp'?1.2:sh.kind==='lance'?.7:sh.kind==='ap'?.6:.8;f={type:'bolt',x1:A.x,y1:A.y,x2:tx,y2:ty,t:dur,max:dur,col:sh.kind==='torp'?sh.s.d.torp:sh.kind==='lance'?sh.s.d.torp:sh.kind==='ap'?'#f2e8ff':'#ffe066',r:sh.kind==='torp'?3+sh.dmg/8:sh.kind==='lance'||sh.kind==='ap'?3+sh.dmg/10:2.5,snd:[sh.kind==='torp'?'torp':'rail',vol]}}
@@ -893,7 +902,7 @@ function commit(){
 // fire history (what each ship fired, and when) — weapon fire is visible at any range
 // Nov 20 (David): 'Weapon charging: over time' — lasers, coilguns, railguns and plasma lances drain their load cost evenly over their cycle (TL5 lasers: half a turn),
 // like torpedoes; if an impulse can't be paid, charging pauses and keeps its progress. PD, missiles, burns and reinforcement stay instant.
-const drains=w=>chargeMode==='time'&&(w.T.kind==='beam'||w.T.kind==='slug'||w.T.kind==='lance');
+const drains=w=>chargeMode==='time'&&!w.T.battery&&(w.T.kind==='beam'||w.T.kind==='slug'||w.T.kind==='lance');
 const cycleImp=(s,w)=>w.T.kind==='beam'&&(s.d.tl||4)>=5?IMP/2:IMP;   // Nov 18 (David): TL5 laser cannons cycle in 4 impulses
 function fireRec(s,ab,kind,dmg,t,n=1){const L=s.fireLog||(s.fireLog=[]);let e=L.find(x=>x.T===T&&x.ab===ab);if(!e){e={T,ab,kind,n:0,dmg:0,at:t.name};L.push(e);if(L.length>24)L.shift()}e.n+=n;e.dmg+=dmg}
 function fireHist(t){const L=t.fireLog||[];const seen=new Set(),out=[];for(let i=L.length-1;i>=0&&out.length<6;i--){const e=L[i];if(seen.has(e.ab))continue;seen.add(e.ab);out.push(e)}
@@ -1709,6 +1718,8 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
         else if(drains(w)){const N=cycleImp(s,w);st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+N-(w.paid||0))}">${w.paid||0}/${N}→${when(T+N-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${N}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this reload; progress is kept');
           if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,(w.state==='paused'?'Resume':'Load')+' '+pim(w.T.cost/N),true,`${w.T.cost} energy drained over ${N} impulses (${+(w.T.cost/N).toFixed(3)} per impulse); pauses if short`)}
+        else if(w.T.battery){st=w.state==='ready'?'<span class="good">READY</span>':w.state==='reloading'?`<span class="dim" title="fresh battery being loaded">new battery ${when(w.readyT)}</span>`:w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
+          if(sd&&canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,'Load',true,'Slot in a laser battery — no reactor power needed')}
         else{st=w.state==='ready'?'<span class="good">READY</span>':w.state==='cycling'?`<span class="dim">ready ${when(w.readyT)}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'start',i,cost:w.T.cost}))ctl+=btn('start:'+i,`Load ${w.T.cost}`,true)}
         if(sd&&w.alive&&t){const key='w'+i,lab='Fire '+sixths(hitP(s,key,t))+(K==='lance'?' · '+lanceDmg(w.T,d):K==='torp'?' · '+torpDmg(w):'');if(canFireMount(s,key,t))ctl+=fireBtn(s,key,lab,K==='lance'?`${lanceDmg(w.T,d)} damage at ${d} hexes`:'');else if(K!=='missile'&&(K==='torp'?torpStored(w)>0:w.state==='ready')&&!inArc(s,w.arc,t))ctl+=offBtn(key,lab)}
@@ -1999,7 +2010,7 @@ function shipSVG(d,W,H,col){const P=(d.shape||[]).filter(Boolean);let x0=1e9,x1=
   const lines=(d.lines||[]).map(l=>{const a=tp(l[0],l[1]),b=tp(l[2],l[3]);return `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${col}88" stroke-width="1"/>`}).join('');
   const dots=(d.dots||[]).map(q=>{const a=tp(q[0],q[1]);return `<circle cx="${a[0]}" cy="${a[1]}" r="${Math.max(1.5,2*sc)}" fill="none" stroke="${col}88"/>`}).join('');
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><path d="${path}" fill="#0c1622" stroke="${col}" stroke-width="1.6" style="filter:drop-shadow(0 0 4px ${col})" fill-rule="nonzero"/>${inner}${lines}${dots}</svg>`}
-const arcName=a=>a==='ALL'?'360°':a==='S'?'spinal':a;
+const arcName=a=>a==='ALL'?'360°':a==='S'?'spinal':a==='SR30'?'spinal+30° R':a==='SL30'?'spinal+30° L':a;
 function shipTipHTML(k){const d=SHIPS[k],fc=FACTIONS[d.faction].color,g={};
   for(const [wk,arc] of d.weapons){const w=WT[wk];if(w.kind==='missile')continue;(g[wk]=g[wk]||[]).push(arcName(arc))}
   const tl2=d.tl===2||d.tl===1;
