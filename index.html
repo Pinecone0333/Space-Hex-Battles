@@ -1913,10 +1913,10 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
       ctx.shadowBlur=0;ctx.strokeStyle='#ffffff';ctx.globalAlpha=fade*.9;ctx.lineWidth=Math.max(1,w*.28);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
       if(ext>=1){const r=w*(1.2+1.4*(1-fade));ctx.globalAlpha=fade*.8;ctx.fillStyle=f.color;ctx.beginPath();ctx.arc(x2,y2,r,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x2,y2,r*.4,0,7);ctx.fill()}
       ctx.restore()}
-    if(f.type==='rail'){const k=1-f.t/f.max,fl=Math.min(1,k/(f.chonk?.2:.3)),x1=sx(f.x1),y1=sy(f.y1),X2=sx(f.x2),Y2=sy(f.y2),hx=x1+(X2-x1)*fl,hy=y1+(Y2-y1)*fl,tl=.35,tx0=x1+(X2-x1)*Math.max(0,fl-tl),ty0=y1+(Y2-y1)*Math.max(0,fl-tl);   // streak crosses in the first 30%, then a fading trail and sparks
+    if(f.type==='rail'){const k=1-f.t/f.max,fl=Math.min(1,k/(f.chonk?.15:.3)),   /* coilgun: same streak and crossing speed as before (its effect just lasts longer for the impact burst) */
+      x1=sx(f.x1),y1=sy(f.y1),X2=sx(f.x2),Y2=sy(f.y2),hx=x1+(X2-x1)*fl,hy=y1+(Y2-y1)*fl,tl=.35,tx0=x1+(X2-x1)*Math.max(0,fl-tl),ty0=y1+(Y2-y1)*Math.max(0,fl-tl);   // streak crosses in the first 30%, then a fading trail and sparks
       ctx.save();ctx.globalAlpha=Math.max(0,1-k)*.35;ctx.strokeStyle=f.color;ctx.lineWidth=1*dpr;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(hx,hy);ctx.stroke();
-      if(fl<1&&f.chonk){ctx.globalAlpha=1;ctx.shadowColor=f.color;ctx.shadowBlur=10*dpr;ctx.strokeStyle=f.core;ctx.lineWidth=2.6*dpr;ctx.beginPath();ctx.moveTo(tx0,ty0);ctx.lineTo(hx,hy);ctx.stroke()}   /* Nov 25 (David): the railgun streak, just slightly heavier */
-      else if(fl<1){ctx.globalAlpha=1;ctx.shadowColor=f.color;ctx.shadowBlur=8*dpr;ctx.strokeStyle=f.core||'#ffffff';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(tx0,ty0);ctx.lineTo(hx,hy);ctx.stroke()}
+      if(fl<1){ctx.globalAlpha=1;ctx.shadowColor=f.color;ctx.shadowBlur=8*dpr;ctx.strokeStyle=f.core||'#ffffff';ctx.lineWidth=2*dpr;ctx.beginPath();ctx.moveTo(tx0,ty0);ctx.lineTo(hx,hy);ctx.stroke()}
       else if(f.chonk&&f.hit){const q=(k-.2)/.8,Z=Math.max(1,cam.s*.9)*dpr;   // impact: white flash, shock ring, sparks and debris flung outward
         if(q<.25){ctx.globalAlpha=1-q/.25;ctx.shadowColor=f.color;ctx.shadowBlur=24*dpr;ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(X2,Y2,(6+18*q)*Z,0,7);ctx.fill();ctx.shadowBlur=0}
         ctx.globalAlpha=Math.max(0,.7-q);ctx.strokeStyle=f.color;ctx.lineWidth=2*dpr;ctx.beginPath();ctx.arc(X2,Y2,(8+40*q)*Z,0,7);ctx.stroke();
