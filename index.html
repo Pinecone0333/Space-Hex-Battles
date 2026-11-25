@@ -108,9 +108,10 @@ table.cas{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}tabl
 .ctlpick{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9500;display:flex;align-items:center;justify-content:center}
 .ctlcard{background:#0d1621;border:2px solid #ffb84d;border-radius:12px;padding:18px;max-width:440px;display:flex;flex-direction:column;gap:10px}
 .ctlcard .btn{text-align:left;padding:10px 12px;white-space:normal;line-height:1.35}
-</style>
-
 #end{overflow-y:auto;align-items:flex-start;padding:12px 0}#end>.box{margin:auto}   /* Nov 24 (David): the end screen scrolls when the casualty list is long */
+
+.quadh{grid-column:1/-1;margin:10px 0 2px;padding-bottom:4px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#9fb0c2}.fp-g>.quadh:first-child{margin-top:0}   /* Nov 25: quadrant headings in the faction picker */
+</style>
 </head><body>
 <canvas id="c"></canvas>
 <div id="side"></div>
@@ -2009,9 +2010,9 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
       let x=r.right+8;if(x+W>innerWidth-6)x=r.left-W-8;if(x<6)x=Math.max(6,Math.min(innerWidth-W-6,r.left));let y=Math.min(innerHeight-H-6,Math.max(6,r.top-10));tip.style.left=x+'px';tip.style.top=y+'px'});
     el.addEventListener('mouseleave',()=>{tip.style.display='none'})})}
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
-  const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const sep=era!=='open'&&!facListed(f)&&(ix===0||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
+  const shownQ=new Set();const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const newQ=ix===0||facQuad(arr[ix-1][0])!==facQuad(f);const sep=era!=='open'&&!facListed(f)&&(newQ||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const qh=shownQ.has(facQuad(f))?'':(shownQ.add(facQuad(f)),`<div class="quadh">${facQuad(f)} Quadrant</div>`);const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=era==='open'||!facListed(f)?[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a):facTLs(f);
-    return sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${f}</b><span class="dim">${F.blurb}</span>
+    return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${f}</b><span class="dim">${F.blurb}</span>
       <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}${era!=='open'&&!facListed(f)?' · <i>not in this era</i>':''}</span></div></button>`}).join('');
   el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${slotLabel(t)==='You'?'your fleet':slotLabel(t)}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
@@ -2099,7 +2100,7 @@ function renderCoopLobby(){const C=COOPS[COOP],box=$('builder'),host=MP.role!=='
   $('forms').innerHTML=`<div style="flex-basis:100%;text-align:center;border:1px solid #5ad18c;border-radius:6px;padding:6px"><b style="color:#5ad18c">⚑ Scenario: ${C.name}</b> <span class="dim sm">${C.blurb}</span>${host?` <button class="btn" id="coopx" style="margin:0 0 0 6px">✕ Leave scenario</button>`:''}</div>`;
   const row=i=>{const S=SLOTS[i],ed=canEditSlot(i),f=fleetFaction[i],L=coopTL(f).sort((a,b)=>SHIPS[b].weight-SHIPS[a].weight),k=coopPick(i);
     return `<div class="fl" style="border-left:3px solid ${FACTIONS[f].color};gap:8px;align-items:center;flex-wrap:wrap"><b style="min-width:90px">${S.kind==='ai'?'🤖 '+(S.name||'AI ally'):pName(S.owner)}</b>
-      <select data-cfac="${i}" ${ed?'':'disabled'}>${facs.map(x=>`<option value="${x}" ${x===f?'selected':''}>${x}</option>`).join('')}</select>
+      <select data-cfac="${i}" ${ed?'':'disabled'}>${facSelectOpts(f)}</select>
       <select data-cship="${i}" ${ed?'':'disabled'} style="flex:1;min-width:180px">${L.map(x=>`<option value="${x}" ${x===k?'selected':''}>${SHIPS[x].name} · ${shipPts(x)} pts</option>`).join('')}</select>
       <span class="dim sm">reinforcements: ${SHIPS[coopFF(f)].short}</span>${S.kind==='ai'&&host?`<button class="btn" data-cdel="${i}" style="margin:0">✕</button>`:''}</div>`};
   const n=hs.length,W=C.waves(n);
@@ -2169,7 +2170,10 @@ const facOK=f=>facTLs(f).length>0;
 const allTLs=f=>[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))].sort((a,b)=>b-a);
 function eraDefault(i){const f=fleetFaction[i],E=ERAS[era],tls=allTLs(f);if(!E||!E.allow)return tls.includes(4)?4:tls[0];const al=E.allow[f];return al?Math.max(...al):0}
 const tlBreaks=(f,tl)=>era!=='open'&&facListed(f)&&tl>0&&!Object.keys(SHIPS).some(k=>SHIPS[k].faction===f&&SHIPS[k].tl===tl&&shipOK(k));
-const facOrder=()=>{const L=Object.keys(FACTIONS).sort();return era==='open'?L:[...L.filter(facListed),...L.filter(f=>!facListed(f))]};
+/* Nov 25 (David): factions grouped by quadrant on the selection screens — Alpha (most races), Beta (Billyon), Gamma (Motoran, Si'gian) */
+const QUADS=['Alpha','Beta','Gamma'],QUAD_OF={Billyon:'Beta',Motoran:'Gamma',"Si'gian":'Gamma'},facQuad=f=>QUAD_OF[f]||'Alpha';
+const facOrder=()=>{const L=Object.keys(FACTIONS).sort(),out=[];for(const q of QUADS){const Q=L.filter(f=>facQuad(f)===q);out.push(...(era==='open'?Q:[...Q.filter(facListed),...Q.filter(f=>!facListed(f))]))}return out};
+const facSelectOpts=sel=>QUADS.map(q=>{const L=Object.keys(FACTIONS).sort().filter(f=>facQuad(f)===q);return L.length?`<optgroup label="${q} Quadrant">${L.map(x=>`<option value="${x}" ${x===sel?'selected':''}>${x}</option>`).join('')}</optgroup>`:''}).join('');
 function eraFix(i){return false
   const tls=facTLs(fleetFaction[i]),al=ERAS[era].allow&&ERAS[era].allow[fleetFaction[i]];if(tls.length&&!tls.includes(fleetTL[i])){fleetTL[i]=al?Math.max(...al):tls.includes(4)?4:tls[0];ch=true}
   const n=fleet[i].length;fleet[i]=fleet[i].filter(x=>shipOK(x.key));if(fleet[i].length!==n)ch=true;return ch}
