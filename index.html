@@ -891,7 +891,7 @@ function commit(){
     if(K==='missile'){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       if(s.msDeploy===true||s.msDeploy>0){if(s.msDeploy!==true)s.msDeploy--;missiles.push(newMissile(s,t,{dmg:w.T.dmg,dorm:true,split:w.T.split||0}));if(own(s))sfx('missile',.35);continue}
       s.darkFiredT=T;fireRec(s,w.T.ab,K,0,t);missiles.push(newMissile(s,t,{dmg:w.T.dmg,split:w.T.split||0}));sfx('missile',fr(s)?1:.65);continue}
-    let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.stages=0;w.paid=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else if(w.T.battery){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='empty';w.readyT=Infinity}}else w.state='idle';
+    let dmg=K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;if(K==='torp'){dmg=torpDmg(w);w.cdT=T+IMP;w.stages=0;w.paid=0;w.charging=false;w.holding=false;w.state='idle';for(const o of ships)if(o.team!==s.team&&!s.weapons.some(v=>v!==w&&v.alive&&v.T.kind==='torp'&&v.stages>=3)){(o.torpMem||(o.torpMem={}))[s.name]=false;(o.torpSeen||(o.torpSeen={}))[s.name]=T}}else if(w.T.battery){w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else{w.state='empty';w.readyT=Infinity}}else w.state='idle';
     const tE=K==='torp'?+(dmg/2).toFixed(2):undefined;fireRec(s,w.T.ab,K,dmg,t);shots.push({s,t,kind:K,fx:w.T.fx,bar:w.T.bar,bw:w.T.bw,dmg,tE,...shotRoll(s,key,t)})}};
   for(const s of alive()){if(!s.mslLight)continue;s.mslLight=false;const t=tgt(s);if(!t)continue;let n=0;
     for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
@@ -1031,7 +1031,7 @@ function canFireMount(s,key,t){if(!t||t.dead||t.team===s.team&&isAI(s))return fa
   if(key.startsWith('pd')){const p=s.pd[+key.slice(2)];return p.alive&&p.shots>0&&inArc(s,p.arc,t)}
   const w=s.weapons[+key.slice(1)];if(!w.alive)return false;const K=w.T.kind;
   if(K==='missile')return s.msMode==='off'&&!defLaunchers(s).includes(w)&&w.state==='ready'&&w.ammo>0;
-  if(K==='torp')return torpStored(w)>0&&inArc(s,w.arc,t);
+  if(K==='torp')return torpStored(w)>0&&!(w.cdT>T)&&inArc(s,w.arc,t);   /* Nov 25 (David): a torpedo can't fire again until a full turn after it last fired, however much it holds */
   return w.state==='ready'&&inArc(s,w.arc,t)}
 const accK=(s,k)=>s.d.tl===5&&ACC[k+'5']?k+'5':k;   // TL5 ships read the stretched 14-hex tables
 const DARK_MUL=.7;   /* Nov 22 (David): Run Dark cuts hit chance by 30% (was halved) */
@@ -1730,7 +1730,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
       if(G.id==='missiles'){h+=missileRow(s,ws,t,sd,GC.missiles);continue}
       for(const {w,i} of ws){const K=w.T.kind;let st='',ctl='';
         if(!w.alive)st='<span class="bad">destroyed</span>';
-        else if(K==='torp'){st=`${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
+        else if(K==='torp'){st=`${w.cdT>T?`<span class="dim" title="Torpedo tube cooling down — can fire again a full turn after it last fired">cooldown ${when(w.cdT)}</span> `:''}${'▮'.repeat(w.stages)}${w.charging?'▷':''}${'▯'.repeat(Math.max(0,3-w.stages-(w.charging?1:0)))} ${torpDmg(w)} ${w.charging?`<span class="dim" title="impulses paid toward stage ${w.stages+1}; it completes at ${when(T+IMP-(w.paid||0))}">${w.paid||0}/${IMP}→${when(T+IMP-(w.paid||0))}</span>`:w.holding?`<span class="dim">hold ${(torpStored(w)/6).toFixed(2)}/t</span>`:''}`;
           if(sd){if(canQueue(s,{type:'start',i,cost:0}))ctl+=btn('start:'+i,(w.holding?'Resume':'Charge')+' '+pim(w.T.perTurn/IMP),true,`${w.T.perTurn} energy per stage, drained ${+(w.T.perTurn/IMP).toFixed(3)} each impulse while charging. Each stage adds ${Math.round(w.T.perTurn*2*(w.T.dmgMul||1))} damage; 3 stages max.`);if(canQueue(s,{type:'hold',i,cost:0}))ctl+=btn('hold:'+i,'Hold',true)}}
         else if(K==='ap'){st=w.state==='ready'?'<span class="good">READY</span>':w.charging?`<span class="dim" title="impulses paid; ready ${when(T+AP_IMP-(w.paid||0))}">${w.paid||0}/${AP_IMP}→${when(T+AP_IMP-(w.paid||0))}</span>`:w.state==='paused'?`<span class="warn">paused ${w.paid||0}/${AP_IMP}</span>`:'<span class="dim">empty</span>';
           if(sd&&canQueue(s,{type:'pausew',i,cost:0}))ctl+=btn('pausew:'+i,'Pause',true,'Stop drawing power for this charge; progress is kept');
