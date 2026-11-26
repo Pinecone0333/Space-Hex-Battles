@@ -1833,7 +1833,8 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
       <div style="display:flex;flex-direction:column;gap:4px"><button class="btn big accel" data-act="burn:F" ${canQueue(s,{type:'burn',a:'F',cost:burnCost(s,'F')})?'':'disabled'} title="${burnCost(s,'F')} energy"><span class="k">W</span> ▲ ACCEL${nBurnQ(s)===1?' ×2':nBurnQ(s)===2?'<b class="pen">⚠ CRIT</b>':''}</button>
       <button class="btn big decel" data-act="burn:R" ${canQueue(s,{type:'burn',a:'R',cost:burnCost(s,'R')})?'':'disabled'} title="Reverse burn (fore thrusters): ${+burnCost(s,'R').toFixed(2)} energy${s.dmgThrF?` — fore thrusters damaged: +${s.dmgThrF*50}%`:''}"><span class="k">X</span> ▼ REVERSE${s.dmgThrF?`<b class="pen">⚠${Math.min(3,s.dmgThrF)>=3?'out':s.dmgThrF*50+'%'}</b>`:''}</button></div>
       <div style="display:grid;grid-template-columns:repeat(4,auto);gap:4px" title="Turn by pivoting (30° each), then burn. 12 facings. Rotation per impulse: cruisers 60°, smaller ships 90°, Dreadnought 30°.">${pv('Z','⟲ Piv 30°','-1')}${pv('C','⟳ Piv 30°','1')}<button class="btn big ${qHas(s,'evade')?'aion':''}" data-act="evade" style="grid-column:span 2" ${qHas(s,'evade')||canQueue(s,{type:'evade',cost:evadeCost(s)})?'':'disabled'} title="Evasive maneuvers: jink with port and starboard thrusters, staying in this hex. Costs ${+evadeCost(s).toFixed(2)} energy (a pivot each way). Not with a pivot this impulse. This impulse your direct fire AND fire against you are 30% less accurate (missiles unaffected). Click again to cancel."><span class="k">J</span> ≈ Evade ${+evadeCost(s).toFixed(1)}</button></div>
-      <button class="btn big go" data-act="go"><span class="k">Enter</span> Continue ▶</button>`}
+      <button class="btn big" data-act="undo" ${s.queue.length&&!mpSubmitted()?'':'disabled'} title="Delete your last order (Backspace)"><span class="k">⌫</span> Undo</button>
+      ${mpSubmitted()?'<button class="btn big go" data-act="unsubmit" title="Take your orders back and change them — possible until every player is ready">✎ Change orders</button>':'<button class="btn big go" data-act="go"><span class="k">Enter</span> Continue ▶</button>'}`}
   else if(dec)b=`<button class="btn big go" data-act="go"><span class="k">Enter</span> Continue ▶</button>`;
   else if(!MP.on&&(phase==='moving'||phase==='resolving'||phase==='post'))b=`<button class="btn big" data-act="pause"><span class="k">Space</span> Stop at next impulse</button>`;
   const io=T?impOf(T):0;b=`<div class="clock" title="8 impulses per turn"><div class="ct">TURN ${turnOf(T)}</div><div class="ci">IMPULSE ${io}/${IMP}</div><div class="pips">${Array.from({length:IMP},(_,i)=>`<i class="${i<io?'on':''}"></i>`).join('')}</div><div class="cs">${st}</div></div>`+b;
@@ -1846,6 +1847,10 @@ const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)
 function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='evade'?'evasive maneuvers':x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pausew'?`${s.weapons[x.i].T.ab} pause`:x.type==='pd'?'PD load':'')+(x.cost?` (${x.cost})`:'')}
 function selectShip(x){if(x&&own(x)&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
+/* Nov 26 (David): online with other humans, a player who has pressed Continue can take the orders back and change them until everyone is ready */
+const mpSubmitted=()=>MP.on&&phase==='decide'&&!!P&&(MP.role==='guest'?mpSent:!!MP.ready[ME]);
+function mpUnsubmit(){if(!mpSubmitted())return;if(MP.role==='guest'){mpSent=false;mpSend({t:'unready'});mpBanner('Changing orders — press Continue (Enter) when ready')}
+  else{MP.ready[ME]=false;mpSend({t:'wait',ready:MP.ready});mpBanner('Changing orders — press Continue (Enter) when ready')}buildHUD()}
 function doAct(a){doAct0(a)}
 let critOK=false;
 /* Nov 22 (David): friendly fire is allowed, but only after a warning and a confirmation */
@@ -1884,7 +1889,7 @@ function critPrompt(s,v){let el=$('critbox');if(!el){el=document.createElement('
   const go=()=>{close();critOK=true;doAct('burn:'+v);critOK=false;buildHUD()};
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close()}else if(ev.key==='Enter'){ev.preventDefault();go()}};
   addEventListener('keydown',kh,true);$('critno').onclick=close;$('crityes').onclick=go}
-function doAct0(a){const [k,v]=a.split(':');
+function doAct0(a){const [k,v]=a.split(':');if(k==='unsubmit'){mpUnsubmit();return}
   if(k==='ordall'){const L=ships.filter(x=>own(x)&&x.ai&&!x.dead);let n=0;for(const x of L)if(setOrder(x,v))n++;
     const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
@@ -1903,7 +1908,7 @@ function doAct0(a){const [k,v]=a.split(':');
     log(`All ships: ${f==='aiE'?'energy':'damage control'} ${on?'handed to the AI':'back under your control'}`,'dim');buildHUD();return}
   if(k==='arcs'){if(arcSel){arcSel=null;showArcs=true}else showArcs=!showArcs;buildHUD();return}
   if(k==='arcone'){arcSel=arcSel===v?null:v;if(arcSel)showArcs=false;buildHUD();return}
-  const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;
+  const s=P;if(phase!=='decide'||!s||s.dead||s.ai)return;if(mpSubmitted())return;   // orders are locked once sent — Change orders first
   if(k==='pcrpick'){const i=+v;pcrPick=pcrPick&&pcrPick.s===s&&pcrPick.i===i?null:{s,i};if(pcrPick){arcSel='w'+pcrPairs(s)[i].l;showArcs=false}else arcSel=null;if(pcrPick)toast(`Click a hex in the ${s.weapons[pcrPairs(s)[i].l].arc} arc — sure hit up to ${pcrTCR(s)} hexes, 50% and falling beyond (Esc cancels)`);buildHUD();return}
   if(k==='undo')s.queue.pop();
   else if(k==='submode')s.subMode=!s.subMode;
@@ -1939,7 +1944,7 @@ function wireHUD(){if($('recSave'))$('recSave').onclick=saveRecord;
   document.querySelectorAll('[data-dcsel]').forEach(el=>el.addEventListener('click',()=>selectShip(ships[+el.dataset.dcsel])));
   document.querySelectorAll('[data-dchide]').forEach(el=>el.addEventListener('click',()=>{dcHide=$('dcAlert').dataset.key;$('dcAlert').style.display='none'}));
   document.querySelectorAll('#side [data-act],#rside [data-act],#bar [data-act]').forEach(el=>el.addEventListener('click',e=>{e.stopPropagation();doAct(el.dataset.act)}));
-  document.querySelectorAll('[data-fire]').forEach(el=>el.addEventListener('click',()=>{const k=el.dataset.fire;P.fireSel.has(k)?P.fireSel.delete(k):(P.fireSel.add(k),pcrExcl(P,k));buildHUD()}));
+  document.querySelectorAll('[data-fire]').forEach(el=>el.addEventListener('click',()=>{if(mpSubmitted())return;const k=el.dataset.fire;P.fireSel.has(k)?P.fireSel.delete(k):(P.fireSel.add(k),pcrExcl(P,k));buildHUD()}));
   document.querySelectorAll('#side [data-auto]').forEach(el=>el.addEventListener('change',()=>{P.auto[el.dataset.auto]=el.checked}));
   document.querySelectorAll('[data-stop]').forEach(el=>el.addEventListener('change',()=>{STOP[el.dataset.stop]=el.checked}));
   document.querySelectorAll('[data-sel]').forEach(el=>el.addEventListener('click',e=>{if(e.target.tagName==='INPUT')return;selectShip(ships[+el.dataset.sel])}));
@@ -2640,6 +2645,7 @@ function mpOnMsg(m,c){if(!m||!m.t)return;
   if(MP.role==='host'){const x=MP.conns.find(y=>y.c===c);if(!x)return;
     if(m.t==='myslot')mpApplySlot(x.pid,m);
     if(m.t==='orders')mpApplyOrders(m.orders,x.pid);
+    if(m.t==='unready'&&phase==='decide'&&MP.ready[x.pid]){MP.ready[x.pid]=false;mpTryCommit()}   // Nov 26: a guest takes back his orders to change them
     if(m.t==='forfeit')doForfeit(x.pid);
     if(m.t==='getrec')c.send({t:'rec',txt:recText()})}}
 
