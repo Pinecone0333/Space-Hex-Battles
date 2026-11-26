@@ -172,7 +172,7 @@ const MAXSLOTS=8;let SLOTS=[{kind:'human',owner:0,team:0,name:'You'},{kind:'ai',
 const isAI=s=>s.ai||s.owner==null;
 function net(){if(MP.role==='host'&&typeof mpSendState==='function')mpSendState()}
 const R={reactor:42, burn:2, reverse:4, pivot:2, genCost:10, genRegen:4, shieldRepairPerImp:2, startDist:20,
-  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.8,   /* Nov 25 (David): 80% (was 75%) */ magReloadTurns:2};
+  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.8,structW:2,   /* Nov 25 (David): 80% (was 75%) */ magReloadTurns:2};
 const income=s=>s.reactor/IMP;
 const genCost=s=>s.d.noShield?0:(s.d.genCost||R.genCost), genRegen=s=>s.d.genRegen||R.genRegen;
 
@@ -1058,7 +1058,7 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
       burst(t.px,8,'#ffe066');fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(52,70),text:'SYSTEM',t:1.6,max:1.6,color:'#ffe066',d:FXD});sysHit(t,box);return}cnt[t.name]=2}else cnt[t.name]=n}
   if(left>0){burst(t.px,6,'#ffb36b');const from=fromPt||(src&&src.px)||t.px;const zone=hitZone(t,from);
     for(let n=0;n<left&&t.hull>0;n++){const struct=Math.max(0,t.hull-t.boxes.length);const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));
-      const r=Math.random()*(struct+valid.length);let box=null;if(r>=struct&&valid.length)box=valid[Math.floor(r-struct)];else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
+      const sw=struct*R.structW,r=Math.random()*(sw+valid.length);let box=null;if(r>=sw&&valid.length)box=valid[Math.floor(r-sw)];   /* Nov 25 (David, vs the death spiral): each point of plain structure is R.structW times as likely to take a damage point as a system box */else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
       t.hull-=1;if(box){t.boxes.splice(t.boxes.indexOf(box),1);sysHit(t,box)}}
     if(t.hull<=0){t.hull=0;t.dead=true;t.deadT=T;t.deadBy=src&&src.name?src.name:(src&&src.owner&&src.owner.name?src.owner.name+' (missile)':null);deathQ.push(t);if(SCEN&&SCEN.cmd===t.name&&!SCEN.cmdLost)cmdLost(t);log(`${t.name} destroyed!`,t.isPlayer?'bad':'good')}}}
 function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).length)return '';
@@ -1071,7 +1071,7 @@ function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[
     h+=sd?`<button class="btn dcb ${q?'armed':''}" data-act="dc:${x.id}" ${q||canQueue(s,{type:'dc',id:x.id,cost:0})?'':'disabled'} title="${q?'team assigned':'assign a team to repair this'}">${q?'🔧':'✖'} ${lab}</button>`:`<span class="chip bad">✖ ${lab}</span>`}
   return h+`</div>`}
 function dmgLine(s){const pip=n=>'●'.repeat(n||0)+'○'.repeat(3-(n||0));const sysLeft=s.boxes.length,struct=Math.max(0,s.hull-sysLeft);const sr=sensRange(s);
-  return `<div class="row dim sm" title="Each damageable system is one of the ship's hull points; every point of hull damage lands on a random remaining point (structure, or a system exposed to the attacker). Sensors: weapon-scan range (10 hexes, −2 per hit); at 0 you can't see enemy shields or hull.">Eng <b class="${s.dmgEng?'bad':''}">${pip(s.dmgEng)}</b> F <b class="${s.dmgThrF?'bad':''}">${pip(s.dmgThrF)}</b> P <b class="${s.dmgThrP?'bad':''}">${pip(s.dmgThrP)}</b> S <b class="${s.dmgThrS?'bad':''}">${pip(s.dmgThrS)}</b> · Rea <b class="${s.dmgRea?'bad':''}">${reaPct(s)}%</b> · Sens <b class="${s.dmgSen?'bad':''}">${sr}</b> · Struct ${struct}</div>`}
+  return `<div class="row dim sm" title="Each damageable system is one of the ship's hull points; every point of hull damage lands on a random remaining point — plain structure is twice as likely to take it as a system exposed to the attacker. Sensors: weapon-scan range (10 hexes, −2 per hit); at 0 you can't see enemy shields or hull.">Eng <b class="${s.dmgEng?'bad':''}">${pip(s.dmgEng)}</b> F <b class="${s.dmgThrF?'bad':''}">${pip(s.dmgThrF)}</b> P <b class="${s.dmgThrP?'bad':''}">${pip(s.dmgThrP)}</b> S <b class="${s.dmgThrS?'bad':''}">${pip(s.dmgThrS)}</b> · Rea <b class="${s.dmgRea?'bad':''}">${reaPct(s)}%</b> · Sens <b class="${s.dmgSen?'bad':''}">${sr}</b> · Struct ${struct}</div>`}
 function internalHit(t){const c=[];t.weapons.forEach(w=>w.alive&&c.push({w}));t.pd.forEach(p=>p.alive&&c.push({p}));c.push({rea:1},{rea:1});
   const x=c[Math.floor(Math.random()*c.length)];let msg;if(x.w){x.w.alive=false;msg=`${x.w.T.name} (${x.w.arc}) destroyed`}else if(x.p){x.p.alive=false;msg=`PD screen (${x.p.arc}) destroyed`}else{t.dReactor=(t.dReactor||0)+1;msg='reactor damage'}
   log(`${t.name}: ${msg}`,t.isPlayer?'bad':'good')}
