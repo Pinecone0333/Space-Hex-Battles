@@ -117,7 +117,7 @@ table.cas{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}tabl
 .fc-pop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:60}
 .fc-pop-in{max-width:440px;margin:16px;background:#0d1621;border:2px solid;border-radius:8px;padding:14px 16px;text-align:left}
 .fc-pop-in p{margin:10px 0 12px;line-height:1.45;font-style:normal}
-.fc-txt{max-height:5.6em;overflow-y:auto;font-size:11.5px;line-height:1.4;color:#9fb0c2;margin:3px 0 2px;padding-right:4px;text-align:left}
+.fc-txt{max-height:22em;overflow-y:auto;font-size:11.5px;line-height:1.4;color:#9fb0c2;margin:3px 0 2px;padding-right:4px;text-align:left}
 .fc-txt.lore{font-style:italic;color:#c9d3de}
 </style>
 </head><body>
@@ -459,7 +459,7 @@ SHIPS.corvette={faction:'Martian',cls:'Light Corvette',weight:30,name:'Martian C
     weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
 SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8.5};   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
-FACTIONS.Blokai={color:'#a9b2bf',full:'Blokai Commonwealth',lore:'Technologically advanced arboreal aliens governed by direct democracy. Those who upset the social order are exiled.',blurb:'Heavy shields, plasma lances, long-range targeting'};
+FACTIONS.Blokai={color:'#a9b2bf',full:'Blokai Commonwealth',lore:'Technologically advanced arboreal aliens governed by direct democracy. Xenophobic and isolationist. Those who upset the social order are exiled.',blurb:'Heavy shields, plasma lances, long-range targeting'};
 // Nov 24 (David): original egg; the fork (25% smaller) sits straight on it, no neck — two side prongs and a thin centre prong, equal length: side prongs curved on the outside edge to a point and straight on the inside, a straight-sided centre prong with a flat end, straight parallel-sided slots between them
 SHIPS.blokai={faction:'Blokai',cls:'Heavy Cruiser',weight:100,name:'Blokai Heavy Cruiser',short:'Blokai',color:'#a9b2bf',laser:'#ffe14d',torp:'#ffd23a',hull:150,shield:75,big:true,tl:5,
     reactor:52,genCost:10,genRegen:6,doctrine:'hunt',sniper:true,standRange:11,noStandoff:true,lanceRange:5,accShift:2,   // 1.5× shields; targeting computer reaches 2 hexes farther at every step
