@@ -506,6 +506,8 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 // Nov 21 (David): every reactor 2 lower — energy allocation should matter more
 for(const k in SHIPS){const d=SHIPS[k];d.reactor=(d.reactor||R.reactor)-2}
+/* Nov 25 (David): every PD mount is split into two single-shot guns (same arcs, same total shots) — one unlucky hit now knocks out one shot, not two */
+const PDCAP=1;for(const k in SHIPS){const d=SHIPS[k];if(d.pd&&!d.pdSplit){d.pd=d.pd.flatMap(a=>[a,a]);d.pdSplit=true}}
 /* Nov 25 (David): more power for cruisers — medium cruisers 32, regular light cruisers 30 (final values). TL3 versions = TL4 minus the generator; TL2/TL1 follow through the ladder below.
    Baangzon Raider keeps its −4 (batteries draw nothing): 26. Chemantar Double = two Artillery Cruisers: 64. Blokai Light Cruiser (TL5) left as is. */
 {const set=(k,r)=>{SHIPS[k].reactor=r;if(SHIPS[k+'3'])SHIPS[k+'3'].reactor=r-(SHIPS[k].genCost||0)};
@@ -720,7 +722,7 @@ function canQueue(s,act){
   if(act.type==='start'){const w=s.weapons[act.i];if(!w.alive||s.queue.some(x=>x.type==='start'&&x.i===act.i))return false;return w.T.kind==='torp'?w.state==='idle'||(w.holding&&w.stages<3):w.state==='idle'||w.state==='paused'}
   if(act.type==='pausew'){const w=s.weapons[act.i];return w.alive&&w.charging&&(drains(w)||w.T.kind==='ap')&&!s.queue.some(x=>x.type==='pausew'&&x.i===act.i)}
   if(act.type==='hold'){const w=s.weapons[act.i];return w.alive&&w.charging&&torpStored(w)>0&&!s.queue.some(x=>x.type==='hold'&&x.i===act.i)}
-  if(act.type==='pd'){const p=s.pd[act.i];const q=s.queue.filter(x=>x.type==='pd'&&x.i===act.i).length;return p.alive&&p.shots+p.pending.length+q<2}
+  if(act.type==='pd'){const p=s.pd[act.i];const q=s.queue.filter(x=>x.type==='pd'&&x.i===act.i).length;return p.alive&&p.shots+p.pending.length+q<PDCAP}
   return true}
 function queue(s,act){if(act.type==='pd'&&s.d.pdKind==='chain')act.cost=0;if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'||drains(s.weapons[act.i])))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){let nbx=0;
@@ -770,7 +772,7 @@ function upkeep(s){
         if(s.E>=c)w.tShort=0}
       if(w.holding&&torpStored(w)>0&&w.holdPaid!==T){const c=torpStored(w)/6/IMP;if(s.E>=c)s.E-=c;else{w.stages=0;w.paid=0;w.holding=false;w.state='idle';if(s.isPlayer)log(`${w.T.ab} lost its charge (no energy to hold)`,'bad')}}}
     else if((w.state==='cycling'||w.state==='reloading')&&T>=w.readyT){if(w.state==='reloading')w.ammo=w.T.mag;w.state='ready';if(own(s)&&!s.ai&&K!=='missile')readyEvt.push(`${s.name} ${w.T.ab}`);if(s.isPlayer&&K==='missile'&&w.ammo===w.T.mag&&w.wasReload)log('Missile launcher reloaded','dim')}}
-  for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(2,p.shots+1);return false}return true})}
+  for(const p of s.pd){if(!p.alive)continue;p.pending=p.pending.filter(t=>{if(T>=t){p.shots=Math.min(PDCAP,p.shots+1);return false}return true})}
 }
 
 // ---- impulse loop ----
@@ -981,6 +983,7 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
   // point defense: fires before impacts; covers own ship first, then nearby friendly ships. Engages any missile whose path this impulse passes within PD range.
   const segD=(m,P0)=>{const ax=m.ppx.x-P0.x,ay=m.ppx.y-P0.y,dx=m.px.x-m.ppx.x,dy=m.px.y-m.ppx.y;const t=clamp(-(ax*dx+ay*dy)/((dx*dx+dy*dy)||1),0,1);return{d:Math.hypot(ax+dx*t,ay+dy*t)/HS,x:P0.x+ax+dx*t,y:P0.y+ay+dy*t}};
   const claimed=new Set();
+  for(let pass=0;pass<2;pass++){claimed.clear();   /* Nov 25 (David): a missile that survives a PD shot can be shot at again (two shots per missile per impulse) */
   for(const s of ships){if(s.dead)continue;
     for(const p of s.pd){if(!p.alive)continue;
       while(p.shots>0){let best=null,bk=1e9,bp=null;
@@ -989,7 +992,7 @@ function moveMissiles(){const dt=1/IMP;let ev=0,last=0;const base=ANIM/1000+.12,
           const k=(m.dorm?200:m.target===s?0:100)+c.d;if(k<bk){bk=k;best=m;bp=c}}
         if(!best)break;claimed.add(best);p.shots--;if(!best.dorm&&best.target===s){const q=inPt(best,rnd(1.2,1.8));bp={...bp,x:q.x,y:q.y}}/* own defense: kill just outside the hull; covering an ally: kill at the point on the missile's path nearest this ship (within PD range) */const hit=Math.random()<R.pdHit+(best.dorm?.15:0)-(s.d.pdKind==='chain'?.15:0)+.05*((s.d.tl||4)-((best.owner&&best.owner.d.tl)||4));msEv({e:hit?'PD':'PDm',id:best.mid,by:sIx(s),arc:p.arc,d:r1(best.dorm?0:Math.hypot(bp.x-best.target.px.x,bp.y-best.target.px.y)/HS),ally:!best.dorm&&best.target!==s?1:undefined});FXD=at();sfxAt(s.d.pdKind==='chain'?'chain':'pd',s.isPlayer?.6:.4);
         fx.push({type:s.d.pdKind==='chain'?'chain':'beam',x1:s.px.x,y1:s.px.y,x2:bp.x+(hit?0:rnd(-12,12)),y2:bp.y+(hit?0:rnd(-12,12)),t:s.d.pdKind==='chain'?.45:.35,max:s.d.pdKind==='chain'?.45:.35,color:s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff',w:1.5,d:FXD});
-        if(hit){MST.pd++;if(!best.dorm&&best.target!==s)MST.ally++;best.dead=true;ghost(best,bp.x,bp.y,FXD);burst({x:bp.x,y:bp.y},14,'#c7a6ff');ring({x:bp.x,y:bp.y},18,'#c7a6ff');sfxAt('mslPop',.6);if(s.isPlayer&&(best.dorm||best.target!==s))log(best.dorm?`${s.name} PD destroyed a dark missile`:`${s.name} PD shot down a missile aimed at ${best.target.name}`,'good')}FXD=0}}}
+        if(hit){MST.pd++;if(!best.dorm&&best.target!==s)MST.ally++;best.dead=true;ghost(best,bp.x,bp.y,FXD);burst({x:bp.x,y:bp.y},14,'#c7a6ff');ring({x:bp.x,y:bp.y},18,'#c7a6ff');sfxAt('mslPop',.6);if(s.isPlayer&&(best.dorm||best.target!==s))log(best.dorm?`${s.name} PD destroyed a dark missile`:`${s.name} PD shot down a missile aimed at ${best.target.name}`,'good')}FXD=0}}}}
   for(const m of missiles){if(m.dead||m.dorm||m.intercept)continue;if(m.closest<=HX){MST.h++;const hb=Math.min(24,Math.floor((m.ld||0)/4)*4);(MST.hd||(MST.hd={}))[hb]=(MST.hd[hb]||0)+1;m.dead=true;FXD=at('imp');const g=inPt(m,1),hp_=inPt(m,.35);ghost(m,g.x,g.y,FXD);const mt=m.target,P0=m.ppx||m.px,b0=mt.shield+reinfAmt(mt),h0=mt.hull,pl=msPdLeft(mt,P0);applyDamage(m.target,m.dmg,m.owner,m.ppx||m.px);msEv({e:'H',id:m.mid,at:sIx(mt),dmg:m.dmg,shDmg:r1(b0-(mt.shield+reinfAmt(mt))),hullDmg:Math.round(h0-mt.hull),brg:msBrg(mt,P0),age:m.age,pdLeft:pl[0],pdLeftArc:pl[1],killed:mt.dead?1:undefined});burst(hp_,26,'#ffb36b',true);ring(hp_,40,'#ffb36b',true);sfxAt('boom',.5);FXD=0}}
   missiles=missiles.filter(m=>!m.dead);msHold=ev?Math.max(0,last+.45-ANIM/1000):0;
   if(deathQ.length){const d=Math.max(ev?last+.35:0,ANIM/1000+.1);flushDeaths(d);msHold=Math.max(msHold,d+.9-ANIM/1000)}
@@ -1242,11 +1245,11 @@ function aiPCR(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire)ret
    (c) then top up PD with what's left. Planned burns/pivots/loads that would break the reserve are dropped (a burn goes with its pivots). */
 function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   const threat=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24)||enemiesOf(s).some(e=>hexDist(e,s)<=30&&e.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0));
-  const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,2-p.shots-p.pending.length):0),0):0;
+  const pdNeed=threat&&!s.d.pdKind?s.pd.reduce((a,p)=>a+(p.alive?Math.max(0,PDCAP-p.shots-p.pending.length):0),0):0;
   /* Nov 22 (David: 'the AI sucks at missile defense'): under missile threat, keep one full PD refill per turn out of the weapon-charging budget,
      and don't spend banked energy below a full PD refill plus a small reinforcement float (flag msDef2) */
   const pdLive=!s.d.pdKind?s.pd.filter(p=>p.alive).length:0,inb=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=24),md2=AIV.msDef2&&inb&&pdLive;   // only while a wave is actually on its way (was: any enemy launcher in range — starved the guns all battle)
-  let rate=upkeepCost(s);const cap=income(s)-.75-(md2?pdLive*2*AIV.msDef2/IMP:0);let E=s.E;const out=[];let dropBurn=false;
+  let rate=upkeepCost(s);const cap=income(s)-.75-(md2?pdLive*PDCAP*AIV.msDef2/IMP:0);let E=s.E;const out=[];let dropBurn=false;
   /* Nov 22 (David, fix 1): banked energy counts — a drain the reactor can't carry may still start if stored energy (above the PD reserve)
      covers the shortfall for that weapon's whole cycle. (The Dogahr Destroyer left its coilgun empty for 30 impulses sitting on 5 energy.) */
   /* Nov 22 (David): against a side with more missile launchers, point defense is the AI's first priority. It always keeps enough energy to
@@ -1254,9 +1257,9 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
      that reserve isn't there, and lasers/coilguns/lances already charging are paused (progress kept) until it is. Torpedoes keep charging. (flag pdPri) */
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&(w.ammo>0||w.state==='reloading')).length;
   const outL=AIV.pdPri&&pdLive>0&&enemiesOf(s).reduce((a,e)=>a+ml(e),0)>ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);
-  const resv=outL?pdNeed+pdLive*2:pdNeed;
+  const resv=outL?pdNeed+pdLive*PDCAP:pdNeed;
   if(outL&&s.E<resv)s.weapons.forEach((w,i)=>{if(w.alive&&w.charging&&w.T.kind!=='torp'&&(drains(w)||w.T.kind==='ap')&&!q.some(x=>x.type==='pausew'&&x.i===i))q.push({type:'pausew',i,cost:0})});
-  let bank=Math.max(0,s.E-resv-(md2?pdLive*2+4*AIV.msDef2:0));
+  let bank=Math.max(0,s.E-resv-(md2?pdLive*PDCAP+4*AIV.msDef2:0));
   for(const x of q){
     if(x.type==='start'){const w=s.weapons[x.i];const n=w?(w.T.kind==='ap'?AP_IMP:w.T.kind==='torp'?IMP:cycleImp(s,w)):0;const dr=w&&(drains(w)||w.T.kind==='ap')?w.T.cost/n:w&&w.T.kind==='torp'?w.T.perTurn/IMP:0;
       if(dr&&outL&&w.T.kind!=='torp'&&s.E<resv+2*dr)continue;
@@ -1271,7 +1274,7 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
   if(threat&&!s.d.pdKind){s.queue=r.queue;s.pd.forEach((p,i)=>{let n=0;while(n++<2&&s.E-qCost(s)-genReserve(s)>=1&&queue(s,{type:'pd',i,cost:1})){}});r.queue=s.queue;s.queue=[]}}
 /* Dogahr missile waves (r7): launch when the target's defense is down or can be saturated; at long range against a full defense, only a 2-missile probe now and then */
 function dogWave(s,t,n,d){if(!n)return 0;const seen=scanWeapons(t,s.team);
-  const pdShots=t.pd.reduce((a,p)=>a+(p.alive?(seen?p.shots:2):0),0)*(t.d.pdKind==='chain'?.6:1);
+  const pdShots=t.pd.reduce((a,p)=>a+(p.alive?(seen?p.shots:PDCAP):0),0)*(t.d.pdKind==='chain'?.6:1);
   const ic=(seen?defLaunchers(t).filter(w=>w.state==='ready'&&w.ammo>0).length:t.weapons.filter(w=>w.alive&&w.T.kind==='missile').length*(t.msMode==='def'?1:0));
   const wave=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
   const allyReady=ships.filter(o=>o!==s&&!o.dead&&o.team===s.team&&tgt(o)===t).reduce((a,o)=>a+o.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0).length,0);
@@ -1620,7 +1623,7 @@ function shipDiagram(s,mode,t){const L=dgLayout(s),own=mode==='own',sd=own&&phas
     else if(it.t==='pd'){const p=s.pd[it.i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.i===it.i),job=box&&dgJob(s,box),chain=s.d.pdKind==='chain';
       const shots=p.alive&&seeW?p.shots:0;const foe=!fr(s),fill=!p.alive?'url(#dmgH)':!seeW?'#1a2230':shots?(foe?'#3d1416':'#173d22'):p.pending.length?'#2e2410':'#1a2230',stroke=!p.alive?'#9aa4ae':!seeW?'#3a4452':shots?(foe?'#ff4d4d':'#4cff7a'):p.pending.length?'#ffc04d':'#55606e';
       body=`<circle r="${it.r}" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/><text y="2.5" font-size="7" text-anchor="middle" fill="${!p.alive?'#e4e8ec':shots?(foe?'#ffd0d0':'#c8ffd8'):'#c9d3de'}">${!p.alive?(job?'🔧':'✕'):seeW?shots:'?'}</text>`;if(foe&&shots&&p.alive)body=`<g class="hotglow">${body}</g>`;
-      tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/2 shots'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
+      tip=`${chain?'Chain-gun':'Laser'} PD (${p.arc==='ALL'?'360°':p.arc}) — ${!p.alive?'DESTROYED'+(own?(job?' · repair team assigned (click to recall)':' · click to send a damage-control team'):''):seeW?shots+'/'+PDCAP+' shot'+(p.pending.length?' (+'+p.pending.length+' loading)':''):'not scanned'}${own&&sd&&p.alive?` · click: load a shot${chain?' (free)':' (1)'}`:''}`;
       if(own&&s.fireSel&&s.fireSel.has('pd'+it.i))ring=`<circle r="${it.r+2.5}" fill="none" stroke="#fff" stroke-width="1.3"/>`;
       if(own&&sd)act=`pdclick:${it.i}`}
     else{const k=it.k,n=sysDmg(s,k),mx=k==='sen'?(s.senN0||5):k==='rea'?REA_N(s):SYSMAX[k],boxes=(s.damaged||[]).filter(b=>b.k===k),jobs=boxes.filter(b=>dgJob(s,b)).length;
@@ -1666,7 +1669,7 @@ function smartPD(s,i){const p=s.pd[i],box=(s.damaged||[]).find(b=>b.k==='pd'&&b.
   if(!p.alive){log('PD mount destroyed — switch to Repair mode to send a team','dim');return}
   const key='pd'+i,t=tgt(s);if(s.fireSel.has(key)){s.fireSel.delete(key);return}
   if(queue(s,{type:'pd',i,cost:1}))return;if(t&&canFireMount(s,key,t)){s.fireSel.add(key);return}   // full: arm it for offensive fire
-  if(!queue(s,{type:'pd',i,cost:1}))log(`${s.name}: PD mount is full (2 shots) or not enough energy`,'dim')}
+  if(!queue(s,{type:'pd',i,cost:1}))log(`${s.name}: PD gun is already loaded or not enough energy`,'dim')}
 function smartSys(s,k){const boxes=(s.damaged||[]).filter(b=>b.k===k);const free=boxes.find(b=>!dgJob(s,b));
   if(free&&dcFree(s)>0){queue(s,{type:'dc',id:free.id,cost:0});return}const busy=boxes.find(b=>dgJob(s,b));if(busy){dcToggle(s,busy);return}
   if(free)log(`${s.name}: no free damage-control team`,'dim')}
@@ -1738,7 +1741,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
         ctl+=s.fireSel.has('pcrh'+i)?fireBtn(s,'pcrh'+i,`Hex ${hx.q},${hx.r}`+(pcrBurstP(s,hexDist(s,hx))<1?` ${Math.round(pcrBurstP(s,hexDist(s,hx))*100)}%`:''),'Armed at a hex: it always arrives and bursts for '+pcrBurstDmg(s)(i)+' to every ship and missile in that hex. Click to disarm.'):`<button class="btn ${pcrPick&&pcrPick.s===s&&pcrPick.i===i?'armed':''}" data-act="pcrpick:${i}" title="Pick a hex in the mount's arc on the map: inside ${pcrTCR(s)} hexes the round always gets there and bursts for ${pcrBurstDmg(s)(i)} on every ship and missile in that hex; beyond that 50%, then 10% less per 2 more hexes">⌖ Hex</button>`}
       h+=`<div class="wrow"><span class="arc">${L.arc}</span><span class="wn" style="color:#ffd23a" title="${L.T.ab} + ${C.T.ab} fired together">Plasma-Charged Coilgun Round</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`});
     s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1})){ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true)}const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit');else if(t&&p.shots>0&&!inArc(s,p.arc,t))ctl+=offBtn(key,'Fire '+sixths(hitP(s,key,t)))}
-      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''} ${arcSel==='pd'+i?'sel':''}" data-act="arcone:pd${i}" title="Show this mount's firing arc on the map (click again to hide)">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'Chain Gun PD':'Point Defense'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
+      h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''} ${arcSel==='pd'+i?'sel':''}" data-act="arcone:pd${i}" title="Show this mount's firing arc on the map (click again to hide)">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'Chain Gun PD':'Point Defense'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,PDCAP-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
     }else{dgMode='repair';h+=dcDiagram(s)+`<div class="sm dim" style="margin:3px 0"><span style="color:#4cff7a">■</span> working &nbsp;·&nbsp; <span style="color:#ff4d4d">■</span> damaged — click to repair &nbsp;·&nbsp; 🔧 team on it</div>`+(dcPanel(s,sd,false)||`<div class="row sm good">No damage.</div>`)}
     h+=`</div>`+qPanel+`<div>`;
     h+=`</div>`}
@@ -2310,7 +2313,7 @@ function coopNext(){const C=COOPS[COOP],hs=coopPlayers(),W=C.waves(hs.length);if
   const used=new Set(ships.filter(s=>!s.dead).map(s=>s.q+','+s.r));
   const put=(X,Y)=>{let h=pixToHex(X,Y);for(let g=0;g<40&&used.has(h.q+','+h.r);g++)h=pixToHex(X+(g%5-2)*HX*1.6,Y+Math.floor(g/5+1)*HX*1.6);used.add(h.q+','+h.r);return h};
   const ang=Math.random()*Math.PI*2,ux=Math.cos(ang),uy=Math.sin(ang),dist=26*HX*SQ3,toC=Math.atan2(-uy,-ux);let bf=0,bd=9;for(let f=0;f<NF;f++){const dd=Math.abs(norm(fAng(f)-toC));if(dd<bd-1e-9){bd=dd;bf=f}}
-  const load=sh=>{for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2;sh.target=nearestEnemy(sh)};
+  const load=sh=>{for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=PDCAP;sh.target=nearestEnemy(sh)};
   /* reinforcements: one frigate per player, arriving beside that player's ship (or the group) */
   const rf=[];if(COOPW===2)for(const i of hs){/* Nov 24 (David): reinforcements only once — when wave 3 arrives */const own_=ships.find(s=>!s.dead&&s.slot===i),k=coopFF(fleetFaction[i]);const bx=own_?own_.px.x:cx,by=own_?own_.px.y:cy;
     const ra=Math.atan2(-uy,-ux)+(Math.random()<.5?1:-1)*(.6+Math.random()*.6),h=put(bx+Math.cos(ra)*HX*SQ3*12,by+Math.sin(ra)*HX*SQ3*12);/* ~12 hexes from the player's ship, off to one side, away from the incoming wave */const isA=SLOTS[i].kind==='ai';const sh=makeShip(k,h.q,h.r,(bf+NF/2)%NF,0,isA,nm(k),isA?null:SLOTS[i].owner);sh.slot=i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;sh.f=(bf+NF/2)%NF;ships.push(sh);rf.push(sh)}
@@ -2342,7 +2345,7 @@ function start(){if(MP.role==='guest')return;if(COOP)coopPrep();else COOPW=0;BID
         const ow=x.cmd!=null&&humans().includes(x.cmd)?x.cmd:owner;const sh=makeShip(x.key,q,r,bf,tm,ow==null?true:!!x.ai,name,ow);sh.slot=l.i;sh.px=hp(sh.pq,sh.pr);sh.ppx=null;ships.push(sh)})}});
   {const m0=ships.find(s=>own(s));if(m0)MYTEAM=m0.team}
   for(const sh of ships)sh.target=nearestEnemy(sh);
-  if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=2}
+  if(startMode==='stations')for(const sh of ships){for(const w of sh.weapons){if(w.T.kind==='torp'){w.stages=3;w.holding=true;w.state='holding'}else w.state='ready'}for(const p of sh.pd)p.shots=PDCAP}
   for(const sh of ships){const v=startSpeed[sh.slot]||0;if(v){const d=fdir(sh.f);sh.vq=d[0]*v;sh.vr=d[1]*v}}   // each side's own starting speed, either start mode
   if(SCEN&&SCENARIOS[SCEN.id].place){SCEN.engaged=false;SCENARIOS[SCEN.id].place(ships);for(const sh of ships)sh.target=nearestEnemy(sh)}
   if(SCEN&&SCEN.coop){SCEN.lobby=false;SCEN.cmdLost=false;SCEN.failed=false;const c=scenCmdIdx(SCENARIOS[SCEN.id],SCEN.side),ck=c&&SCENARIOS[SCEN.id].fleets[c.fi].ships[c.j];const cs=ck&&ships.find(x=>x.slot===c.fi&&x.key===ck);SCEN.cmd=cs?cs.name:null;setTimeout(()=>log(`${SCENARIOS[SCEN.id].name} (co-op). ${SCENARIOS[SCEN.id].goal[SCEN.side]||''}`,'warn'),0)}
