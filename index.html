@@ -571,6 +571,9 @@ FACTIONS.Smiley={color:'#ffd23f',full:'Smiley Federation',lore:'A big yellow smi
 /* Nov 26 (David): the joke ships only show up on April Fools' Day (April 1, the player's local date). Add ?aprilfools to the page address to force them on. */
 const APRIL_FOOLS=(()=>{const d=new Date();return d.getMonth()===3&&d.getDate()===1||/aprilfools/i.test(typeof location!=='undefined'?location.search:'')})();
 if(!APRIL_FOOLS){for(const k of ['smiley','smiley3','golthan3x'])delete SHIPS[k];delete FACTIONS.Smiley}
+/* Nov 26 (David): tutorial practice drone — unarmed, 1 hull, no shields, no PD, does nothing. Hidden from every fleet list (tech level 9). */
+SHIPS.drone={faction:'Martian',cls:'Drone',weight:1,name:'Training Drone',short:'Drone',color:'#9aa3ad',laser:'#ffffff',torp:'#ffffff',hull:1,shield:0,noShield:true,reactor:0,genCost:0,genRegen:0,
+  tl:9,drone:true,doctrine:'hunt',weapons:[],pd:[],pdSplit:true,shape:[[9,0],[0,7],[-7,0],[0,-7]],lines:[[-3,0,5,0]],dots:[]};
 /* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
    TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
 {const h=x=>Math.round(x*2)/2;
@@ -1101,14 +1104,14 @@ function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
   if(left>0&&t.armor>0){const from=fromPt||(src&&src.px);   // front armor (Golthan): soaks hits from the front 180° after shields, before hull and systems; not repairable
     if(from&&Math.abs(norm(Math.atan2(from.y-t.px.y,from.x-t.px.x)-fAng(t.f)))<=Math.PI/2+1e-6){const a=Math.min(t.armor,left);t.armor-=a;left-=a;
       if(t.armor<=0&&(fr(t)||scanStatus(t)))log(`${t.name}: front armor breached`,t.isPlayer?'bad':'good')}}
-  if(left>0&&sub&&src){const from=src.px,zone=hitZone(t,from);const cnt=src.subCnt||(src.subCnt={});const n=(cnt[t.name]||0)+1;
-    // subsystem targeting (lasers/PD): every third hit that gets past the shields knocks out a system instead of doing hull damage
-    if(n>=3){const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));if(valid.length){cnt[t.name]=0;const box=valid[Math.floor(Math.random()*valid.length)];t.boxes.splice(t.boxes.indexOf(box),1);
-      burst(t.px,8,'#ffe066');fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(52,70),text:'SYSTEM',t:1.6,max:1.6,color:'#ffe066',d:FXD});sysHit(t,box);return}cnt[t.name]=2}else cnt[t.name]=n}
+  /* Nov 26 (David): Aim: Systems (lasers and PD) — each system box the shot can reach is twice as likely to take a damage point as a point of plain
+     structure (the reverse of the normal 2:1 toward structure), but every third point of hull damage that ship deals to that target is thrown away. */
+  const subC=sub&&src?(src.subCnt||(src.subCnt={})):null;
   if(left>0){burst(t.px,6,'#ffb36b');const from=fromPt||(src&&src.px)||t.px;const zone=hitZone(t,from);
-    for(let n=0;n<left&&t.hull>0;n++){const struct=Math.max(0,t.hull-t.boxes.length);const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));
-      const sw=struct*R.structW,r=Math.random()*(sw+valid.length);let box=null;if(r>=sw&&valid.length)box=valid[Math.floor(r-sw)];   /* Nov 25 (David, vs the death spiral): each point of plain structure is R.structW times as likely to take a damage point as a system box */else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
+    let lost=0;for(let n=0;n<left&&t.hull>0;n++){if(subC){subC[t.name]=(subC[t.name]||0)+1;if(subC[t.name]%3===0){lost++;continue}}const struct=Math.max(0,t.hull-t.boxes.length);const valid=t.boxes.filter(x=>boxValid(t,x,from,zone));
+      const sw=struct*(subC?.5:R.structW),r=Math.random()*(sw+valid.length);let box=null;if(r>=sw&&valid.length)box=valid[Math.floor(r-sw)];   /* Nov 25 (David, vs the death spiral): each point of plain structure is R.structW times as likely to take a damage point as a system box */else if(!struct&&!valid.length&&t.boxes.length)box=t.boxes[Math.floor(Math.random()*t.boxes.length)];
       t.hull-=1;if(box){t.boxes.splice(t.boxes.indexOf(box),1);sysHit(t,box)}}
+    if(lost)fx.push({type:'text',x:t.px.x+rnd(-20,20),y:t.px.y-rnd(52,70),text:'AIMED −'+lost,t:1.4,max:1.4,color:'#ffe066',d:FXD});
     if(t.hull<=0){t.hull=0;t.dead=true;t.deadT=T;t.deadBy=src&&src.name?src.name:(src&&src.owner&&src.owner.name?src.owner.name+' (missile)':null);deathQ.push(t);if(SCEN&&SCEN.cmd===t.name&&!SCEN.cmdLost)cmdLost(t);log(`${t.name} destroyed!`,t.isPlayer?'bad':'good')}}}
 function dcPanel(s,sd,compact){const dmg=s.damaged||[];if(!dmg.length&&!(s.dc||[]).length)return '';
   const teams=dcTeams(s),busy=s.dc.length+s.queue.filter(q=>q.type==='dc').length;
@@ -1137,7 +1140,7 @@ function mpResetReadyKeep(){const old=MP.ready||{};mpResetReady();for(const k in
 const mpAllReady=()=>Object.values(MP.ready||{}).every(Boolean);
 const nTeams=()=>new Set(ships.map(s=>s.team)).size;
 const teamsAlive=()=>[...new Set(ships.filter(s=>!s.dead).map(s=>s.team))].sort((a,b)=>a-b);
-function checkEnd(){if(teamsAlive().length>1)return false;if(COOP&&COOPW&&teamsAlive().length===1&&teamsAlive()[0]===0&&coopNext()){buildHUD();net();return false}phase='over';recEnd();stopMusic();net();const hd=fx.reduce((a,f)=>f.type==='hulk'?Math.max(a,f.d):a,0);if(hd>0)setTimeout(showEnd,(hd+1.3)*1000);else showEnd();buildHUD();return true}   // let the last explosion play before the end screen
+function checkEnd(){if(typeof TUT!=='undefined'&&TUT)return false;if(teamsAlive().length>1)return false;if(COOP&&COOPW&&teamsAlive().length===1&&teamsAlive()[0]===0&&coopNext()){buildHUD();net();return false}phase='over';recEnd();stopMusic();net();const hd=fx.reduce((a,f)=>f.type==='hulk'?Math.max(a,f.d):a,0);if(hd>0)setTimeout(showEnd,(hd+1.3)*1000);else showEnd();buildHUD();return true}   // let the last explosion play before the end screen
 /* Nov 21: forfeit = a player's ships withdraw (removed from the battle); the battle ends when one team is left */
 let ffArm=0,forfeited=[];
 function doForfeit(pid){if(phase==='over'||!ships.length)return;const L=ships.filter(s=>!s.dead&&s.owner===pid);if(!L.length)return;for(const s of L){s.dead=true;s.withdrew=true;s.deadT=T}if(!forfeited.includes(pid))forfeited.push(pid);
@@ -1278,7 +1281,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}return r}
+function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}return r}
 /* Nov 22 (David): Martian-doctrine ships fire their torpedoes together with the coilguns — whenever a coilgun takes a 50%+ shot, every torpedo bearing on the target with at least one stage's worth of charge goes too */
 /* Nov 22 (David: '7 is too far out to fire'): Martian-doctrine torpedoes fire only when both the torpedoes and the coilguns have 65%+ to hit
    (coilguns destroyed: torpedoes alone at 65%+). The kill-shot rule (target nearly dead) is exempt. */
@@ -1784,7 +1787,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
      ${dcPanel(s,sd,true)}
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
-    h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Subsystem targeting (lasers and PD only): every third hit that gets past the target's shields knocks out one of its systems (one it's exposed to from your bearing) instead of doing hull damage. Coilguns and torpedoes always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button>${(()=>{const hasMs=s.weapons.some(w=>w.alive&&w.T.kind==='missile');return `<button class="btn" data-act="msmode" ${sd&&hasMs?'':'disabled'} title="${hasMs?'Missile launchers: offense / defensive interceptors / hold':s.weapons.some(w=>w.T.kind==='missile')?'All missile launchers destroyed':'This ship carries no missiles'}">Msl: ${hasMs?{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]:'none'}</button>`})()}</span></h2>`;
+    h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Aim for systems (lasers and PD only): damage that gets past the target's shields is twice as likely to land on a system it exposes to you as on plain structure (normally the other way round), but every third point of that damage is lost. Coilguns, torpedoes and missiles always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button>${(()=>{const hasMs=s.weapons.some(w=>w.alive&&w.T.kind==='missile');return `<button class="btn" data-act="msmode" ${sd&&hasMs?'':'disabled'} title="${hasMs?'Missile launchers: offense / defensive interceptors / hold':s.weapons.some(w=>w.T.kind==='missile')?'All missile launchers destroyed':'This ship carries no missiles'}">Msl: ${hasMs?{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]:'none'}</button>`})()}</span></h2>`;
     {const nDmg=(s.damaged||[]).filter(b=>b.k!=='rea').length+((s.damaged||[]).some(b=>b.k==='rea')?1:0);h+=`<div class="row tabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire control</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage control${nDmg?` <b class="warn">${nDmg}</b>`:''}</button>${dgTab==='fire'?`<button class="btn ${showArcs?'mfire':''}" data-act="arcs" title="Show every weapon's firing arc on the map, out to its targeting-computer range (V). Bright inner part = 50%+ to hit. Click a weapon's arc label to show just that mount.">◔ Arcs${showArcs?': on':''}</button>`:''}</div>`}
     if(dgTab==='fire'){
     const GC={lasers:s.d.laser,torps:s.d.torp,coils:'#ffe066',missiles:'#c7a6ff',lances:s.d.torp,aplances:'#f2e8ff'};
@@ -2778,6 +2781,206 @@ function setMobile(on){MOB=!!on;try{localStorage.setItem('shtMobile',MOB?'1':'0'
     if(typeof menuMusicKick==='function')menuMusicKick()};
   ['touchend','click','keydown'].forEach(ev=>addEventListener(ev,unlock,true));
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&AC&&AC.state!=='running')AC.resume().catch(()=>{})})}
+
+/* ===================== Tutorial mode (Nov 26, David) =====================
+   "Maneuvering and Weapons": a Martian Peregrine, scripted phases, pop-ups that must be clicked through before anything moves,
+   highlights on the part of the screen each pop-up talks about, practice drones. Desktop layout only.
+   Every pop-up has a fixed id (mw.<phase>.<n>) so voice-over recordings can be attached later: put the audio URL in TUT_VO[id]. */
+var TUT=null;
+const TUT_VO={};   // voice-over clips by pop-up id, e.g. TUT_VO['mw.01.1']='vo/mw-01-1.mp3'
+
+/* ---- finding things on screen ---- */
+const tq=(sel,o={})=>{let L=[...document.querySelectorAll(sel)];if(o.text)L=L.filter(e=>e.textContent.includes(o.text));if(o.up)L=L.map(e=>e.closest(o.up)||e);if(o.first)L=L.slice(0,1);return [...new Set(L)]};
+const wr=i=>[document.querySelectorAll('#side .wrow:not(.mslrow)')[i]].filter(Boolean);
+const HL={
+  shipPanel:()=>tq('[data-act="aie"]',{up:'.panel'}),
+  aiToggles:()=>tq('.aiw'),
+  energy:()=>tq('.bar.en',{up:'.row'}),
+  upkeep:()=>tq('.upk'),
+  hullSh:()=>tq('#side .g2'),
+  gen:()=>tq('[data-act="gen:0"]',{up:'.row'}),
+  velLine:()=>tq('#side .row.dim.sm',{text:'hex/turn'}),
+  bar:()=>tq('#bar'),
+  clock:()=>tq('#bar *',{text:'IMPULSE'}).slice(-1).map(e=>e.closest('div')||e),
+  accel:()=>tq('#bar button',{text:'ACCEL'}),
+  reverse:()=>tq('#bar button',{text:'REVERSE'}),
+  pivots:()=>tq('#bar button',{text:'Piv'}),
+  evade:()=>tq('#bar button',{text:'Evade'}),
+  cont:()=>tq('#bar button',{text:'Continue'}),
+  help:()=>tq('#help'),
+  weapons:()=>tq('[data-act="chargeall"]',{up:'.panel'}),
+  wHead:()=>tq('[data-act="chargeall"]',{up:'h2'}),
+  tabs:()=>tq('.row.tabs'),
+  arcsBtn:()=>tq('[data-act="arcs"]'),
+  row0:()=>wr(0),
+  lasers:()=>[...wr(0),...wr(1),...wr(2)],
+  arcLabels:()=>tq('[data-act^="arcone:w"]'),
+  arc0:()=>tq('[data-act="arcone:w0"]'),
+  name0:()=>wr(0).map(r=>r.querySelector('.wn')||r),
+  state0:()=>wr(0).map(r=>r.querySelector('.ws')||r),
+  fireBtns:()=>tq('[data-fire^="w"]'),
+  fire0:()=>tq('[data-fire="w0"]'),
+  loadBtns:()=>tq('#side .wrow button',{text:'Load'}),
+  coil:()=>wr(3),
+  torp:()=>wr(4),
+  msl:()=>tq('.mslrow'),
+  mslCtl:()=>tq('.mslctl'),
+  msmode:()=>tq('[data-act="msmode"]'),
+  msdef:()=>tq('[data-act="msdef:1"]',{up:'.chip'}),
+  msdeploy:()=>tq('[data-act="msdeploy"]'),
+  mslLaunch:()=>tq('[data-act="mslone"],[data-act="mslall"]'),
+  pd:()=>tq('[data-act^="arcone:pd"]',{up:'.wrow'}),
+  aipd:()=>tq('[data-act="aipd"]'),
+  submode:()=>tq('[data-act="submode"]'),
+  chargeall:()=>tq('[data-act="chargeall"]'),
+  target:()=>tq('#rside .panel',{first:true}),
+  log:()=>tq('#rside .panel').slice(-1),
+  map:()=>[{getBoundingClientRect:()=>{const L=document.getElementById('side').getBoundingClientRect(),Rr=document.getElementById('rside').getBoundingClientRect();return{left:L.right+20,top:60,right:Rr.left-20,bottom:innerHeight-150}}}],
+  none:()=>[]};
+
+/* ---- the script ---- */
+const tP=()=>P&&!P.dead?P:null;
+const wOf=k=>{const s=tP();return s?s.weapons.filter(w=>w.T&&w.T.grp===k||k==='lasers'&&w.T.kind==='beam'):[]};
+const tLasers=()=>{const s=tP();return s?s.weapons.filter(w=>w.T.kind==='beam'):[]};
+const tTorp=()=>{const s=tP();return s?s.weapons.find(w=>w.T.kind==='torp'):null};
+const droneDead=n=>TUT.drones[n]&&TUT.drones[n].dead;
+
+const TUTS={mw:{name:'Maneuvering and Weapons',blurb:'Fly a Martian Peregrine: how a ship moves in space with no friction, then every part of the fire control panel, firing lasers, missiles and an energy torpedo, reloading, and hitting moving targets.',
+ steps:[
+ {id:'01',title:'Welcome',obj:'',pops:[
+  ['Welcome aboard, Captain.','This is the Martian frigate Peregrine — fast, light, and now yours. This training run teaches you how a starship moves and how to use every weapon you have.\n\nClick Next (or press Enter) to move on. Nothing in the battle moves until you have read each message.','none'],
+  ['How the game runs','The battle is split into turns, and every turn into 8 impulses. At the start of every impulse the game stops so you can give orders: burn, pivot, load weapons, fire. Then you press Continue and everything happens at once — your orders and the enemy\'s.','clock'],
+ ]},
+ {id:'02',title:'Moving in space',obj:'Practice: pivot, burn, and press Continue a few times. Watch your speed change.',pops:[
+  ['There is no friction in space','On a planet a ship slows down by itself. Out here nothing slows you down. Once you are moving, you keep moving in the same direction at the same speed — forever — until you burn your engine to change it.\n\nRight now the Peregrine is drifting forward at 2 hexes per turn.','map'],
+  ['Your speed and course','This line shows your speed in hexes per turn and the way your nose points. On the map, the arrow in front of your ship is your drift: where your ship will be one turn from now if you do nothing.','velLine'],
+  ['Pivoting','Pivoting (Z and C, or Q and E) turns your ship 30° at a time WITHOUT changing the direction you are travelling. A pivot only changes where your nose — and your guns — point. Cruisers pay 1 energy per 30°, small ships like this one 0.5.\n\nThere is a limit to how far you can turn in one impulse: 60° for cruisers, 90° for frigates and destroyers like the Peregrine.','pivots'],
+  ['Burning','ACCEL (W) fires your main engine along the way your nose points and adds 1 hex per turn of velocity in that direction. Your new course is your old velocity plus the push — so to turn your course, pivot first and then burn.\n\nYou can burn twice in one impulse if you have the energy. A third burn is a critical burn: it pushes the engine too hard and damages it, and the game asks before it lets you.','accel'],
+  ['Slowing down','To slow down, push against the way you are moving. Either pivot to point your nose backwards and burn, or use REVERSE (X or S), which fires the forward thrusters. Reverse costs double and can only be used every other impulse — turning around and burning is usually cheaper.','reverse'],
+  ['Evasive maneuvers','Evade (J) jinks the ship side to side for one impulse. Shots at you — and your own shots — are 30% less likely to hit that impulse. It costs about as much as a pivot and you cannot pivot in the same impulse.','evade'],
+  ['Continue','When your orders are in, press Continue (or Enter). Orders you gave this impulse show in the queue and can be undone with Backspace until then.\n\nTry it now: pivot a little, burn once or twice, and press Continue a few times. Watch your drift arrow and your speed change.','cont'],
+ ],goal:()=>{const s=tP();if(!s)return false;const v=Math.hypot(s.vq-TUT.v0[0],s.vr-TUT.v0[1]);return v>.5&&T>=TUT.T0+2}},
+ {id:'03',title:'Fire control',obj:'',setup(){tutDrone(0,6,0,'Drone A')},pops:[
+  ['A target','A training drone has appeared 6 hexes ahead so the fire control panel has something to aim at. Before you shoot it, here is a tour of everything on your panels.','map'],
+  ['Your ship','This panel is your ship. The bar shows your energy: your reactor refills it every impulse, and everything — engines, weapons, shields — is paid from it. The pool can never hold more than one turn of reactor output, so energy you do not spend is wasted.','energy'],
+  ['Upkeep','Some things drain energy every impulse: the shield generator, and any weapon that is charging. This line adds them up and shows what is left over each impulse.','upkeep'],
+  ['Hull and shields','Hull is your ship\'s life. Shields soak up damage first. When damage gets through to the hull, every point can also knock out a system — a gun, an engine, the reactor. Shields get their own training later.','hullSh'],
+  ['Helpers','These buttons hand jobs to the computer if you want to concentrate on flying: Energy (loading and shields), Repairs (damage control teams) and PD (reloading point defense automatically). Green means the computer is doing it.','aiToggles'],
+  ['The weapons panel','This is fire control. Every weapon on your ship has a row here. The two tabs switch between firing your weapons and repairing damage.','weapons'],
+  ['A weapon row','Each row is one weapon mount. From left to right: its firing arc, its name, its state, and its Fire button.','row0'],
+  ['Firing arcs','The box on the left is the arc: the directions that gun can shoot. FX is the front 240°. LS and RS are the left and right sides, 180° each. S is spinal — a big gun built along the keel that only fires within 15° of straight ahead. 360 turrets fire anywhere.\n\nA bright arc box means that gun can hit your current target right now.','arcLabels'],
+  ['Seeing your arcs','Click an arc box to draw that gun\'s arc on the map. The Arcs button (or V) draws every arc at once — the bright inner part of each arc is where you have at least a 50% chance to hit. You can also hold your pointer on any Fire button for a second to see its arc.','arcsBtn'],
+  ['Weapon state','READY means loaded. A weapon that has fired is empty until you load it again. A loading weapon shows how far along it is and the impulse it will be ready.','state0'],
+  ['Fire buttons','The Fire button shows your chance to hit at the current range. Click it to arm the weapon (it lights up), click again to disarm. Armed weapons fire when you press Continue.\n\nA greyed-out Fire button means the target is outside that gun\'s arc.','fireBtns'],
+  ['Hit chance and range','Every weapon is less accurate the farther the target is. Your targeting computer is good out to 18 hexes; beyond that you will almost never hit. Damage does not drop with range — a hit is a hit — except for plasma lances, which fade.','fire0'],
+  ['Firing and turning in the same impulse','A shot uses the way your ship was pointing when you gave the order. So you can fire and then pivot away in the same impulse — the shot still goes.','fire0'],
+  ['Lasers','Laser cannons are turret guns: wide arcs, good accuracy, quick to reload. Small, medium, heavy and titan lasers do 4, 6, 8 and 12 damage. Your Peregrine has three small ones covering the front and both sides.','lasers'],
+  ['Coilguns','Coilguns are magnetic cannons built along the spine. They hit hard for their energy but only fire nearly straight ahead, and their accuracy falls off faster with range than lasers.','coil'],
+  ['Energy torpedoes','The energy torpedo is your big punch. It charges in stages over three turns; each stage adds damage (this medium torpedo does 24 at full charge). You can fire it at any charge, or hold it — but holding a charge costs a little energy every turn. After it fires it needs one full turn before it can fire again. Like coilguns, it is spinal: point your nose at the target.','torp'],
+  ['Other weapons','You will meet others: plasma lances (huge damage up close that fades with range), antiproton lances (huge damage at any range, but slow to charge), railgun turrets on older ships, and the pirates\' disposable battery cannons.','none'],
+  ['Loading','Loading costs energy. With weapons charging over time (the usual setting) the cost is spread over the reload: the Load button shows the energy per impulse. A charging weapon can be paused to free up power and resumed later. The ⚡ Charge button loads everything you can afford at once.','chargeall'],
+  ['Missiles','This row is your missile launchers. Each launcher holds 4 missiles. It fires one, then needs a turn to cycle before the next; after the 4th it needs two turns to reload the magazine. Missiles cost no energy.\n\nA missile starts with your ship\'s velocity, then accelerates hard and steers itself to the target for three turns. Each hit does 10 damage.','msl'],
+  ['Missile controls','Launch 1 fires one missile, All fires every ready launcher. The Fire/Deploy switch decides whether missiles light at once, or leave the rack dark and drift silently until you press Light — a hidden wave the enemy may not see coming.','mslCtl'],
+  ['Attack or defend','This button sets what your launchers do. Attack: they fire at your target. Defend: they hold fire and launch interceptors the moment a missile comes at you — each interceptor has a 70% chance to kill one missile. The shield stepper sets aside just some launchers for defense and lets the rest attack.','msmode'],
+  ['Point defense','These are your point-defense guns. They fire automatically at missiles that come within 2 hexes, 80% to hit, each gun once per impulse, and every missile can be shot at twice. A fired gun must be reloaded (1 energy, instantly) — the PD helper does that for you. You can also fire PD at a ship for 1 damage.','pd'],
+  ['Aim: Hull or Systems','Lasers and point defense can aim for systems. Normally damage that gets through is twice as likely to hit plain structure as a system. Aiming for systems flips that — systems become twice as likely — but every third point of that damage is lost. Use it to knock out guns and engines; use Hull to kill faster.','submode'],
+  ['Your target','The right panel shows your target. Click a ship on the map to target it, or press T to cycle through targets. Within sensor range you can see its shields, hull and which of its weapons are loaded.','target'],
+  ['The log','Everything that happens is written here: hits, misses, damage, systems knocked out.','log'],
+ ]},
+ {id:'04',title:'Lasers',obj:'Destroy the drone dead ahead: arm your lasers with their Fire buttons, then press Continue.',pops:[
+  ['Target practice','Time to shoot. The drone dead ahead is unarmed and one hit will destroy it.\n\nArm the lasers that can reach it — click their Fire buttons — then press Continue.','lasers'],
+ ],goal:()=>droneDead(0)},
+ {id:'05',title:'Reloading',obj:'Load your empty lasers (their Load buttons, or ⚡ Charge), then press Continue.',pops:[
+  ['Good shot!','Your lasers are now empty. A weapon that has fired does nothing until you load it again.\n\nClick Load on each empty laser (or ⚡ Charge to load everything) and watch how many impulses it takes to be ready.','loadBtns'],
+ ],goal:()=>tLasers().every(w=>!w.alive||w.state!=='idle')&&T>TUT.T0},
+ {id:'06',title:'Turning to fire',obj:'A drone is dead behind you. Pivot until your lasers bear on it, then destroy it.',setup(){tutDrone(180,5,0,'Drone B')},pops:[
+  ['Behind you!','Another drone is drifting along right behind you, matching your course and speed. None of your guns point backwards.\n\nPivot until your lasers bear on it — their arc boxes light up when they can hit — and fire. Remember: you can only turn 90° per impulse, so this takes more than one impulse. Make sure your lasers have finished loading.','pivots'],
+ ],goal:()=>droneDead(1)},
+ {id:'07',title:'Missiles',obj:'Launch a missile wave at the drone ahead (Msl: Attack, then All), and press Continue until it hits.',setup(){const s=tP();if(s){s.msMode='off';s.msDef=0}tutDrone(0,12,0,'Drone C')},pops:[
+  ['Missile wave','A drone has appeared 12 hexes ahead. Make sure your launchers are on Attack, press All to launch every ready missile, then press Continue and watch them fly. Missiles steer themselves — they do not need you to point at the target.','mslCtl'],
+ ],goal:()=>droneDead(2)},
+ {id:'08',title:'Energy torpedo',obj:'Point your nose at the drone and fire the energy torpedo.',setup(){tutDrone(0,6,0,'Drone D');TUT.tFired=false},pops:[
+  ['The big gun','One more drone, dead ahead. Your energy torpedo is fully charged. It only fires within 15° of your nose, so keep the drone right in front of you, arm the torpedo and press Continue.','torp'],
+ ],goal:()=>{const w=tTorp();if(w&&(w.stages<1||w.state==='idle'))TUT.tFired=true;return TUT.tFired&&droneDead(3)}},
+ {id:'09',title:'Recharging',obj:'Start charging the torpedo again, then keep pressing Continue until it is fully charged (3 turns).',pops:[
+  ['Recharging the torpedo','The torpedo is empty. Click Charge to start charging it again, then keep pressing Continue and watch the stages fill.\n\nIt takes three full turns — 24 impulses — to reach full charge. That is why a captain thinks hard about when to fire it. You can stop at any stage with Hold and fire with whatever charge you have.','torp'],
+ ],goal:()=>{const w=tTorp();return !!w&&w.stages>=3}},
+ {id:'10',title:'Moving targets',obj:'Destroy all four moving drones.',setup(){tutDrone(40,12,[3,-150]);tutDrone(-70,11,[2,60]);tutDrone(150,13,[5,-30]);tutDrone(-160,14,[6,90])},pops:[
+  ['Moving targets','Four drones are flying past on their own courses, at speeds from 2 to 6. Use everything you have learned: pivot and burn to stay in range, keep your guns loaded, and bring the right weapon to bear. Press T to switch targets.','map'],
+ ],goal:()=>TUT.drones.slice(4).every(d=>d.dead)},
+ {id:'11',title:'Training complete',obj:'',pops:[
+  ['Well done, Captain.','You have flown your ship, used every weapon on it and hit moving targets. Next time: shields, damage control and fighting a real enemy.\n\nPress Next to return to the game modes.','none'],
+ ],end:true},
+ ]}};
+
+/* ---- drones ---- */
+function tutDrone(brg,dist,vel,name){const s=tP();if(!s)return;const a=fAng(s.f)+brg*D2R,X=s.px.x+Math.cos(a)*dist*HX*SQ3,Y=s.px.y+Math.sin(a)*dist*HX*SQ3,h=pixToHex(X,Y);
+  const n=TUT.drones.length,d=makeShip('drone',h.q,h.r,s.f,1,true,name||'Drone '+(n+1),null);d.slot=1;d.px=hp(d.pq,d.pr);d.ppx=null;
+  if(vel===0){d.vq=s.vq;d.vr=s.vr}else{const [sp,deg]=vel,va=deg*D2R;let bf=0,bd=9;for(let f=0;f<NF;f++){const dd=Math.abs(norm(fAng(f)-va));if(dd<bd){bd=dd;bf=f}}d.f=bf;const v=fdir(bf);d.vq=v[0]*sp;d.vr=v[1]*sp}
+  ships.push(d);TUT.drones.push(d);if(!s.target||s.target.dead)s.target=d;buildHUD()}
+
+/* ---- running a tutorial ---- */
+function startTutorial(id){const Tu=TUTS[id];if(!Tu)return;if(typeof setMobile==='function'&&typeof MOB!=='undefined'&&MOB)setMobile(false);
+  if(typeof SCEN!=='undefined'&&SCEN)leaveScenario();COOP='';
+  SLOTS=[{kind:'human',owner:ME,team:0,name:'You'},{kind:'ai',owner:null,team:1,name:'Drones'},null,null,null,null,null,null];
+  fleet[0]=[{key:'peregrine',ai:false}];fleet[1]=[{key:'drone',ai:true}];for(let i=2;i<MAXSLOTS;i++)fleet[i]=[];fleetFaction[0]='Martian';fleetFaction[1]='Martian';fleetTL[0]=4;startSpeed[0]=0;startSpeed[1]=0;startMode='stations';era='open';
+  for(const x of ['modepick','facpick']){const o=$(x);if(o)o.remove()}
+  TUT={id,step:-1,pop:0,drones:[],T0:0,v0:[0,0]};initAudio();startMusic();start();
+  // clear the placeholder drone; the Peregrine sits at the centre drifting north at 2 hexes/turn
+  ships=ships.filter(s=>!s.d.drone);const s=P;s.pq=s.q=0;s.pr=s.r=0;s.px=hp(0,0);s.f=0;const v=fdir(0);s.vq=v[0]*2;s.vr=v[1]*2;s.target=null;
+  cam.x=s.px.x;cam.y=s.px.y;cam.snap=true;logLines=[];log('Training: '+Tu.name,'warn');buildHUD();tutNext()}
+function tutNext(){const Tu=TUTS[TUT.id];TUT.step++;const st=Tu.steps[TUT.step];if(!st){tutExit();return}
+  TUT.T0=T;const s=tP();TUT.v0=s?[s.vq,s.vr]:[0,0];if(st.setup)st.setup();TUT.pop=0;tutObj();tutShowPop()}
+function tutObj(){let el=$('tutobj');if(!el){el=document.createElement('div');el.id='tutobj';document.body.appendChild(el)}const Tu=TUTS[TUT.id],st=Tu.steps[TUT.step];
+  el.innerHTML=`<b>🎓 ${Tu.name}</b> · <span class="dim">${TUT.step+1}/${Tu.steps.length} ${st.title}</span>${st.obj?`<div class="to-obj">${st.obj}</div>`:''}<div class="to-b"><button class="btn" id="tutagain">↺ Show again</button>${st.goal?'<button class="btn" id="tutskip">Skip ▸</button>':''}<button class="btn" id="tutquit">✕ Quit</button></div>`;
+  $('tutagain').onclick=()=>{TUT.pop=0;tutShowPop()};if($('tutskip'))$('tutskip').onclick=()=>tutNext();$('tutquit').onclick=()=>tutExit()}
+function tutRect(els){let L=1e9,Tt=1e9,Rr=-1e9,B=-1e9;for(const e of els){const r=e.getBoundingClientRect();if(!r||r.width===0&&r.height===0)continue;L=Math.min(L,r.left);Tt=Math.min(Tt,r.top);Rr=Math.max(Rr,r.right);B=Math.max(B,r.bottom)}return L<1e9?{left:L-4,top:Tt-4,right:Rr+4,bottom:B+4}:null}
+let tutVO=null;
+function tutShowPop(){const st=TUTS[TUT.id].steps[TUT.step];const p=st.pops[TUT.pop];if(!p){tutHidePop();if(st.end)tutExit();else if(!st.goal)tutNext();return}
+  const pid='mw.'+st.id+'.'+(TUT.pop+1);let blk=$('tutblock');if(!blk){blk=document.createElement('div');blk.id='tutblock';document.body.appendChild(blk)}blk.style.display='block';
+  let ring=$('tutring');if(!ring){ring=document.createElement('div');ring.id='tutring';document.body.appendChild(ring)}
+  let card=$('tutpop');if(!card){card=document.createElement('div');card.id='tutpop';document.body.appendChild(card)}
+  card.innerHTML=`<div class="tp-h">${p[0]}</div><div class="tp-t">${p[1].replace(/\n/g,'<br>')}</div><div class="tp-b"><span class="dim sm">${TUT.pop+1} / ${st.pops.length}</span><span style="flex:1"></span>${TUT.pop?'<button class="btn" id="tpback">◂ Back</button>':''}<button class="btn go" id="tpnext">${TUT.pop+1<st.pops.length?'Next ▸':st.end?'Finish ▸':st.goal?'Got it ▸':'Next ▸'}</button></div>`;
+  card.dataset.hl=p[2]||'none';card.style.display='block';tutPlace();
+  $('tpnext').onclick=()=>{TUT.pop++;tutShowPop()};if($('tpback'))$('tpback').onclick=()=>{TUT.pop--;tutShowPop()};
+  try{if(tutVO){tutVO.pause();tutVO=null}if(TUT_VO[pid]){tutVO=new Audio(TUT_VO[pid]);tutVO.play().catch(()=>{})}}catch(e){}}
+function tutPlace(){const card=$('tutpop'),ring=$('tutring');if(!card||card.style.display==='none')return;const f=HL[card.dataset.hl]||HL.none,r=tutRect(f());
+  if(r){ring.style.display='block';Object.assign(ring.style,{left:r.left+'px',top:r.top+'px',width:(r.right-r.left)+'px',height:(r.bottom-r.top)+'px'});ring.classList.add('on')}
+  else{ring.style.display='block';ring.classList.remove('on');Object.assign(ring.style,{left:innerWidth/2+'px',top:innerHeight/2+'px',width:'0px',height:'0px'})}
+  const W=card.offsetWidth,H=card.offsetHeight;let x,y;
+  if(!r){x=(innerWidth-W)/2;y=(innerHeight-H)/2}
+  else if(r.right+W+24<innerWidth&&r.left<innerWidth/2){x=r.right+18;y=Math.min(Math.max(10,(r.top+r.bottom)/2-H/2),innerHeight-H-10)}
+  else if(r.left-W-24>0){x=r.left-W-18;y=Math.min(Math.max(10,(r.top+r.bottom)/2-H/2),innerHeight-H-10)}
+  else{x=Math.min(Math.max(10,(r.left+r.right)/2-W/2),innerWidth-W-10);y=r.top-H-18>10?r.top-H-18:Math.min(r.bottom+18,innerHeight-H-10)}
+  card.style.left=x+'px';card.style.top=y+'px'}
+function tutHidePop(){for(const x of ['tutpop','tutring','tutblock']){const e=$(x);if(e)e.style.display='none'}try{if(tutVO){tutVO.pause();tutVO=null}}catch(e){}}
+const tutPopOpen=()=>{const c=$('tutpop');return !!c&&c.style.display!=='none'};
+function tutExit(){tutHidePop();for(const x of ['tutobj']){const e=$(x);if(e)e.remove()}TUT=null;ships=[];missiles=[];fx=[];P=null;phase='select';buildHUD();
+  $('end').style.display='none';$('start').style.display='flex';try{menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}}catch(e){}renderBuilder();openModePicker()}
+// goal checks and keeping highlights on target while the HUD redraws
+setInterval(()=>{if(!TUT)return;if(tutPopOpen()){tutPlace();return}const st=TUTS[TUT.id].steps[TUT.step];if(st&&st.goal&&phase!=='over'&&st.goal())tutNext()},250);
+addEventListener('resize',()=>{if(TUT)tutPlace()});
+// while a pop-up is open the game takes no keys: Enter / Space / → = Next, ← = Back
+addEventListener('keydown',e=>{if(!TUT||!tutPopOpen())return;e.preventDefault();e.stopImmediatePropagation();
+  if(e.key==='Enter'||e.key===' '||e.key==='ArrowRight'){const b=$('tpnext');if(b)b.click()}else if(e.key==='ArrowLeft'){const b=$('tpback');if(b)b.click()}},true);
+
+/* ---- entry on the Game modes screen ---- */
+(function(){const css=document.createElement('style');css.textContent=`
+#tutblock{position:fixed;inset:0;z-index:9000;display:none;background:transparent}
+#tutring{position:fixed;z-index:9001;pointer-events:none;border-radius:8px;display:none;transition:all .25s}
+#tutring.on{border:2px solid #ffd84d;box-shadow:0 0 0 9999px rgba(2,6,12,.62),0 0 18px #ffd84d}
+#tutring:not(.on){box-shadow:0 0 0 9999px rgba(2,6,12,.55)}
+#tutpop{position:fixed;z-index:9002;display:none;width:400px;max-width:44vw;background:#0d1a27;border:1px solid #ffd84d;border-radius:10px;padding:14px 16px;color:#e4edf6;box-shadow:0 8px 30px #000a;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
+#tutpop .tp-h{font-size:17px;font-weight:bold;color:#ffd84d;margin-bottom:8px}#tutpop .tp-t{margin-bottom:12px}#tutpop .tp-b{display:flex;gap:8px;align-items:center}
+#tutobj{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8000;background:#0d1a27ee;border:1px solid #5ad18c;border-radius:8px;padding:6px 12px;max-width:560px;text-align:center;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#e4edf6}
+#tutobj .to-obj{color:#ffd84d;margin:3px 0}#tutobj .to-b{display:flex;gap:6px;justify-content:center;margin-top:3px}#tutobj .btn{margin:0;font-size:11px;padding:2px 8px}`;document.head.appendChild(css);
+  // add a Tutorial card to the mode picker each time it opens
+  const orig=openModePicker;openModePicker=function(){orig();const el=$('modepick');if(!el)return;const add=()=>{const g=el.querySelector('.fp-g');if(!g||g.querySelector('[data-tut]'))return;
+      const b=document.createElement('button');b.className='faccard';b.dataset.tut='1';b.style.setProperty('--fc','#ffd84d');
+      b.innerHTML=`<div class="fc-t"><b style="color:#ffd84d;font-size:16px">🎓 Tutorial</b><span class="dim">Learn to fly and fight, step by step. Desktop only.</span></div>`;g.prepend(b);
+      b.onclick=e=>{e.stopPropagation();const g2=el.querySelector('.fp-in');g2.innerHTML=`<div class="fp-h"><button class="btn" id="tutback" style="margin:0">◂</button><b style="font-size:17px">Tutorials</b></div>`+Object.entries(TUTS).map(([id,Tu],k)=>`<div class="faccard" style="--fc:#ffd84d;display:block;cursor:default;margin-bottom:8px"><b style="color:#ffd84d;font-size:16px">${k+1}. ${Tu.name}</b><div style="margin:6px 0">${Tu.blurb}</div><button class="btn big" data-tutgo="${id}" style="min-width:200px;border-color:#ffd84d;color:#ffd84d">Start ▶</button>${MP.on?' <span class="dim sm">(offline only — you are hosting or joined)</span>':''}</div>`).join('')+'<div class="dim sm">More tutorials coming: shields and damage control, fleets.</div>';
+        $('tutback').onclick=ev=>{ev.stopPropagation();openModePicker()};g2.querySelectorAll('[data-tutgo]').forEach(x=>x.onclick=ev=>{ev.stopPropagation();if(MP.on)return;startTutorial(x.dataset.tutgo)})}};
+    add();new MutationObserver(add).observe(el,{childList:true,subtree:true})}})();
 
 function toggleMusic(){musicOn=!musicOn;const st=document.getElementById('start');if(!(st&&getComputedStyle(st).display!=='none'))startMusic();setMusicGain()}
 init();
