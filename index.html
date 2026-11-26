@@ -159,6 +159,9 @@ body.mob #mpbanner{left:50%;top:auto;bottom:calc(var(--barh,60px) + 120px);max-w
 #mobnote{position:fixed;left:6px;right:6px;top:126px;z-index:44;background:#0d1a26ee;border:1px solid #4da6ff;color:#d8ecff;border-radius:7px;padding:6px 10px;font-size:12.5px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #mobnote.on{opacity:1;pointer-events:auto}
 body.mob.open-l .mcard,body.mob.open-r .mcard{display:none!important}
+#mobready{position:fixed;left:6px;right:6px;top:176px;z-index:44;background:#0d2010ee;border:1px solid #5fd35f;color:#d6f5d6;border-radius:7px;padding:6px 10px;font-size:12.5px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
+#mobready.on{opacity:1;pointer-events:auto}body:not(.mob) #mobready{display:none}
+body.mob #toast{top:228px}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -879,7 +882,7 @@ function afterMove(){
 let lastFireOpp=0,seenMissiles=new Set();
 function fireOppCount(){let opp=0;for(const s of mine()){const t=tgt(s);if(!t)continue;opp+=s.weapons.filter((w,i)=>canFireMount(s,'w'+i,t)&&w.T.kind!=='missile'&&hitP(s,'w'+i,t)>=.25).length}return opp}
 function shouldStop(){
-  const ev=[...new Set(readyEvt)];readyEvt=[];const full=[];
+  if(readyEvt.length&&typeof mobReady==='function')mobReady(readyEvt.slice());const ev=[...new Set(readyEvt)];readyEvt=[];const full=[];
   for(const s of mine()){const f=s.E>=s.reactor-1e-6;if(f&&!s._full)full.push(s.name);s._full=f}
   if(pauseReq){pauseReq=false;return 'Paused'}
   if(T===0)return 'Battle start — give your opening orders';
@@ -2830,7 +2833,12 @@ function setMobile(on){MOB=!!on;try{localStorage.setItem('shtMobile',MOB?'1':'0'
   <div class="mcol mr"><div class="mrow"><button class="btn" data-mt="x" id="mobhelp2" title="Back to the desktop layout">🖥</button><button class="btn" data-mt="r">Target ☰</button></div><div class="mcard" id="mcardR"></div></div>`;
   tabs.addEventListener('click',e=>{const b=e.target.closest('[data-mt="cyc"]');if(!b)return;e.stopPropagation();if(typeof cycleTarget==='function')cycleTarget()},true);
   const note=document.createElement('div');note.id='mobnote';document.body.appendChild(note);
-  window.mobNote=msg=>{if(!MOB)return;note.innerHTML=msg;note.classList.add('on');clearTimeout(mobNote.t);mobNote.t=setTimeout(()=>note.classList.remove('on'),6000)};
+  /* weapons reloaded: green strip, counts per ship and weapon (e.g. "Condor: LC(m) ×3, CG(m)") */
+  const rn=document.createElement('div');rn.id='mobready';document.body.appendChild(rn);rn.addEventListener('click',()=>rn.classList.remove('on'));
+  window.mobReady=list=>{list=list.filter(e=>!/ stage \d/.test(e));if(!MOB||!list.length)return;const by={};for(const e of list){const i=e.indexOf(' ');const sh=e.slice(0,i),w=e.slice(i+1);(by[sh]=by[sh]||{})[w]=((by[sh]||{})[w]||0)+1}
+    rn.innerHTML='🔄 <b>Weapons reloaded</b> — '+Object.entries(by).map(([sh,ws])=>`${sh}: `+Object.entries(ws).map(([w,n])=>w+(n>1?' ×'+n:'')).join(', ')).join(' · ');
+    rn.classList.add('on');clearTimeout(mobReady.t);mobReady.t=setTimeout(()=>rn.classList.remove('on'),6000);};
+  window.mobNote=msg=>{if(!MOB)return;msg=msg.split(' · ').filter(x=>!x.startsWith('Weapon ready')).join(' · ');if(!msg)return;note.innerHTML=msg;note.classList.add('on');clearTimeout(mobNote.t);mobNote.t=setTimeout(()=>note.classList.remove('on'),6000)};
   note.addEventListener('click',()=>note.classList.remove('on'));
   const bar=(v,m,c)=>`<div class="mb"><i style="width:${Math.max(0,Math.min(100,m>0?100*v/m:0))}%;background:${c}"></i></div>`;
   const card=(s,own)=>{if(!s||s.dead)return '<div class="dim">—</div>';
