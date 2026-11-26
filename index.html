@@ -1955,8 +1955,9 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
   for(const s of ships){if(s.dead)continue;const a=posOf(s);let vq=s.vq,vr=s.vr;
     if(own(s)&&phase==='decide'){let f=s.f;for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn'){const b=burnResult(s,x.a,f);f=b.f;vq+=b.dq;vr+=b.dr}}}
     if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?REL.foe+'cc':own(s)?s.color+(s===P&&phase==='decide'?'cc':'66'):REL.ally+'99',!fr(s)?[6,4]:[3,5])}}
-  const PT=P&&!P.dead?tgt(P):null;if(PT){const a=posOf(P),b=posOf(PT);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
-    ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(P,PT)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
+  const PT=P&&!P.dead?tgt(P):null;const AL=ships.filter(x=>!x.dead),DU=PT?[P,PT]:AL.length===2&&AL[0].team!==AL[1].team?AL:null;   /* Nov 26 (David): duels always show the range, even with every ship on AI */
+  if(DU){const [A1,B1]=DU,a=posOf(A1),b=posOf(B1);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(A1,B1)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
   for(const s of ships)if(!s.dead&&own(s)&&s.dark&&s.d.runDark){const p=posOf(s),R0=12*HS,a0=s.drawAng==null?fAng(s.f):s.drawAng,on=darkOn(s);   /* Run Dark: bow wedge (±60°), enemies inside marked green, outside red */
     ctx.save();ctx.fillStyle=on?'rgba(90,220,140,.07)':'rgba(200,200,120,.05)';ctx.strokeStyle=on?'rgba(90,220,140,.45)':'rgba(200,200,120,.35)';ctx.setLineDash([5,5]);ctx.lineWidth=devicePixelRatio;
     ctx.beginPath();ctx.moveTo(sx(p.x),sy(p.y));ctx.arc(sx(p.x),sy(p.y),R0*cam.s,a0-Math.PI/3,a0+Math.PI/3);ctx.closePath();ctx.fill();ctx.stroke();ctx.setLineDash([]);
@@ -2001,6 +2002,7 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
       ctx.beginPath();for(let i=0;i<n;i++){const o=(i-(n-1)/2)*g;ctx.moveTo(X1+nx*o,Y1+ny*o);ctx.lineTo(X2+nx*o,Y2+ny*o)}ctx.stroke();ctx.shadowBlur=0}   // one thin beam per barrel, side by side
     else if(f.type==='bolt'){const k=1-a;const x=f.x1+(f.x2-f.x1)*k,y=f.y1+(f.y2-f.y1)*k;ctx.globalAlpha=1;ctx.fillStyle=f.col+'66';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*2.2*dpr,0,7);ctx.fill();ctx.fillStyle='#fffbe8';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*dpr,0,7);ctx.fill()}
     else if(f.type==='p'){ctx.globalAlpha=Math.min(1,f.t*2);ctx.fillStyle=f.color;ctx.fillRect(sx(f.x),sy(f.y),2*dpr,2*dpr)}
+    else if(f.type==='deb'){ctx.save();ctx.globalAlpha=Math.min(1,f.t*1.2);ctx.translate(sx(f.x),sy(f.y));ctx.rotate(f.rot);const z=f.sz*dpr*Math.max(.7,Math.min(1.6,cam.s/dpr));ctx.fillStyle=f.color;if(f.ember){ctx.shadowColor='#ff8a2a';ctx.shadowBlur=5*dpr}ctx.fillRect(-z,-z*.6,z*2,z*1.2);ctx.restore()}
     else if(f.type==='ghost'){ctx.globalAlpha=1;drawMissile(f.x,f.y,f.h,f.col,f.ic)}
     else if(f.type==='ring'){ctx.globalAlpha=a;ctx.strokeStyle=f.color;ctx.lineWidth=2.5*dpr;ctx.beginPath();ctx.arc(sx(f.x),sy(f.y),Math.max(2*dpr,f.r*(1-a)*cam.s+4*dpr),0,7);ctx.stroke()}
     else if(f.type==='text'){ctx.globalAlpha=a;ctx.fillStyle=f.color;ctx.font=`bold ${12*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(f.text,sx(f.x),sy(f.y))}}
@@ -2020,12 +2022,37 @@ function drawJink(s,pos,ang){const p=Math.min(1,jinkP(s)),e=Math.sin(Math.PI*p),
   for(const fx_ of [x0+(x1-x0)*.25,x0+(x1-x0)*.7]){const L=(11+Math.random()*7)*str,y=side*(hw*.95);const g=ctx.createLinearGradient(fx_,y,fx_,y+side*L);g.addColorStop(0,'#ffffff');g.addColorStop(.4,'#9fd8ff');g.addColorStop(1,'#9fd8ff00');
     ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(fx_-3.5,y);ctx.lineTo(fx_+3.5,y);ctx.lineTo(fx_,y+side*L);ctx.closePath();ctx.fill()}
   ctx.restore()}
+/* Nov 26 (David): hull-damage looks. Slightly (hull ≤ 75%), moderately (≤ 50%) and heavily (≤ 25%) damaged ships show scorch marks, cracks and,
+   when heavy, holes with glowing rims; moderately and heavily damaged ships leak debris. Marks are fixed per ship design (seeded), so they don't jump around. */
+const dmgLvl=s=>{const f=s.hull/Math.max(1,s.d.hull);return f>.75?0:f>.5?1:f>.25?2:3};
+function hullPath(d){const P=new Path2D();let mv=true;for(const p of d.shape){if(!p){P.closePath();mv=true;continue}mv?P.moveTo(p[0],p[1]):P.lineTo(p[0],p[1]);mv=false}P.closePath();return P}
+let _scr=null;
+function dmgMarks(d){if(d._dm)return d._dm;const P=d._hp||(d._hp=hullPath(d));_scr=_scr||document.createElement('canvas').getContext('2d');
+  let seed=0;for(const p of d.shape)if(p)seed=(seed*31+Math.round(p[0]*7+p[1]*13))|0;const R=()=>{seed=(seed+0x6D2B79F5)|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const p of d.shape)if(p){x0=Math.min(x0,p[0]);x1=Math.max(x1,p[0]);y0=Math.min(y0,p[1]);y1=Math.max(y1,p[1])}const sz=Math.max(x1-x0,y1-y0);
+  const pt=()=>{for(let i=0;i<60;i++){const x=x0+R()*(x1-x0),y=y0+R()*(y1-y0);if(_scr.isPointInPath(P,x,y))return[x,y]}return[(x0+x1)/2,(y0+y1)/2]};
+  const scorch=[],cracks=[],holes=[];for(let i=0;i<9;i++){const [x,y]=pt();scorch.push({x,y,r:sz*(.06+R()*.07)})}
+  for(let i=0;i<6;i++){const [x,y]=pt();const a=R()*7,n=3+Math.floor(R()*3),L=sz*(.05+R()*.05);const pts=[[x,y]];let cx=x,cy=y,ca=a;for(let k=0;k<n;k++){ca+=(R()-.5)*1.4;cx+=Math.cos(ca)*L;cy+=Math.sin(ca)*L;pts.push([cx,cy])}cracks.push(pts)}
+  for(let i=0;i<3;i++){const [x,y]=pt();const r=sz*(.045+R()*.035),k=7,poly=[];for(let j=0;j<k;j++){const a=j/k*Math.PI*2,rr=r*(.55+R()*.6);poly.push([x+Math.cos(a)*rr,y+Math.sin(a)*rr])}holes.push({x,y,r,poly})}
+  return d._dm={scorch,cracks,holes,sz}}
+function drawSprite(ctx,d,color,lvl,sc,dpr){const P=d._hp||(d._hp=hullPath(d));
+  ctx.fillStyle='#0c1622';ctx.fill(P);ctx.strokeStyle=color;ctx.lineWidth=2/sc*dpr;ctx.shadowColor=color;ctx.shadowBlur=(lvl>=3?6:10)*dpr;ctx.stroke(P);ctx.shadowBlur=0;
+  if(d.inner){ctx.beginPath();d.inner.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=color+'26';ctx.fill();ctx.strokeStyle=color+'cc';ctx.lineWidth=1/sc*dpr;ctx.stroke()}   // aft hull block (Condor)
+  ctx.strokeStyle=color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
+  if(lvl>0){const M=dmgMarks(d),nS=[0,3,6,9][lvl],nC=[0,2,4,6][lvl],nH=[0,0,1,3][lvl];ctx.save();ctx.clip(P);
+    for(let i=0;i<nS;i++){const m=M.scorch[i],g=ctx.createRadialGradient(m.x,m.y,0,m.x,m.y,m.r*(lvl>=3?1.3:1));g.addColorStop(0,'rgba(8,6,4,.85)');g.addColorStop(.6,'rgba(40,28,18,.45)');g.addColorStop(1,'rgba(40,28,18,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(m.x,m.y,m.r*(lvl>=3?1.3:1),0,7);ctx.fill()}
+    ctx.lineCap='round';for(let i=0;i<nC;i++){const c=M.cracks[i];ctx.strokeStyle=lvl>=2?'rgba(255,170,90,.75)':'rgba(220,230,240,.55)';ctx.lineWidth=(lvl>=3?1.4:1)/sc*dpr;ctx.beginPath();c.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.stroke()}
+    for(let i=0;i<nH;i++){const h=M.holes[i];ctx.beginPath();h.poly.forEach((p,k)=>k?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle='#010203';ctx.fill();
+      const fl=typeof performance!=='undefined'?.75+.25*Math.sin(performance.now()/140+i*2):1;ctx.strokeStyle=`rgba(255,${120+Math.round(60*fl)},40,${.9*fl})`;ctx.shadowColor='#ff8a2a';ctx.shadowBlur=6*dpr;ctx.lineWidth=1.3/sc*dpr;ctx.stroke();ctx.shadowBlur=0}
+    ctx.restore()}}
+/* debris leaking from moderately / heavily damaged ships (called every frame) */
+function leakDebris(dt){for(const s of ships){if(s.dead||!s.px)continue;const L=dmgLvl(s);if(L<2)continue;const rate=L>=3?7:2.5;if(Math.random()>rate*dt)continue;
+  const M=dmgMarks(s.d),src=L>=3&&Math.random()<.6?M.holes[Math.floor(Math.random()*3)]:M.cracks[Math.floor(Math.random()*4)][0];const lx=src.x??src[0],ly=src.y??src[1];
+  const a=s.drawAng??fAng(s.f),k=.75,p=posOf(s),wx=p.x+(lx*Math.cos(a)-ly*Math.sin(a))*k,wy=p.y+(lx*Math.sin(a)+ly*Math.cos(a))*k;const ang=Math.random()*7,v=6+Math.random()*(L>=3?26:16),ember=Math.random()<(L>=3?.35:.2);
+  fx.push({type:'deb',x:wx,y:wy,vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,t:1.4+Math.random()*1.4,max:2.8,rot:Math.random()*7,vr:(Math.random()-.5)*6,sz:ember?1.2:1.4+Math.random()*1.6,color:ember?'#ffb060':['#8b9098','#6d727a','#a3a8b0'][Math.floor(Math.random()*3)],ember})}}
 function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(pos.y),sc=Math.max(cam.s*.75,.35*dpr);const PT=P&&!P.dead?tgt(P):null;
   const g=genLvl(s),sh=s.shield+reinfAmt(s);if(g>0&&sh>0){ctx.beginPath();ctx.arc(X,Y,42*sc,0,7);ctx.strokeStyle=`rgba(88,184,255,${.12+.4*Math.min(1,sh/s.d.shield)*g+(s.flash||0)})`;ctx.lineWidth=(1.5+(reinfAmt(s)>0?2:0)+(s.flash||0)*8)*dpr;ctx.stroke()}
-  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);ctx.beginPath();{let mv=true;for(const p of s.d.shape){if(!p){ctx.closePath();mv=true;continue}mv?ctx.moveTo(p[0],p[1]):ctx.lineTo(p[0],p[1]);mv=false}}ctx.closePath();
-  ctx.fillStyle='#0c1622';ctx.fill();ctx.strokeStyle=s.color;ctx.lineWidth=2/sc*dpr;ctx.shadowColor=s.color;ctx.shadowBlur=10*dpr;ctx.stroke();ctx.shadowBlur=0;
-  if(s.d.inner){ctx.beginPath();s.d.inner.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fillStyle=s.color+'26';ctx.fill();ctx.strokeStyle=s.color+'cc';ctx.lineWidth=1/sc*dpr;ctx.stroke()}   // aft hull block (Condor)
-  ctx.strokeStyle=s.color+'88';ctx.lineWidth=1/sc*dpr;ctx.beginPath();for(const l of s.d.lines){ctx.moveTo(l[0],l[1]);ctx.lineTo(l[2],l[3])}ctx.stroke();for(const q of s.d.dots){ctx.beginPath();ctx.arc(q[0],q[1],2,0,7);ctx.stroke()}
+  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);drawSprite(ctx,s.d,s.color,s.dead?0:dmgLvl(s),sc,dpr);
   if(s.burnFx>0){ctx.fillStyle=`rgba(255,180,90,${s.burnFx})`;ctx.beginPath();ctx.moveTo(-36,-5);ctx.lineTo(-52-Math.random()*8,0);ctx.lineTo(-36,5);ctx.closePath();ctx.fill()}
   ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=REL[rel(s)];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(own(s)?(s.ai?' (AI)':''):'')+(nTeams()>2&&!fr(s)?' ['+TLET[s.team]+']':'')+(fr(s)&&!own(s)?(s.owner!=null?' (P'+(s.owner+1)+')':' (ally)'):''),ly=Y+48*sc+8*dpr;
     {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=REL2[rel(s)];ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
@@ -2419,9 +2446,9 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(phase==='moving'){animT+=dt*1000;if(animT>=ANIM&&msHold>0)msHold-=dt;else if(animT>=ANIM&&MP.role!=='guest'){for(const s of ships)s.ppx=null;for(const m of missiles)m.ppx=null;phase='post';afterMove()}}
     if(phase==='resolving'&&MP.role!=='guest'){resolveT-=dt;if(resolveT<=0)finishResolve()}
     if(deathQ.length&&phase!=='moving')flushDeaths(0);
-    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&own(x)&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
+    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&own(x)&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='deb'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.99;f.vy*=.99;f.rot+=f.vr*dt}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
     for(const s of ships){if(s.flash)s.flash=Math.max(0,s.flash-dt);if(s.burnFx)s.burnFx=Math.max(0,s.burnFx-dt*1.2)}
-    updateCam(dt);render();requestAnimationFrame(loop)}
+    if(phase!=='select'&&ships.length)leakDebris(dt);updateCam(dt);render();requestAnimationFrame(loop)}
   requestAnimationFrame(loop)}
 
 // =====================================================================
