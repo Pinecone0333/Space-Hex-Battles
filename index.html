@@ -2121,19 +2121,34 @@ function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(p
 
 // ---- flow: fleet builder ----
 const fleet=[[],[],[],[],[],[],[],[]];const MAXSHIPS=20;
-const FORMS={line:'Line abreast',wedge:'Wedge',column:'Column',block:'Block',echelon:'Echelon',screen:'Screen (escorts forward)'};
+/* Nov 26 (David): wide (3 empty hexes between ships, rows 3 apart) and tight (1 empty hex between ships, rows 2 apart) versions; wedge, column and
+   echelon come in tight only; echelon left and right. Old keys (wedge, column, echelon) map to their tight versions. */
+const FORMS={line:'Line abreast — wide',lineT:'Line abreast — tight',wedgeT:'Wedge — tight',columnT:'Column — tight',block:'Block — wide',blockT:'Block — tight',
+  echL:'Echelon left — tight',echR:'Echelon right — tight',screen:'Screen — wide',screenT:'Screen — tight'};
+const FORM_DESC={line:'All ships side by side facing the enemy, three empty hexes between neighbours. Every ship can fire forward and nobody blocks anybody; the wide spacing keeps one missile wave from threatening two ships.',
+  lineT:'All ships side by side facing the enemy, one empty hex between neighbours. A compact front: point defense on neighbouring ships overlaps, and the fleet turns as one.',
+  wedgeT:'Flagship at the point, the others trailing back to either side like an arrowhead, one hex between ships. Concentrates the heaviest ship at the front and keeps the flanks covered.',
+  columnT:'Single file behind the flagship, one hex apart. Narrow target from the front and easy to steer, but only the lead ship has a clear forward shot at first.',
+  block:'Rows of up to five ships side by side, three hexes apart, rows four hexes deep. A solid mass for large fleets.',
+  blockT:'Rows of up to five ships side by side, one hex apart, rows two hexes deep. The densest formation — mutual point-defense cover, but vulnerable to area attacks.',
+  echL:'A diagonal line stepping back to the left of the flagship, one hex apart. Every ship has a clear line of fire toward the front and right — good for swinging around an enemy flank.',
+  echR:'A diagonal line stepping back to the right of the flagship, one hex apart. Every ship has a clear line of fire toward the front and left — good for swinging around an enemy flank.',
+  screen:'Frigates and destroyers in a forward line, cruisers in a second line behind them, wide spacing. The escorts take the first missiles and fire; the heavy ships follow up. (With only one size of ship it becomes a line.)',
+  screenT:'Frigates and destroyers in a forward line, cruisers close behind them, one hex between ships. Tighter mutual point defense for the heavy ships.'};
+const FORM_ALIAS={wedge:'wedgeT',column:'columnT',echelon:'echR'};
 const fleetForm=['line','line','line','line','line','line','line','line'];let startMode='stations',startSpeed=[4,4,4,4,4,4,4,4],chargeMode='time';   // starting speed (hexes/turn, toward the enemy) chosen per side   // 'stations' = every weapon loaded, torpedoes full, PD loaded; 'cold' = everything empty
 // formation slot offsets in hexes: x = lateral, y = depth behind the front rank (heaviest ships get the first slots)
-function formSlots(form,list){const n=list.length,sp=4;const out=[];
+function formSlots(form,list){form=FORM_ALIAS[form]||form;const n=list.length,tight=/T$|^ech/.test(form),sp=tight?2:4,rs=tight?2:3;const out=[];const base=form.replace(/T$/,'');
   const centerOut=k=>{const r=[];for(let i=0;i<k;i++)r.push(i===0?0:(i%2?1:-1)*Math.ceil(i/2));return r};
-  if(form==='line'){centerOut(n).forEach(c=>out.push({x:c*sp,y:0}))}
-  else if(form==='column'){for(let i=0;i<n;i++)out.push({x:0,y:i*3})}
-  else if(form==='wedge'){out.push({x:0,y:0});for(let i=1;i<n;i++){const row=Math.ceil(i/2);out.push({x:(i%2?1:-1)*row*sp,y:row*3})}}
-  else if(form==='echelon'){for(let i=0;i<n;i++)out.push({x:i*sp-(n-1)*sp/2,y:i*3})}
-  else if(form==='block'){const w=Math.min(5,Math.ceil(Math.sqrt(n*1.6)));for(let i=0;i<n;i++){const row=Math.floor(i/w),k=Math.min(w,n-row*w);const co=centerOut(k)[i%w];out.push({x:co*sp,y:row*4})}}
-  else if(form==='screen'){const heavy=[],light=[];list.forEach((x,i)=>(SHIPS[x.key].weight>=80?heavy:light).push(i));
-    if(!heavy.length||!light.length)return formSlots('line',list);
-    const res=new Array(n);centerOut(light.length).forEach((c,j)=>res[light[j]]={x:c*sp,y:0});centerOut(heavy.length).forEach((c,j)=>res[heavy[j]]={x:c*sp*1.3,y:5});return res}
+  if(base==='line'){centerOut(n).forEach(c=>out.push({x:c*sp,y:0}))}
+  else if(base==='column'){for(let i=0;i<n;i++)out.push({x:0,y:i*rs})}
+  else if(base==='wedge'){out.push({x:0,y:0});for(let i=1;i<n;i++){const row=Math.ceil(i/2);out.push({x:(i%2?1:-1)*row*sp,y:row*(tight?1:rs)})}}   // tight wedge: each step 2 columns out and 1 row back = 2 hexes, one hex between
+  else if(base==='echL'||base==='echR'){const d=base==='echR'?1:-1;for(let i=0;i<n;i++)out.push({x:d*(i*sp-(n-1)*sp/2),y:i})}   // each step 2 columns over and 1 row back = 2 hexes
+  else if(base==='block'){const w=Math.min(5,Math.ceil(Math.sqrt(n*1.6)));for(let i=0;i<n;i++){const row=Math.floor(i/w),k=Math.min(w,n-row*w);const co=centerOut(k)[i%w];out.push({x:co*sp,y:row*(tight?2:4)})}}
+  else if(base==='screen'){const heavy=[],light=[];list.forEach((x,i)=>(SHIPS[x.key].weight>=80?heavy:light).push(i));
+    if(!heavy.length||!light.length)return formSlots(tight?'lineT':'line',list);
+    const res=new Array(n);centerOut(light.length).forEach((c,j)=>res[light[j]]={x:c*sp,y:0});centerOut(heavy.length).forEach((c,j)=>res[heavy[j]]={x:c*sp*1.3,y:tight?3:5});return res}
+  else return formSlots('line',list);
   return out}
 const fleetFaction=['Martian','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr','Dogahr'],fleetTL=[4,4,4,4,4,4,4,4];
 const mySlotIdx=()=>{const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);return i<0?0:i};
@@ -2374,7 +2389,7 @@ function renderBuilder(){renderHistory();if(SCEN&&SCEN.lobby){renderScenLobby();
      <div class="row" style="gap:6px;margin:2px 0 4px">${hum&&t===selSlot?`<button class="btn ${allAI?'aion':''}" data-aiall="${t}" title="Put every ship in this fleet under AI control, to just watch the fight. Click again to take them all back.">🤖 AI controls all${allAI?' ✓':''}</button>`:''}${fleet[t].length?`<button class="btn" data-fclr="${t}" title="Remove every ship from this fleet">✕ Clear all</button>`:''}${t!==selSlot?`<button class="btn" data-rndeq="${t}" title="Fill this fleet with a random faction and ships of about the same strength as your fleet (points by class and tech level — a TL3 heavy cruiser is 150)">🎲 Random equivalent enemy</button>`:''}</div>
      <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor} · <b style="color:#ffd27a">${shipPts(x.key)}</b></span>${humans().length>1?`<select data-fcmd="${t}:${i}" title="Who commands this ship in battle">${(hum?[]:[['','AI']]).concat(humans().map(pid=>[String(pid),pid===ME?'Me':'Player '+(pid+1)])).map(([v,l])=>`<option value="${v}" ${String(x.cmd!=null?x.cmd:(hum?SLOTS[t].owner:''))===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${hum||x.cmd!=null?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
      <div class="row" style="margin-top:10px"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${fleetTL[t]?'':'<option value="0" selected>— pick —</option>'}${allTLs(fac).map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb}${fleetTL[t]?` · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}`:''}</span>${tlBreaks(fac,fleetTL[t])?`<div class="sm" style="flex-basis:100%;color:var(--warn)">⚠ ${fac} TL${fleetTL[t]} breaks the rules of the ${ERAS[era].name} (era: ${fac} TL${ERAS[era].allow[fac].join('/')}${(ERAS[era].extra||[]).filter(k=>SHIPS[k].faction===fac).map(k=>' + '+SHIPS[k].cls+' TL'+SHIPS[k].tl).join('')})</div>`:''}</div>
-     <div class="row" style="gap:10px"><label class="dim">Starting speed <select data-sspeed="${t}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[t]===v?'selected':''}>${v}</option>`).join('')}</select></label>${fleet[t].length>1?`<label class="dim">Formation <select data-form="${t}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" ${fleetForm[t]===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
+     <div class="row" style="gap:10px"><label class="dim">Starting speed <select data-sspeed="${t}">${[0,1,2,3,4].map(v=>`<option value="${v}" ${startSpeed[t]===v?'selected':''}>${v}</option>`).join('')}</select></label>${fleet[t].length>1?`<label class="dim">Formation <select data-form="${t}" title="${FORM_DESC[FORM_ALIAS[fleetForm[t]]||fleetForm[t]]||''}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" title="${FORM_DESC[k]}" ${(FORM_ALIAS[fleetForm[t]]||fleetForm[t])===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
      <div class="addlist">${avail.length?'':`<span class="dim">${!fleetTL[t]?`<b style="color:var(--warn)">${fac} isn't part of this era — pick a tech level to add ships.</b>`:era==='open'?'No ships at this tech level for this faction yet.':'None in this era at this tech level.'}</span>`}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}${shipOK(k)?'':' <span style="color:var(--warn)" title="breaks the rules of this era">⚠</span>'}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor} · <b style="color:#ffd27a">${shipPts(k)} pts</b></span></button>`}).join('')}</div></div>`};
   const card=i=>{const s=SLOTS[i];const fac=fleetFaction[i];
     return `<div class="slotc ${i===rightSel?'sel':''}" ${i!==selSlot?`data-slotsel="${i}"`:''} style="border-left:5px solid ${TCOL8[s.team]};display:inline-flex;gap:6px;align-items:center;margin:3px">
