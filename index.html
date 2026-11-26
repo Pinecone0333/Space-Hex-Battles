@@ -164,7 +164,7 @@ const MAXSLOTS=8;let SLOTS=[{kind:'human',owner:0,team:0,name:'You'},{kind:'ai',
 const isAI=s=>s.ai||s.owner==null;
 function net(){if(MP.role==='host'&&typeof mpSendState==='function')mpSendState()}
 const R={reactor:42, burn:2, reverse:4, pivot:2, genCost:10, genRegen:4, shieldRepairPerImp:2, startDist:20,
-  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.75, magReloadTurns:2};
+  pdRange:2, pdReload:IMP/2, interceptP:.7, defRange:16, missileLife:3, msAcc:2*IMP, msClose:36, pdHit:.8,   /* Nov 25 (David): 80% (was 75%) */ magReloadTurns:2};
 const income=s=>s.reactor/IMP;
 const genCost=s=>s.d.noShield?0:(s.d.genCost||R.genCost), genRegen=s=>s.d.genRegen||R.genRegen;
 
@@ -716,7 +716,7 @@ function canQueue(s,act){
   if(act.type==='hold'){const w=s.weapons[act.i];return w.alive&&w.charging&&torpStored(w)>0&&!s.queue.some(x=>x.type==='hold'&&x.i===act.i)}
   if(act.type==='pd'){const p=s.pd[act.i];const q=s.queue.filter(x=>x.type==='pd'&&x.i===act.i).length;return p.alive&&p.shots+p.pending.length+q<2}
   return true}
-function queue(s,act){if(act.type==='pd'&&s.d.pdKind==='chain')act.cost=0;if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'||drains(s.weapons[act.i])))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
+function queue(s,act){if(act.type==='pd'&&s.d.pdKind==='chain')act.cost=act.fast?1:0;if(act.type==='start'&&s.weapons[act.i]&&(s.weapons[act.i].T.kind==='torp'||s.weapons[act.i].T.kind==='ap'||drains(s.weapons[act.i])))act.cost=0;if(!canQueue(s,act))return false;s.queue.push(act);return true}
 function applyQueue(s){let nbx=0;
   for(const a of s.queue){if(s.E<a.cost-1e-9)continue;if(a.type==='burn'&&(++nbx>3||nbx>1&&(a.a!=='F'||(s.dmgEng||0)>=3)))continue;s.E-=a.cost;
     if(a.type==='burn'&&nbx===3)critBurn(s);
@@ -734,7 +734,7 @@ function applyQueue(s){let nbx=0;
       else{w.state='cycling';w.readyT=T+cycleImp(s,w)}}
     else if(a.type==='pausew'){const w=s.weapons[a.i];w.charging=false;w.state='paused'}   // manual pause: progress kept, Resume continues
     else if(a.type==='hold'){const w=s.weapons[a.i];w.charging=false;w.holding=true;w.state='holding'}
-    else if(a.type==='pd'){s.pd[a.i].pending.push(T+R.pdReload)}}
+    else if(a.type==='pd'){if(a.fast)s.pd[a.i].shots++;else s.pd[a.i].pending.push(T+R.pdReload)}}   /* Nov 25 (David): rush reload — 1 extra energy, shot ready at once */
   s.queue=[];
 }
 
@@ -1269,7 +1269,7 @@ function dogWave(s,t,n,d){if(!n)return 0;const seen=scanWeapons(t,s.team);
   const ic=(seen?defLaunchers(t).filter(w=>w.state==='ready'&&w.ammo>0).length:t.weapons.filter(w=>w.alive&&w.T.kind==='missile').length*(t.msMode==='def'?1:0));
   const wave=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
   const allyReady=ships.filter(o=>o!==s&&!o.dead&&o.team===s.team&&tgt(o)===t).reduce((a,o)=>a+o.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&w.state==='ready'&&w.ammo>0).length,0);
-  const def=pdShots*.75+ic*.7;
+  const def=pdShots*R.pdHit+ic*.7;
   if(d<=10)return n;                                  // close in: no time to react — everything, with the guns
   if(n+allyReady+wave>=def+3)return n;                  // saturation
   if(seen&&pdShots<=1)return n;                         // its PD is empty or reloading
@@ -1375,7 +1375,8 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   // missiles inbound: reload point defence before anything else
   const inbN=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20&&(!AIV.pdBudget||m.target===s||!m.target.dead&&hexDist(m.target,s)<=3)).length;
   if(AIV.pdFirst&&inbN){const need=AIV.pdBudget?Math.ceil(inbN*1.25):99;const have=()=>s.pd.reduce((a,p)=>a+(p.alive?p.shots+p.pending.length:0),0)+s.queue.filter(x=>x.type==='pd').length;
-    s.pd.forEach((pp,i)=>{while(have()<need&&s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}})}
+    const close=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=10);   /* Nov 25: missiles about to arrive — rush the reload (one more energy) so the shot is up before they hit */
+    s.pd.forEach((pp,i)=>{while(have()<need&&s.E-qCost(s)-genReserve(s)-pdC(s)-(close?1:0)>=0&&queue(s,close?{type:'pd',i,cost:2,fast:true}:{type:'pd',i,cost:1})){}})}
   // weapons before manoeuvre when the target is in range and guns sit empty (an energy-starved ship otherwise spends everything on burns)
   if(prio&&!prio.includes('lances'))prio=[...prio,'lances'];if(prio&&!prio.includes('rails'))prio=[...prio,'rails'];if(prio&&!prio.includes('aplances'))prio=['aplances',...prio];
   if(AIV.wfirst&&d<=18&&s.mode!=='standoff'&&s.mode!=='attack'&&s.mode!=='run')for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
@@ -1731,7 +1732,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
       if(sd&&rdy){if(t&&canFireMount(s,'pcr'+i,t)){const bp=pcrBurstP(s,hexDist(s,t));ctl+=fireBtn(s,'pcr'+i,'Fire '+sixths(hitP(s,'pcr'+i,t))+(bp<1?` · burst ${Math.round(bp*100)}%`:''),`Plasma-charged round at ${t.name}: the coilgun round hits ${sixths(hitP(s,'pcr'+i,t))} for ${C.T.dmg}, then ${t.shield+reinfAmt(t)>0?`(shields up) a ${pcrBurstDmg(s)(i)}-point burst in its hex`:`(no shields) ${pcrInner(s,i)} more inside the hull`}. If the round misses, the plasma still bursts beside it for ${pcrBurstDmg(s)(i)} on everything in its hex — ${Math.round(bp*100)}% (100% inside ${pcrTCR(s)} hexes). Uses both the lance and the coilgun.`)}
         ctl+=s.fireSel.has('pcrh'+i)?fireBtn(s,'pcrh'+i,`Hex ${hx.q},${hx.r}`+(pcrBurstP(s,hexDist(s,hx))<1?` ${Math.round(pcrBurstP(s,hexDist(s,hx))*100)}%`:''),'Armed at a hex: it always arrives and bursts for '+pcrBurstDmg(s)(i)+' to every ship and missile in that hex. Click to disarm.'):`<button class="btn ${pcrPick&&pcrPick.s===s&&pcrPick.i===i?'armed':''}" data-act="pcrpick:${i}" title="Pick a hex in the mount's arc on the map: inside ${pcrTCR(s)} hexes the round always gets there and bursts for ${pcrBurstDmg(s)(i)} on every ship and missile in that hex; beyond that 50%, then 10% less per 2 more hexes">⌖ Hex</button>`}
       h+=`<div class="wrow"><span class="arc">${L.arc}</span><span class="wn" style="color:#ffd23a" title="${L.T.ab} + ${C.T.ab} fired together">Plasma-Charged Coilgun Round</span><span class="ws">${st}</span><span class="wc">${ctl}</span></div>`});
-    s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1}))ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit');else if(t&&p.shots>0&&!inArc(s,p.arc,t))ctl+=offBtn(key,'Fire '+sixths(hitP(s,key,t)))}
+    s.pd.forEach((p,i)=>{let ctl='';if(sd&&p.alive){if(canQueue(s,{type:'pd',i,cost:1})){ctl+=btn('pd:'+i,s.d.pdKind==='chain'?'Load (free)':'Load 1',true);ctl+=btn('pdf:'+i,s.d.pdKind==='chain'?'Rush 1':'Rush 2',true,'Rush reload: one more energy, the shot is ready at once instead of in half a turn')}const key='pd'+i;if(t&&canFireMount(s,key,t))ctl+=fireBtn(s,key,'Fire '+sixths(hitP(s,key,t)),'offensive fire, 1 dmg per hit');else if(t&&p.shots>0&&!inArc(s,p.arc,t))ctl+=offBtn(key,'Fire '+sixths(hitP(s,key,t)))}
       h+=`<div class="wrow"><span class="arc ${p.alive&&t&&inArc(s,p.arc,t)?'bears':''} ${arcSel==='pd'+i?'sel':''}" data-act="arcone:pd${i}" title="Show this mount's firing arc on the map (click again to hide)">${p.arc==='ALL'?'360':p.arc}</span><span class="wn" style="color:${s.d.pdKind==='chain'?'#ffd27a':'#e8f6ff'}" title="${s.d.pdKind==='chain'?'Chain gun PD: free to load, 15% less accurate than laser PD':'Laser PD'}">${s.d.pdKind==='chain'?'Chain Gun PD':'Point Defense'}</span><span class="ws">${p.alive?'■'.repeat(p.shots)+'▷'.repeat(p.pending.length)+'□'.repeat(Math.max(0,2-p.shots-p.pending.length)):'<span class="bad">destroyed</span>'}</span><span class="wc">${ctl}</span></div>`});
     }else{dgMode='repair';h+=dcDiagram(s)+`<div class="sm dim" style="margin:3px 0"><span style="color:#4cff7a">■</span> working &nbsp;·&nbsp; <span style="color:#ff4d4d">■</span> damaged — click to repair &nbsp;·&nbsp; 🔧 team on it</div>`+(dcPanel(s,sd,false)||`<div class="row sm good">No damage.</div>`)}
     h+=`</div>`+qPanel+`<div>`;
@@ -1759,7 +1760,7 @@ function upkeepRow(s){const L=upkeepList(s);const tot=L.reduce((a,x)=>a+x.c,0),n
   return `<div class="row sm upk" title="Ongoing energy expenses, paid every impulse. Income is +${income(s).toFixed(2)} per impulse."><span class="lab">Upkeep</span><b class="${tot?'warn':'dim'}">−${tot.toFixed(2)}</b><span class="dim">/imp</span>${L.length?' <span class="dim">'+L.map(x=>`${x.lab} ${x.c.toFixed(2)}`).join(' · ')+'</span>':''}<span style="margin-left:auto" class="${net<0?'bad':'good'}">net ${net>=0?'+':''}${net.toFixed(2)}</span></div>`}
 const offBtn=(key,label)=>`<button class="btn fire off" data-arcprev="${key}" title="Ready, but the target is outside this mount's arc — hold the pointer here to see the arc">${label}</button>`;   // Nov 24 (David)
 const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+label:label}</button>`;
-function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='evade'?'evasive maneuvers':x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pausew'?`${s.weapons[x.i].T.ab} pause`:x.type==='pd'?'PD load':'')+(x.cost?` (${x.cost})`:'')}
+function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='evade'?'evasive maneuvers':x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pausew'?`${s.weapons[x.i].T.ab} pause`:x.type==='pd'?(x.fast?'PD rush load':'PD load'):'')+(x.cost?` (${x.cost})`:'')}
 function selectShip(x){if(x&&own(x)&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
 function doAct(a){doAct0(a)}
@@ -1825,6 +1826,7 @@ function doAct0(a){const [k,v]=a.split(':');
   else if(k==='hold')queue(s,{type:'hold',i:+v,cost:0});
   else if(k==='pausew')queue(s,{type:'pausew',i:+v,cost:0});
   else if(k==='pd')queue(s,{type:'pd',i:+v,cost:1});
+  else if(k==='pdf')queue(s,{type:'pd',i:+v,cost:2,fast:true});
   else if(k==='burn'){const act0={type:'burn',a:v,cost:burnCost(s,v)};if(nBurnQ(s)===2&&canQueue(s,act0)&&!critOK){critPrompt(s,v);return}critOK=false;if(queue(s,act0)){if(BURNS[v]&&BURNS[v].turn)turnWarn(s,Math.sign(BURNS[v].turn),burnCost(s,v))}else log(nBurnQ(s)>=3?'Max three burns per impulse (the third is a critical burn)':nBurnQ(s)&&v!=='F'?'Only one turn-burn or reverse burn per impulse — extra burns must be straight ahead (W ▲ ACCEL)':nBurnQ(s)&&(s.dmgEng||0)>=3?'Main engine destroyed — no more forward burns':nBurnQ(s)?'Not enough energy for another burn':(!burnAllowed(s,v)&&v==='R'?((s.dmgThrF||0)>=3?'Fore thrusters destroyed — no reverse burn':(s.dmgEng||0)>=3&&false?'':`Reverse burns only every other impulse — next at ${when((s.lastRevT??-99)+2)}`):!burnAllowed(s,v)&&(s.dmgEng||0)>=3?'Main engine destroyed — reverse burns only':!burnAllowed(s,v)?`${s.name} can turn-burn every ${turnGap(s)>1?turnGap(s)===2?'other impulse':turnGap(s)+'rd impulse':'impulse'} — next at ${when((s.lastTurnT??-99)+turnGap(s))}`:(rotQ(s)+(BURNS[v].turn||0)&&Math.abs(rotQ(s)+(BURNS[v].turn||0))>maxPiv(s)?`Max rotation per impulse for ${s.name}: ${maxPiv(s)*30}° (pivots and turn-burns together)`:'Not enough energy')),'dim')}
   else if(k==='dgtab')dgTab=v;
   else if(k==='wclick')smartW(s,+v);
