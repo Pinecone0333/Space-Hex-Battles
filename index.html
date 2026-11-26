@@ -568,6 +568,9 @@ FACTIONS.Smiley={color:'#ffd23f',full:'Smiley Federation',lore:'A big yellow smi
   pd:['FX','FX','FX','FX','ALL','ALL'],pdSplit:true,
   shape:ring(24,36),fill:'#ffd23f',ink:'#3a2a00',lines:sl,dots:[[7,-8],[7,8]],eyes:3.2};
  SHIPS.smiley3={...SHIPS.smiley,tl:3,name:'Smiley Face (TL3)',short:'Smiley III',shield:0,noShield:true,reactor:30,weight:99.9}}
+/* Nov 26 (David): the joke ships only show up on April Fools' Day (April 1, the player's local date). Add ?aprilfools to the page address to force them on. */
+const APRIL_FOOLS=(()=>{const d=new Date();return d.getMonth()===3&&d.getDate()===1||/aprilfools/i.test(typeof location!=='undefined'?location.search:'')})();
+if(!APRIL_FOOLS){for(const k of ['smiley','smiley3','golthan3x'])delete SHIPS[k];delete FACTIONS.Smiley}
 /* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
    TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
 {const h=x=>Math.round(x*2)/2;
