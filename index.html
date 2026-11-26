@@ -541,6 +541,14 @@ const PDCAP=1;for(const k in SHIPS){const d=SHIPS[k];if(d.pd&&!d.pdSplit){d.pd=d
  for(const k of ['albatross','hunold','hunifer','chemart','chemcru'])set(k,32);
  for(const k of ['lcruiser','earthcl','chematk','golthanart','sigcl','billcl'])set(k,30);
  set('baangraid',26);set('chemdbl',64)}
+/* Nov 26 (David): cruisers closer to heavy cruisers in durability. Medium cruisers 20 shields / 135 hull, light cruisers 20 / 120 (heavies 25 / 150).
+   Sleek hulls (Hunibler, Hunifer, Si'gian, Billyon) keep 90% of their class hull; Blokai keep 1.5x shields; the Chemantar Double = two Artillery Cruisers. TL3/TL2 copies follow (no shields). */
+{const dur=(k,h,sh)=>{for(const v of [k,k+'3',k+'2'])if(SHIPS[v]){SHIPS[v].hull=h;if(!SHIPS[v].noShield)SHIPS[v].shield=sh}};
+ for(const k of ['albatross','chemart','chemcru'])dur(k,135,20);
+ for(const k of ['hunold','hunifer'])dur(k,Math.round(135*.9),20);
+ for(const k of ['lcruiser','earthcl','chematk','golthanart','baangraid'])dur(k,120,20);
+ for(const k of ['sigcl','billcl'])dur(k,Math.round(120*.9),20);
+ dur('blokaicl',120,30);dur('chemdbl',270,40)}
 /* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
    TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
 {const h=x=>Math.round(x*2)/2;
