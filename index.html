@@ -242,7 +242,7 @@ WT.SCT={...WT.SC,name:'Small Coilgun Turret',ab:'CG(s)T',acc:'rail'};   // Nov 2
 WT.RG4={...WT.RG,name:'Small Railgun Turret (TL4)',acc:'rail',tl1:false};WT.MRG4={...WT.MRG,name:'Medium Railgun Turret (TL4)',acc:'rail',tl1:false};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
-const FACTIONS={Dogahr:{color:'#39e75f',full:'Dogahr Empire',lore:'Upstart Alpha Quadrant empire, recently risen to become the "Third Power" after the Chemantar and Golthan. Subject races are forcibly incorporated into the empire but given the chance to advance through the ranks.',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
+const FACTIONS={Dogahr:{color:'#39e75f',full:'Dogahr Empire',lore:'Upstart Alpha Quadrant empire, recently risen to become the "Third Power" after the Chemantar and Golthan. Subject races are forcibly incorporated into the empire but given the chance to advance through the ranks.',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',full:'United States of Mars',lore:'Constitutional federal republic based on the planet Mars, founded by those who fled the creeping authoritarianism on Earth to build a new future. Fiercely patriotic and ready to defend what they have built.',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
 const SHIPS={
   dogahr:{faction:'Dogahr',cls:'Heavy Cruiser',weight:100,name:'Dogahr Heavy Cruiser',short:'Dogahr',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:150,shield:50,big:true,doctrine:'hunt',
     shape:[[-32,-20],[2,-20],[4,-16],[6,-12],[8,-8],[34,-8],[34,8],[8,8],[6,12],[4,16],[2,20],[-32,20],[-32,8],[-24,8],[-24,6],[-32,6],[-32,-6],[-24,-6],[-24,-8],[-32,-8]],
@@ -284,7 +284,7 @@ const SHIPS={
     weapons:[['SL','FX'],['SL','FX'],['SL','LS'],['SL','RS'],['SC','S'],['SC','S'],['MT','S'],['MS','ALL'],['MS','ALL']],pd:['FX','ALL','ALL']}
 };
 // ---- Earthling (Nov 18, David): blue, red weapons fire. Placeholder outline until David's sprite: triangular hull, wings off the stern ----
-FACTIONS.Earthling={color:'#3d8bff',blurb:'Balanced: torpedo, coilgun, lasers and missiles'};
+FACTIONS.Earthling={color:'#3d8bff',full:'United Nations of Earth',lore:'Authoritarian one-world government of the mother planet of humanity. Sworn enemy of the United States of Mars. The populace is constantly monitored for any sign of dissent, and any who dissent disappear.',blurb:'Balanced: torpedo, coilgun, lasers and missiles'};
 SHIPS.earthling={faction:'Earthling',cls:'Heavy Cruiser',weight:100,name:'Earthling Heavy Cruiser',short:'Earthling',color:'#3d8bff',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,big:true,doctrine:'alpha',
     shape:[[36,0],[-18,14],[-28,26],[-35,26],[-29,10],[-29,-10],[-35,-26],[-28,-26],[-18,-14]],
     lines:[[-29,0,30,0],[-20,-6,10,-3],[-20,6,10,3]],dots:[[14,-5],[14,5],[-14,-9],[-14,9]],
@@ -303,8 +303,8 @@ SHIPS.earthcl={faction:'Earthling',cls:'Light Cruiser',weight:78,name:'Earthling
 // Nov 23 (David): the Earthling Heavy Cruiser's "fat boi" look — the original hull overlapping a broad rectangle that runs from near (not at) the bow back past mid-ship: the superheavy torpedo slung under the nose
 // (applied in the outline touch-ups block, after every derived ship has copied the plain hull)
 // ---- Hunibler (Nov 18, David): sleek, agile heavy cruisers — destroyer-class maneuvering, 5% harder to hit, less hull. Placeholder outlines until David's sprites ----
-FACTIONS.Hunibler={color:'#a6f5a0',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
-FACTIONS.Hunifer={color:'#6e7480',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
+FACTIONS.Hunibler={color:'#a6f5a0',full:'Hunibler Kingdom',lore:'Constitutional monarchy with an elected legislative branch, but a space navy commanded by the King. A minor power that has clashed with the Blokai Commonwealth in the past.',blurb:'Sleek, agile cruisers: destroyer-class handling, harder to hit, lighter hulls'};
+FACTIONS.Hunifer={color:'#6e7480',full:'Hunifer Imperium',lore:'Exiles from the Hunibler Kingdom after a succession crisis generations ago, now returned from the edge of the galaxy with improved technology to reclaim the Hunibler throne. Conquerors of any who stand in their way.',blurb:'Sleek, agile lance cruisers: destroyer-class handling, harder to hit, lighter hulls'};
 SHIPS.hunold={faction:'Hunibler',cls:'Cruiser',weight:99,name:'Hunibler Cruiser',short:'Hunibler CL',color:'#a6f5a0',laser:'#4da6ff',torp:'#6fb8ff',hull:99,shield:40,big:true,reactor:30,genCost:7.5,genRegen:3,agile:true,evade:.05,doctrine:'hunt',broadside:true,
     shape:[[36,-5],[36,5],[-8,5],[-26,24],[-32,24],[-32,-24],[-26,-24],[-8,-5]],
     lines:[[-30,0,34,0],[-28,-12,-12,-5],[-28,12,-12,5]],dots:[[20,0],[-18,-10],[-18,10]],
@@ -365,7 +365,7 @@ SHIPS.dread={faction:'Dogahr',cls:'Dreadnought',weight:120,name:'Dogahr Dreadnou
     shape:[[-41.6,-26],[2.6,-26],[5.2,-20.8],[7.8,-15.6],[10.4,-10.4],[44.2,-10.4],[44.2,10.4],[10.4,10.4],[7.8,15.6],[5.2,20.8],[2.6,26],[-41.6,26],[-41.6,10.4],[-31.2,10.4],[-31.2,7.8],[-41.6,7.8],[-41.6,-7.8],[-31.2,-7.8],[-31.2,-10.4],[-41.6,-10.4]],lines:[[-41.6,-6.5,0,-6.5],[-41.6,6.5,0,6.5]],dots:[[32,0],[32,-14],[32,14],[0,-20],[0,20]],
     weapons:[['TC','S'],['TC','S'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','FX'],['HL','RS'],['HL','RS'],['HL','LS'],['HL','LS'],...rep(16,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};   // Nov 18 (David). Durability 1.5× a heavy cruiser; reactor at the Dogahr CA demand ratio (75/1.095)
 // ---- Golthan (Nov 18, David): brown, fire red. Heavy front armor makes them sluggish. Placeholder outline: large oval bow, smaller rectangular stern ----
-FACTIONS.Golthan={color:'#a0703c',blurb:'Stealth broadside cruisers: Run Dark from the bow, laser batteries, deployed missiles'};
+FACTIONS.Golthan={color:'#a0703c',full:'Golthan Empire',lore:'Second Power of the Alpha Quadrant and sworn enemy of the Chemantar Empire. Known for trickery and subterfuge, with intelligence assets throughout the quadrant that stoke internal division among their rivals.',blurb:'Stealth broadside cruisers: Run Dark from the bow, laser batteries, deployed missiles'};
 SHIPS.golthan={faction:'Golthan',cls:'Heavy Cruiser',weight:100,name:'Golthan Heavy Cruiser',short:'Golthan',color:'#a0703c',laser:'#ff3b3b',torp:'#ff4d4d',hull:150,shield:50,runDark:true,big:true,reactor:42,doctrine:'hunt',broadside:true,
     shape:[[-32,10],[-32,-10],[-11,-10],[-10.8,-9.5],[-8.4,-12.2],[-5.4,-14.6],[-2,-16.5],[1.8,-17.9],[5.8,-18.7],[10,-19],[14.2,-18.7],[18.2,-17.9],[22,-16.5],[25.4,-14.6],[28.4,-12.2],[30.8,-9.5],[32.6,-6.5],[33.6,-3.3],[34,0],[33.6,3.3],[32.6,6.5],[30.8,9.5],[28.4,12.2],[25.4,14.6],[22,16.5],[18.2,17.9],[14.2,18.7],[10,19],[5.8,18.7],[1.8,17.9],[-2,16.5],[-5.4,14.6],[-8.4,12.2],[-10.8,9.5],[-11,10]],lines:[[-30,-6,-10,-6],[-30,6,-10,6],[-8,0,30,0]],dots:[[24,0],[8,-14],[8,14],[-20,-7],[-20,7]],
     weapons:[['ML','ALL'],['ML','ALL'],['ML','LS'],['ML','LS'],['ML','LS'],['ML','RS'],['ML','RS'],['ML','RS'],...rep(4,['SC','S']),...rep(8,['MS','ALL'])],pd:['FX','FX','ALL']};
