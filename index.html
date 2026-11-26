@@ -571,9 +571,10 @@ FACTIONS.Smiley={color:'#ffd23f',full:'Smiley Federation',lore:'A big yellow smi
 /* Nov 26 (David): the joke ships only show up on April Fools' Day (April 1, the player's local date). Add ?aprilfools to the page address to force them on. */
 const APRIL_FOOLS=(()=>{const d=new Date();return d.getMonth()===3&&d.getDate()===1||/aprilfools/i.test(typeof location!=='undefined'?location.search:'')})();
 if(!APRIL_FOOLS){for(const k of ['smiley','smiley3','golthan3x'])delete SHIPS[k];delete FACTIONS.Smiley}
-/* Nov 26 (David): tutorial practice drone — unarmed, 1 hull, no shields, no PD, does nothing. Hidden from every fleet list (tech level 9). */
-SHIPS.drone={faction:'Martian',cls:'Drone',weight:1,name:'Training Drone',short:'Drone',color:'#9aa3ad',laser:'#ffffff',torp:'#ffffff',hull:1,shield:0,noShield:true,reactor:0,genCost:0,genRegen:0,
-  tl:9,drone:true,doctrine:'hunt',weapons:[],pd:[],pdSplit:true,shape:[[9,0],[0,7],[-7,0],[0,-7]],lines:[[-3,0,5,0]],dots:[]};
+/* Nov 26 (David): practice drone — unarmed, 1 hull, no shields, no PD, does nothing. Used by the tutorial; selectable under the Nonaligned faction. */
+FACTIONS.Nonaligned={color:'#9aa3ad',full:'Nonaligned',lore:'Craft that answer to no empire, republic or kingdom.',blurb:'Unaffiliated craft — for now, unarmed training drones for target practice'};
+SHIPS.drone={faction:'Nonaligned',cls:'Drone',weight:1,name:'Training Drone',short:'Drone',color:'#9aa3ad',laser:'#ffffff',torp:'#ffffff',hull:1,shield:0,noShield:true,reactor:0,genCost:0,genRegen:0,
+  tl:4,drone:true,doctrine:'hunt',weapons:[],pd:[],pdSplit:true,shape:[[9,0],[0,7],[-7,0],[0,-7]],lines:[[-3,0,5,0]],dots:[]};
 /* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
    TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
 {const h=x=>Math.round(x*2)/2;
@@ -2163,7 +2164,7 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
       let x=r.right+8;if(x+W>innerWidth-6)x=r.left-W-8;if(x<6)x=Math.max(6,Math.min(innerWidth-W-6,r.left));let y=Math.min(innerHeight-H-6,Math.max(6,r.top-10));tip.style.left=x+'px';tip.style.top=y+'px'});
     el.addEventListener('mouseleave',()=>{tip.style.display='none'})})}
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
-  const shownQ=new Set();const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const newQ=ix===0||facQuad(arr[ix-1][0])!==facQuad(f);const sep=era!=='open'&&!facListed(f)&&(newQ||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const qh=shownQ.has(facQuad(f))?'':(shownQ.add(facQuad(f)),`<div class="quadh">${facQuad(f)} Quadrant</div>`);const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
+  const shownQ=new Set();const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const newQ=ix===0||facQuad(arr[ix-1][0])!==facQuad(f);const sep=era!=='open'&&!facListed(f)&&(newQ||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const qh=shownQ.has(facQuad(f))?'':(shownQ.add(facQuad(f)),`<div class="quadh">${quadLabel(facQuad(f))}</div>`);const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=era==='open'||!facListed(f)?[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a):facTLs(f);
     return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${F.full||f}</b><div class="fc-txt${F.lore?' lore':''}">${F.lore||F.blurb}</div>
       <span class="fc-bs">${F.lore?`<span class="fc-btn" data-fflip="${f}" title="Flip between lore and how they fight">⚙ Mechanics</span>`:''}<span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}${era!=='open'&&!facListed(f)?' · <i>not in this era</i>':''}</span></span></div></button>`}).join('');
@@ -2173,7 +2174,7 @@ function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();c
     const fl=e.target.closest('[data-fflip]');if(fl){e.stopPropagation();const F=FACTIONS[fl.dataset.fflip],tx=fl.closest('.fc-t').querySelector('.fc-txt'),toMech=tx.classList.contains('lore');   /* Nov 25 (David): lore by default; click to flip to mechanics */
       tx.classList.toggle('lore',!toMech);tx.textContent=toMech?F.blurb:F.lore;tx.scrollTop=0;fl.textContent=toMech?'📜 Lore':'⚙ Mechanics';return}
     const lb=e.target.closest('[data-flore],[data-fmech]');if(lb){e.stopPropagation();const f=lb.dataset.flore||lb.dataset.fmech,F=FACTIONS[f],lore=!!lb.dataset.flore;   /* Nov 25 (David): Lore and Mechanics pop-ups on the faction cards */
-      const d=document.createElement('div');d.className='fc-pop';d.innerHTML=`<div class="fc-pop-in" style="border-color:${F.color}"><b style="color:${F.color};font-size:16px">${F.full||f}</b> <span class="dim">· ${lore?'Lore':'Mechanics'} · ${facQuad(f)} Quadrant</span><p>${lore?F.lore:F.blurb}</p><div class="row" style="gap:8px">${lore?`<button class="btn" data-fpopsw="mech">⚙ Mechanics</button>`:F.lore?`<button class="btn" data-fpopsw="lore">📜 Lore</button>`:''}<button class="btn" data-fpopx>Close</button></div></div>`;
+      const d=document.createElement('div');d.className='fc-pop';d.innerHTML=`<div class="fc-pop-in" style="border-color:${F.color}"><b style="color:${F.color};font-size:16px">${F.full||f}</b> <span class="dim">· ${lore?'Lore':'Mechanics'} · ${quadLabel(facQuad(f))}</span><p>${lore?F.lore:F.blurb}</p><div class="row" style="gap:8px">${lore?`<button class="btn" data-fpopsw="mech">⚙ Mechanics</button>`:F.lore?`<button class="btn" data-fpopsw="lore">📜 Lore</button>`:''}<button class="btn" data-fpopx>Close</button></div></div>`;
       d.querySelector('[data-fpopsw]')&&d.querySelector('[data-fpopsw]').addEventListener('click',ev=>{ev.stopPropagation();d.remove();const n=document.createElement('span');n.dataset[ev.target.dataset.fpopsw==='lore'?'flore':'fmech']=f;el.querySelector('.fp-in').appendChild(n);n.click();n.remove()});
       el.appendChild(d);return}
     if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;tlManual[t]=false;fleetTL[t]=eraDefault(t);el.remove();renderBuilder();lobbyChanged()})}
@@ -2331,9 +2332,9 @@ const allTLs=f=>[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=
 function eraDefault(i){const f=fleetFaction[i],E=ERAS[era],tls=allTLs(f);if(!E||!E.allow)return tls.includes(4)?4:tls[0];const al=E.allow[f];return al?Math.max(...al):0}
 const tlBreaks=(f,tl)=>era!=='open'&&facListed(f)&&tl>0&&!Object.keys(SHIPS).some(k=>SHIPS[k].faction===f&&SHIPS[k].tl===tl&&shipOK(k));
 /* Nov 25 (David): factions grouped by quadrant on the selection screens — Alpha (most races), Beta (Billyon), Gamma (Motoran, Si'gian) */
-const QUADS=['Alpha','Beta','Gamma'],QUAD_OF={Billyon:'Beta',Motoran:'Gamma',"Si'gian":'Gamma'},facQuad=f=>QUAD_OF[f]||'Alpha';
+const QUADS=['Alpha','Beta','Gamma','Nonaligned'],QUAD_OF={Billyon:'Beta',Motoran:'Gamma',"Si'gian":'Gamma',Nonaligned:'Nonaligned'},facQuad=f=>QUAD_OF[f]||'Alpha',quadLabel=q=>q==='Nonaligned'?'Nonaligned':q+' Quadrant';   /* Nov 26 (David): a Nonaligned group below the quadrants */
 const facOrder=()=>{const fn=f=>(FACTIONS[f].full||f).toLowerCase(),L=Object.keys(FACTIONS).sort((a,b)=>fn(a).localeCompare(fn(b))),out=[];   /* Nov 25 (David): sorted by full name */for(const q of QUADS){const Q=L.filter(f=>facQuad(f)===q);out.push(...(era==='open'?Q:[...Q.filter(facListed),...Q.filter(f=>!facListed(f))]))}return out};
-const facSelectOpts=sel=>QUADS.map(q=>{const L=Object.keys(FACTIONS).sort().filter(f=>facQuad(f)===q);return L.length?`<optgroup label="${q} Quadrant">${L.map(x=>`<option value="${x}" ${x===sel?'selected':''}>${x}</option>`).join('')}</optgroup>`:''}).join('');
+const facSelectOpts=sel=>QUADS.map(q=>{const L=Object.keys(FACTIONS).sort().filter(f=>facQuad(f)===q);return L.length?`<optgroup label="${quadLabel(q)}">${L.map(x=>`<option value="${x}" ${x===sel?'selected':''}>${x}</option>`).join('')}</optgroup>`:''}).join('');
 function eraFix(i){return false
   const tls=facTLs(fleetFaction[i]),al=ERAS[era].allow&&ERAS[era].allow[fleetFaction[i]];if(tls.length&&!tls.includes(fleetTL[i])){fleetTL[i]=al?Math.max(...al):tls.includes(4)?4:tls[0];ch=true}
   const n=fleet[i].length;fleet[i]=fleet[i].filter(x=>shipOK(x.key));if(fleet[i].length!==n)ch=true;return ch}
@@ -2342,17 +2343,17 @@ const canManage=()=>MP.role!=='guest';
 function lobbyChanged(){if(MP.role==='guest'){if(typeof mpSendMySlot==='function')mpSendMySlot()}else if(MP.role==='host'&&typeof mpBroadcastLobby==='function')mpBroadcastLobby()}
 /* Random Equivalent Enemy matches fleet points (Nov 22, David) */
 /* Nov 22 (David): rough point values — by class and tech level, not per ship. Benchmark: a TL3 heavy cruiser = 150. */
-const PTS3={'Dreadnought':300,'Double Cruiser':220,'Heavy Cruiser':150,'Cruiser':110,'Light Cruiser':95,'Destroyer':70,'Heavy Frigate':60,'Frigate':55,'Light Frigate':50,'Corvette':30,'Light Corvette':20,'Freighter':25};
+const PTS3={'Dreadnought':300,'Double Cruiser':220,'Heavy Cruiser':150,'Cruiser':110,'Light Cruiser':95,'Destroyer':70,'Heavy Frigate':60,'Frigate':55,'Light Frigate':50,'Corvette':30,'Light Corvette':20,'Freighter':25,'Drone':5};
 const PTS_TL={1:.6,2:.8,3:1,4:1.3,5:1.6};
 function ptsClass(k){const d=SHIPS[k],c=d.cls,b=k.replace(/[0-9]+$/,'');if(d.ptsCls)return d.ptsCls;   // Nov 24: explicit points class (light cruisers with other class names)
   if(b==='dread')return 'Dreadnought';if(/Double/.test(c))return 'Double Cruiser';if(/Heavy Cruiser/.test(c))return 'Heavy Cruiser';if(/Light Cruiser/.test(c))return 'Light Cruiser';if(/Cruiser/.test(c))return 'Cruiser';
   if(/Destroyer/.test(c))return 'Destroyer';if(b==='peregrine')return 'Heavy Frigate';if(b==='dfrigate'||b==='chemff')return 'Light Frigate';if(/Frigate/.test(c))return 'Frigate';
-  if(/Light Corvette/.test(c))return 'Light Corvette';if(/Corvette/.test(c))return 'Corvette';if(/Freighter/.test(c))return 'Freighter';return 'Destroyer'}
+  if(/Light Corvette/.test(c))return 'Light Corvette';if(/Corvette/.test(c))return 'Corvette';if(/Freighter/.test(c))return 'Freighter';if(c==='Drone')return 'Drone';return 'Destroyer'}
 const shipPts=k=>Math.round(PTS3[ptsClass(k)]*(PTS_TL[SHIPS[k].tl||4]||1)/5)*5;
 const shipValue=shipPts;
 const fleetValue=t=>Math.round(fleet[t].reduce((a,x)=>a+shipValue(x.key),0));
 function randomEquivalent(t,ref){const V=fleetValue(ref);if(!V)return false;let best=null;
-  const facs=Object.keys(FACTIONS).filter(f=>facOK(f));
+  const facs=Object.keys(FACTIONS).filter(f=>facOK(f)&&f!=='Nonaligned');
   for(let tries=0;tries<400;tries++){const f=facs[Math.floor(Math.random()*facs.length)],tls=facTLs(f),tl=tls[Math.floor(Math.random()*tls.length)];
     const C=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&SHIPS[k].tl===tl&&shipOK(k)&&!SHIPS[k].freighter&&SHIPS[k].doctrine!=='flee');if(!C.length)continue;
     const L=[];let sum=0;for(let g=0;g<60&&L.length<MAXSHIPS;g++){const fit=C.filter(k=>sum+shipValue(k)<=V*1.08);if(!fit.length)break;const k=fit[Math.floor(Math.random()*fit.length)];L.push(k);sum+=shipValue(k);if(sum>=V*.95)break}
@@ -2923,7 +2924,7 @@ function tutDrone(brg,dist,vel,name){const s=tP();if(!s)return;const a=fAng(s.f)
 function startTutorial(id){const Tu=TUTS[id];if(!Tu)return;if(typeof setMobile==='function'&&typeof MOB!=='undefined'&&MOB)setMobile(false);
   if(typeof SCEN!=='undefined'&&SCEN)leaveScenario();COOP='';
   SLOTS=[{kind:'human',owner:ME,team:0,name:'You'},{kind:'ai',owner:null,team:1,name:'Drones'},null,null,null,null,null,null];
-  fleet[0]=[{key:'peregrine',ai:false}];fleet[1]=[{key:'drone',ai:true}];for(let i=2;i<MAXSLOTS;i++)fleet[i]=[];fleetFaction[0]='Martian';fleetFaction[1]='Martian';fleetTL[0]=4;startSpeed[0]=0;startSpeed[1]=0;startMode='stations';era='open';
+  fleet[0]=[{key:'peregrine',ai:false}];fleet[1]=[{key:'drone',ai:true}];for(let i=2;i<MAXSLOTS;i++)fleet[i]=[];fleetFaction[0]='Martian';fleetFaction[1]='Nonaligned';fleetTL[0]=4;fleetTL[1]=4;startSpeed[0]=0;startSpeed[1]=0;startMode='stations';era='open';
   for(const x of ['modepick','facpick']){const o=$(x);if(o)o.remove()}
   TUT={id,step:-1,pop:0,drones:[],T0:0,v0:[0,0]};initAudio();startMusic();start();
   // clear the placeholder drone; the Peregrine sits at the centre drifting north at 2 hexes/turn
