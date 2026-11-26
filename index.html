@@ -549,6 +549,14 @@ const PDCAP=1;for(const k in SHIPS){const d=SHIPS[k];if(d.pd&&!d.pdSplit){d.pd=d
  for(const k of ['lcruiser','earthcl','chematk','golthanart','baangraid'])dur(k,120,20);
  for(const k of ['sigcl','billcl'])dur(k,Math.round(120*.9),20);
  dur('blokaicl',120,30);dur('chemdbl',270,40)}
+/* Nov 26 (David, showing his Grandma): a deliberately ugly Golthan ship — the Heavy Cruiser tripled and stuck together:
+   three egg bodies with three engine sections, the middle one pushed forward, the outer two jammed into its flanks. Open era only, no TL3 version. */
+{const G=SHIPS.golthan,off=[[8,0],[-6,-31],[-6,31]],mv=([dx,dy])=>p=>p&&[p[0]+dx,p[1]+dy];
+ const shape=[];off.forEach((o,i)=>{if(i)shape.push(null);shape.push(...G.shape.map(mv(o)))});
+ SHIPS.golthan3x={...G,cls:'Egg Cluster',ptsCls:'Dreadnought',weight:121,name:'Golthan Egg Cluster',short:'Egg Cluster',tl:4,
+  hull:450,shield:75,reactor:120,genCost:30,genRegen:12,dcTeams:6,pivotMax:1,
+  weapons:[...G.weapons,...G.weapons,...G.weapons],pd:[...G.pd,...G.pd,...G.pd],
+  shape,lines:off.flatMap(([dx,dy])=>G.lines.map(l=>[l[0]+dx,l[1]+dy,l[2]+dx,l[3]+dy])),dots:off.flatMap(([dx,dy])=>G.dots.map(q=>[q[0]+dx,q[1]+dy])),_hp:null,_dm:null}}
 /* Nov 22 (David): tech-level reactor ladder measured from the final TL3 reactor (after the −2): TL2 = TL3 −15%, TL1 = TL3 −30%, rounded to the nearest half point.
    TL1 ships are their own designs, so each is measured from the TL3 ship of its class (corvettes left as David set them: deliberately underpowered). */
 {const h=x=>Math.round(x*2)/2;
