@@ -519,7 +519,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null,arcHover=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -1293,7 +1293,7 @@ function aiBudget(s,r){const q=r.queue||[];if(!q.length&&!s.pd.length)return;
      reload every PD mount from empty on top of topping up what's missing now; burns, pivots, reinforcement and new gun loads wait while
      that reserve isn't there, and lasers/coilguns/lances already charging are paused (progress kept) until it is. Torpedoes keep charging. (flag pdPri) */
   const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile'&&(w.ammo>0||w.state==='reloading')).length;
-  const outL=AIV.pdPri&&pdLive>0&&enemiesOf(s).reduce((a,e)=>a+ml(e),0)>ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);
+  const outL=AIV.pdPri&&pdLive>0&&(!AIV.mbr||inb||s.d.doctrine!=='alpha')&&enemiesOf(s).reduce((a,e)=>a+ml(e),0)>ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);
   const resv=outL?pdNeed+pdLive*PDCAP:pdNeed;
   if(outL&&s.E<resv)s.weapons.forEach((w,i)=>{if(w.alive&&w.charging&&w.T.kind!=='torp'&&(drains(w)||w.T.kind==='ap')&&!q.some(x=>x.type==='pausew'&&x.i===i))q.push({type:'pausew',i,cost:0})});
   let bank=Math.max(0,s.E-resv-(md2?pdLive*PDCAP+4*AIV.msDef2:0));
@@ -1334,6 +1334,13 @@ function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.t
 // liberal reinforcement): Dogahr and, for now, Golthan. Everyone else hunts without the Dogahr's torpedo-shyness and reinforces only when it matters.
 const MDOC=s=>s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>s.d.faction==='Dogahr'||s.d.faction==='Golthan';
 const drainNow=s=>s.weapons.reduce((a,w)=>a+(!w.alive||!w.charging?0:w.T.kind==='torp'?w.T.perTurn/IMP:w.T.kind==='ap'?w.T.cost/AP_IMP:drains(w)?w.T.cost/cycleImp(s,w):0),0);   // per-impulse weapon-charging drain
+/* Nov 26: which bearing (degrees off the nose, + starboard) to put the target on so the most working guns bear (loaded guns count more).
+   Torpedoes count only once they hold a stage. Turning away from the current bearing costs a little, so it doesn't flip-flop. */
+function bestBattery(s,t){const cur=norm(relBearing(s,t))/D2R;let best=0,bv=-1e9;
+  for(const c of [0,60,-60,90,-90,120,-120]){let v=0;for(const w of s.weapons){if(!w.alive||w.T.kind==='missile'||!ARCS[w.arc])continue;if(w.T.kind==='torp'&&w.stages<1)continue;
+      const [cc,hw]=ARCS[w.arc];if(hw<180&&Math.abs(norm((c-cc)*D2R))>hw*D2R+1e-6)continue;v+=(w.T.kind==='torp'||w.state==='ready'?2:w.charging||w.state==='cycling'?1.3:1)*(w.T.dmg||6)}
+    v-=Math.abs(norm((c-cur)*D2R))/D2R*.05;if(v>bv){bv=v;best=c}}
+  return best}
 function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)===1&&!s.isPlayer||s.ai&&impOf(T)===1)s.target=AIV.focus?pickTarget(s):nearestEnemy(s);
   if(isAI(s)){const sc=SCEN&&SCENARIOS[SCEN.id].aiTarget&&SCENARIOS[SCEN.id].aiTarget(s),ot=orderTarget(s);if(ot)s.target=ot;else if(sc)s.target=sc}
   const t=foeTgt(s);
@@ -1360,9 +1367,15 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     // Martian: stay out of the fight while charging; once every gun is loaded and torpedoes are full, close and fire everything at once
     s.mode=s.alphaDone&&torps.length&&!AIV.extend?'brawl':(torps.length?torps.every(ready):guns.every(ready))?'attack':'charge';
     s.holdImp=AIV.mhold&&s.mode==='attack'&&d<=13?(s.holdImp||0)+1:0;   // impulses spent holding fire for the alpha strike
-    if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
+    /* Nov 26 (David: 'the Martians are better than your AI plays them'; his Condor brawled at mid range and won comfortably). Flag mbr:
+       with no torpedoes left it fights as a gunship (no more waiting for an alpha strike it can't make); while its torpedoes charge it brawls
+       at ~9 hexes instead of standing off at 22; and it turns whichever battery has the most working, loaded guns toward the enemy. */
+    if(AIV.mbr&&!torps.length)s.mode='guns';
+    if(s.mode==='guns'){want={range:6,radial:1.2,chase:true,maxClose:10};face=a-bestBattery(s,t)*D2R;prio=['coils','lasers'];reserve=2}
+    else if(s.mode==='brawl'){want={range:2,radial:1.5,chase:true,maxClose:12};face=a;prio=['torps','coils','lasers'];reserve=2}   // after the alpha strike: stick to the target at close range, torpedoes every turn   // after the alpha strike: stay in close, torpedoes every turn
     else if(s.mode==='attack'){want=AIV.fast?{range:1,radial:1.5,maxClose:12,orbit:d>6?2.5:0}:AIV.r5&&!MDOC(s)?{range:1,radial:1.3,maxClose:10}:{range:1,radial:1.2};face=d>6&&!(AIV.r9&&turnIn(s,t,d))?a-side*Math.PI/3:a;prio=['torps','coils','lasers'];reserve=4}   // angled approach: keep the enemy one facing off the nose (spinals out of its line of fire) until 4 hexes, then turn nose-on for the alpha strike
     else if(AIV.crip&&(s.hull<s.d.hull*.5||s.reactor<s.reactor0*.6)&&torps.length){want={range:27,radial:1.2,orbit:.5};face=a-side*Math.PI/2;prio=['torps'];reserve=6;s.crip=true}   // crippled: open the range and spend only on torpedoes, generator and engines
+    else if(AIV.mbr){want={range:9,radial:1,orbit:1};face=a-bestBattery(s,t)*D2R;prio=['torps','lasers','coils'];reserve=6}   // Nov 26: brawl at mid range with the best battery while the torpedoes charge
     else{want={range:22,radial:1,orbit:1};face=a-side*Math.PI/2;prio=['torps','lasers','coils'];reserve=6}   // broadside so side lasers bear while it backs off
   }else if(s.d.doctrine==='hunt'||s.d.doctrine==='brawl'){
     // Dogahr: hunt at mid range; if an enemy within 12 hexes has full torpedoes, stand off at 10 (torpedoes only 45% there)
@@ -1497,7 +1510,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const ref=torps.length?tk:lk;const best=ref.reduce((m,k)=>Math.max(m,hitP(s,k,t)),0);
     const pen=s.d.accPen||0;const hurt=AIV.mhold&&(s.shield+reinfAmt(s))<s.d.shield*.3&&s.hull<s.d.hull*.8;
     const trig=s.killing&&best>=.15||AIV.r6&&best>=.65-pen-1e-6||best>=.85-pen-1e-6||AIV.trig65&&best>=.65-pen-1e-6&&d<=10||best>=.65-pen-1e-6&&sepRate>.25||s.holdImp>=8&&best>=.75-pen-1e-6||(s.holdImp>=14||hurt)&&best>=.65-pen-1e-6;   // the longer it's held off (or the more it's hurt), the lower the bar
-    if(s.mode==='brawl'){keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
+    if(s.mode==='brawl'||s.mode==='guns'){keys.forEach((key,i)=>{const w=s.weapons[i];if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
         if(K==='missile'){if(d<=16)fire.push(key);return}
         if(K==='torp'){if(w.stages>=1&&pp>=.65-pen-1e-6)fire.push(key);return}
         if(pp>=.5-pen-1e-6)fire.push(key)});
