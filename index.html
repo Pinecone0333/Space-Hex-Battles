@@ -690,7 +690,7 @@ const BURNS={F:{c:'burn',burn:1},TL:{c:'burn',burn:1,turn:-2,kind:'turn'},TR:{c:
 function burnResult(s,a,f0){const A=BURNS[a];let f=f0??s.f;if(A.turn)f=(f+A.turn+NF)%NF;const v=fdir(A.slip?f+A.slip:f);return{f,dq:v[0]*A.burn,dr:v[1]*A.burn}}
 // Nov 21 (David): turn-burns are limited by time, not by the next burn — frigates/corvettes every impulse, medium ships (destroyers, cruisers) every other impulse, the large Dreadnought every 3rd
 const turnGap=s=>s.d.turnGap??(s.d.pivotMax===1||s.d.cls==='Dreadnought'?3:/Frigate|Corvette/.test(s.d.cls)?1:2);
-const turnReady=s=>T-(s.lastTurnT??-99)>=turnGap(s);
+const turnReady=s=>true;   /* Nov 25 (David): no turn-burn timing — a pivot-then-burn already did the same thing; turning is limited only by the rotation cap per impulse (cruisers 60°, small ships 90°, Dreadnought 30°) */
 function burnAllowed(s,a){const A=BURNS[a];if(a!=='R'&&(s.dmgEng||0)>=3)return false;   // main engine out: only reverse (retro) thrust
   if(a==='R'&&(s.dmgThrF||0)>=3)return false;   // fore thrusters out: no reverse burn
   if(a==='R'&&T-(s.lastRevT??-99)<2)return false;   // Nov 21 (David): reverse burns only every other impulse
@@ -1781,6 +1781,16 @@ function tacPrompt(tp){let el=$('critbox');if(!el){el=document.createElement('di
   const go=def=>{close();if(def){for(const x of tp.mineL)x.msMode='def';log('Tactical officer: launchers set to Defend','good')}tacOK=true;doAct('go');tacOK=false};
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close();buildHUD()}else if(ev.key==='Enter'){ev.preventDefault();go(true)}};
   addEventListener('keydown',kh,true);$('tacyes').onclick=()=>go(true);$('tacno').onclick=()=>go(false);$('tacback').onclick=()=>{close();buildHUD()}}
+/* Nov 25 (David): Engineering Officer — pressing Continue with idle damage-control teams and unrepaired systems. Shown again only when the damage changes. */
+let engOK=false,engSeen=null;
+const engKey=L=>L.map(x=>x.name+':'+x.damaged.filter(b=>!(x.dc||[]).some(j=>j.box===b)&&!x.queue.some(q=>q.type==='dc'&&q.id===b.id)).map(b=>b.id).join(',')).join('|');
+function engPrompt(L,key){let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
+  const lines=L.map(x=>`<li><b>${x.name}</b>: ${dcFree(x)} team${dcFree(x)>1?'s':''} idle · ${dcOpen(x)} damaged system${dcOpen(x)>1?'s':''} (${x.damaged.filter(b=>!(x.dc||[]).some(j=>j.box===b)).slice(0,4).map(b=>boxShort(x,b)).join(', ')}${dcOpen(x)>4?', …':''})</li>`).join('');
+  el.innerHTML=`<div class="critcard" style="border-color:#4da6ff;background:#0d1621"><div class="crith" style="color:#8fd0ff">🔧 ENGINEERING OFFICER</div><div>Captain, we have damage-control teams standing idle:</div><ul style="margin:6px 0 8px 18px;padding:0">${lines}</ul><div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><button class="btn" id="engauto" style="border-color:#4da6ff">Assign them for me and continue (Enter)</button><button class="btn" id="engno">Continue without repairs</button><button class="btn" id="engback">Back — I'll assign them (Esc)</button></div></div>`;
+  el.style.display='flex';const close=()=>{el.style.display='none';removeEventListener('keydown',kh,true)};
+  const go=auto=>{close();if(auto)for(const x of L){const a=x.aiDC,e=x.aiE;x.aiDC=true;x.aiE=false;aiAssist(x);x.aiDC=a;x.aiE=e}engSeen=key;engOK=true;doAct('go');engOK=false};
+  const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close();buildHUD()}else if(ev.key==='Enter'){ev.preventDefault();go(true)}};
+  addEventListener('keydown',kh,true);$('engauto').onclick=()=>go(true);$('engno').onclick=()=>go(false);$('engback').onclick=()=>{close();buildHUD()}}
 function ffPrompt(L){let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
   const lines=L.map(x=>{const t=tgt(x),n=[...x.fireSel].filter(q=>canFireMount(x,q,t)).length;return `<li><b>${x.name}</b> → <b style="color:${own(t)?'var(--good)':'#6fb8ff'}">${t.name}</b> (${own(t)?'your ship':'ally'}) — ${n} weapon${n>1?'s':''} armed</li>`}).join('');
   el.innerHTML=`<div class="critcard"><div class="crith">⚠ FRIENDLY FIRE</div><div>You are about to fire on your own side:</div><ul style="margin:6px 0 8px 18px;padding:0">${lines}</ul><div class="dim">Fire anyway, or stand down (those weapons are disarmed and stay loaded).</div><div class="row" style="margin-top:10px;gap:8px"><button class="btn" id="ffno">Stand down (Esc)</button><button class="btn" id="ffyes" style="border-color:#ff5a3d;color:#ff8a7a">Fire on friendlies (Enter)</button></div></div>`;
@@ -1801,7 +1811,7 @@ function doAct0(a){const [k,v]=a.split(':');
     const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
     if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
-  if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!ffOK){const L=mine().filter(x=>{const t=tgt(x);return t&&t.team===x.team&&[...x.fireSel].some(q=>canFireMount(x,q,t))});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
+  if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!engOK){const L=mine().filter(dcAvail),key=engKey(L);if(L.length&&key!==engSeen){engPrompt(L,key);return}}if(!ffOK){const L=mine().filter(x=>{const t=tgt(x);return t&&t.team===x.team&&[...x.fireSel].some(q=>canFireMount(x,q,t))});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
   if(k==='aipdall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
