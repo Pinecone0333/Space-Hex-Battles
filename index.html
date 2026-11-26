@@ -96,7 +96,7 @@ select{background:#0f1b28;color:var(--txt);border:1px solid var(--line);font:inh
 .fp-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
 .faccard{display:flex;gap:10px;align-items:center;text-align:left;background:#0e1823;border:1px solid #223244;border-left:4px solid var(--fc);border-radius:8px;padding:8px;color:inherit;cursor:pointer;font:inherit}
 .faccard:hover{background:#13212f;border-color:var(--fc)}.faccard.on{box-shadow:0 0 0 2px var(--fc) inset}
-.fc-s{flex:none;background:#070c12;border-radius:6px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
+.fc-s{flex:none;background:#070c12;border-radius:6px}.fc-s svg{width:88px;height:96px}.fc-t{display:flex;flex-direction:column;gap:3px;font-size:12px}.fc-t b{font-size:15px}.fc-m{color:#9fb3c6;font-size:11.5px}
 .facpick.first{background:#05080c}.facpick.first .fp-in{border-color:#3a5674}
 .slotc{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin:5px 0;background:#08121b;cursor:default}.slotc[data-slotsel]{cursor:pointer}.slotc.sel{background:#102236;border-color:#3b6a8f}.slotc select{background:#0b1520;color:var(--txt);border:1px solid #2a4258;font-family:inherit;font-size:11px}
 .mslrow .chips{display:inline-flex;flex-wrap:wrap;max-width:100%;letter-spacing:1px}.mslrow .ws{min-width:0}.mslctl{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-end;padding:2px 0 3px}.mslctl .chip{display:inline-flex;align-items:center;gap:2px}
@@ -111,13 +111,13 @@ table.cas{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}tabl
 #end{overflow-y:auto;align-items:flex-start;padding:12px 0}#end>.box{margin:auto}   /* Nov 24 (David): the end screen scrolls when the casualty list is long */
 
 .quadh{grid-column:1/-1;margin:10px 0 2px;padding-bottom:4px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#9fb0c2}.fp-g>.quadh:first-child{margin-top:0}   /* Nov 25: quadrant headings in the faction picker */
-.fc-bs{display:flex;gap:6px;margin:4px 0}
-.fc-btn{border:1px solid #3a4a5c;border-radius:4px;padding:2px 7px;font-size:11.5px;color:#cfe0f0;background:#122030;cursor:pointer}
+.fc-bs{display:flex;gap:2px 6px;margin:3px 0 0;align-items:center;flex-wrap:wrap}.fc-btn{white-space:nowrap}.fc-t{min-width:0;flex:1}.fc-bs .fc-m{font-size:10.5px}
+.fc-btn{border:1px solid #3a4a5c;border-radius:4px;padding:1px 5px;font-size:10.5px;color:#cfe0f0;background:#122030;cursor:pointer}
 .fc-btn:hover{border-color:var(--fc);color:#fff}
 .fc-pop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:60}
 .fc-pop-in{max-width:440px;margin:16px;background:#0d1621;border:2px solid;border-radius:8px;padding:14px 16px;text-align:left}
 .fc-pop-in p{margin:10px 0 12px;line-height:1.45;font-style:normal}
-.fc-txt{max-height:22em;overflow-y:auto;font-size:11.5px;line-height:1.4;color:#9fb0c2;margin:3px 0 2px;padding-right:4px;text-align:left}
+.fc-txt{max-height:22em;overflow-y:auto;font-size:10px;line-height:1.28;color:#9fb0c2;margin:3px 0 2px;padding-right:4px;text-align:left}
 .fc-txt.lore{font-style:italic;color:#c9d3de}
 </style>
 </head><body>
@@ -2061,8 +2061,8 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
   const shownQ=new Set();const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const newQ=ix===0||facQuad(arr[ix-1][0])!==facQuad(f);const sep=era!=='open'&&!facListed(f)&&(newQ||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const qh=shownQ.has(facQuad(f))?'':(shownQ.add(facQuad(f)),`<div class="quadh">${facQuad(f)} Quadrant</div>`);const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=era==='open'||!facListed(f)?[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a):facTLs(f);
-    return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${F.full||f}</b><div class="fc-txt${F.lore?' lore':''}">${F.lore||F.blurb}</div>${F.lore?`<span class="fc-bs"><span class="fc-btn" data-fflip="${f}" title="Flip between lore and how they fight">⚙ Mechanics</span></span>`:''}
-      <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}${era!=='open'&&!facListed(f)?' · <i>not in this era</i>':''}</span></div></button>`}).join('');
+    return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${F.full||f}</b><div class="fc-txt${F.lore?' lore':''}">${F.lore||F.blurb}</div>
+      <span class="fc-bs">${F.lore?`<span class="fc-btn" data-fflip="${f}" title="Flip between lore and how they fight">⚙ Mechanics</span>`:''}<span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}${era!=='open'&&!facListed(f)?' · <i>not in this era</i>':''}</span></span></div></button>`}).join('');
   el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${slotLabel(t)==='You'?'your fleet':slotLabel(t)}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
   el.addEventListener('click',e=>{const pop=el.querySelector('.fc-pop');if(pop&&(e.target.closest('[data-fpopx]')||!e.target.closest('.fc-pop'))){pop.remove();return}if(pop)return;
