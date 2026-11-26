@@ -111,7 +111,12 @@ table.cas{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}tabl
 #end{overflow-y:auto;align-items:flex-start;padding:12px 0}#end>.box{margin:auto}   /* Nov 24 (David): the end screen scrolls when the casualty list is long */
 
 .quadh{grid-column:1/-1;margin:10px 0 2px;padding-bottom:4px;border-bottom:1px solid var(--line);font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:#9fb0c2}.fp-g>.quadh:first-child{margin-top:0}   /* Nov 25: quadrant headings in the faction picker */
-.fc-lore{display:block;font-style:italic;color:#c9d3de;font-size:11.5px;margin:2px 0 3px}
+.fc-bs{display:flex;gap:6px;margin:4px 0}
+.fc-btn{border:1px solid #3a4a5c;border-radius:4px;padding:2px 7px;font-size:11.5px;color:#cfe0f0;background:#122030;cursor:pointer}
+.fc-btn:hover{border-color:var(--fc);color:#fff}
+.fc-pop{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0008;z-index:60}
+.fc-pop-in{max-width:440px;margin:16px;background:#0d1621;border:2px solid;border-radius:8px;padding:14px 16px;text-align:left}
+.fc-pop-in p{margin:10px 0 12px;line-height:1.45;font-style:normal}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -237,7 +242,7 @@ WT.SCT={...WT.SC,name:'Small Coilgun Turret',ab:'CG(s)T',acc:'rail'};   // Nov 2
 WT.RG4={...WT.RG,name:'Small Railgun Turret (TL4)',acc:'rail',tl1:false};WT.MRG4={...WT.MRG,name:'Medium Railgun Turret (TL4)',acc:'rail',tl1:false};
 const GROUPS=[{id:'lasers',label:'Laser Cannons'},{id:'coils',label:'Coilguns'},{id:'rails',label:'Railgun Turrets'},{id:'torps',label:'Energy Torpedoes'},{id:'lances',label:'Plasma Lances'},{id:'aplances',label:'Antiproton Lances'},{id:'missiles',label:'Missiles'}];
 const rep=(n,x)=>Array.from({length:n},()=>x);
-const FACTIONS={Dogahr:{color:'#39e75f',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
+const FACTIONS={Dogahr:{color:'#39e75f',full:'Dogahr Empire',lore:'Upstart Alpha Quadrant empire, recently risen to become the "Third Power" after the Chemantar and Golthan. Subject races are forcibly incorporated into the empire but given the chance to advance through the ranks.',blurb:'Missile-heavy fleets, heavy coilguns, long-range pressure'},Martian:{color:'#ff3b3b',blurb:'Energy torpedoes and laser batteries, power-hungry brawlers'}};
 const SHIPS={
   dogahr:{faction:'Dogahr',cls:'Heavy Cruiser',weight:100,name:'Dogahr Heavy Cruiser',short:'Dogahr',color:'#39e75f',laser:'#b46bff',torp:'#d9a8ff',hull:150,shield:50,big:true,doctrine:'hunt',
     shape:[[-32,-20],[2,-20],[4,-16],[6,-12],[8,-8],[34,-8],[34,8],[8,8],[6,12],[4,16],[2,20],[-32,20],[-32,8],[-24,8],[-24,6],[-32,6],[-32,-6],[-24,-6],[-24,-8],[-32,-8]],
@@ -333,7 +338,7 @@ SHIPS.huniferdd={faction:'Hunifer',cls:'Frigate',weight:55,name:'Hunifer Frigate
    weapons:[['SPL','S'],['SPL','S'],['SL','RS'],['SL','RS'],['SL','LS'],['SL','LS'],...rep(4,['MS','ALL'])]};   // 4 SC → 2 Small Plasma Lances
 }
 // ---- Chemantar (Nov 18, David): purple, fire light green. Placeholder outlines until David's sprites ----
-FACTIONS.Chemantar={color:'#7b2fd6',blurb:'Artillery cruisers: antiproton lances, laser batteries, light torpedoes'};
+FACTIONS.Chemantar={color:'#7b2fd6',full:'Chemantar Empire',lore:'Venerable Alpha Quadrant empire. Controls a vast swath of territory between the galactic core and Earth. Imperialistic and expansionist, it conquers worlds and uses them to feed its war machine.',blurb:'Artillery cruisers: antiproton lances, laser batteries, light torpedoes'};
 const CHEM={faction:'Chemantar',color:'#7b2fd6',laser:'#9dff8a',torp:'#b8ff9e'};
 SHIPS.chemdbl={...CHEM,cls:'Double Artillery Cruiser',weight:110,name:'Chemantar Double Artillery Cruiser',short:'Chem Double',hull:220,shield:80,big:true,dcTeams:4,reactor:58,genCost:15,genRegen:6,doctrine:'hunt',prefRange:10,
     shape:[[25,-31.5],[27.8,-30.7],[29.4,-28.8],[30,-26],[30,-16],[29.4,-13.2],[27.8,-11.3],[25,-10.5],[-23,-5.5],[-25.8,-5.8],[-27.4,-7.3],[-28,-10],[-28,-32],[-27.4,-34.7],[-25.8,-36.2],[-23,-36.5],null,[25,10.5],[27.8,11.3],[29.4,13.2],[30,16],[30,26],[29.4,28.8],[27.8,30.7],[25,31.5],[-23,36.5],[-25.8,36.2],[-27.4,34.7],[-28,32],[-28,10],[-27.4,7.3],[-25.8,5.8],[-23,5.5],null,[14,-10],[14,10],[8,10],[8,-10],null,[-12,-7.5],[-12,7.5],[-18,7.5],[-18,-7.5]],lines:[[-24,-21,26,-21],[-24,21,26,21]],dots:[[20,-21],[20,21],[-10,-34],[-10,34]],
@@ -2054,11 +2059,16 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
   const shownQ=new Set();const cards=facOrder().map(f=>[f,FACTIONS[f]]).map(([f,F],ix,arr)=>{const newQ=ix===0||facQuad(arr[ix-1][0])!==facQuad(f);const sep=era!=='open'&&!facListed(f)&&(newQ||facListed(arr[ix-1][0]))?`<div class="dim" style="grid-column:1/-1;margin:6px 0 0;border-top:1px solid var(--line);padding-top:6px">Not part of the ${ERAS[era].name} — pick their tech level by hand</div>`:'';if(!facOK(f))return '';const qh=shownQ.has(facQuad(f))?'':(shownQ.add(facQuad(f)),`<div class="quadh">${facQuad(f)} Quadrant</div>`);const ships0=Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&shipOK(k)).map(k=>SHIPS[k]);const ships=era==='open'||!facListed(f)?Object.values(SHIPS).filter(d=>d.faction===f&&d.tl!==3&&!(d.tl===2&&/ II$/.test(d.short||''))):ships0;if(!ships.length)return '';
     const flag=ships.filter(d=>(d.tl||4)===Math.max(...ships.map(x=>x.tl||4))).sort((a,b)=>b.weight-a.weight)[0];const tls=era==='open'||!facListed(f)?[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl||4))].sort((a,b)=>b-a):facTLs(f);
-    return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${F.full||f}</b>${F.lore?`<span class="fc-lore">${F.lore}</span>`:''}<span class="dim">${F.blurb}</span>
+    return qh+sep+`<button class="faccard ${fleetFaction[t]===f?'on':''}" data-pickfac="${f}" style="--fc:${F.color}"><div class="fc-s">${shipSVG(flag,110,120,F.color)}</div><div class="fc-t"><b style="color:${F.color}">${F.full||f}</b><span class="fc-bs">${F.lore?`<span class="fc-btn" data-flore="${f}" title="Who they are">📜 Lore</span>`:''}<span class="fc-btn" data-fmech="${f}" title="How they fight">⚙ Mechanics</span></span>
       <span class="fc-m">${ships.length} ship${ships.length>1?'s':''} · TL ${tls.join('/')}${era!=='open'&&!facListed(f)?' · <i>not in this era</i>':''}</span></div></button>`}).join('');
   el.innerHTML=`<div class="fp-in"><div class="fp-h">${first?'<b style="font-size:18px">Choose your faction</b> <span class="dim">step 1 of 2 — then build your fleet</span>':`<b>Choose a faction</b> <span class="dim">for ${slotLabel(t)==='You'?'your fleet':slotLabel(t)}</span>`}<button class="btn" data-fpclose title="${first?'Keep '+fleetFaction[t]+' and go to the fleet screen':'Close'}">${first?'Skip ▸':'✕'}</button></div><div class="fp-g">${cards}</div></div>`;
   document.body.appendChild(el);
-  el.addEventListener('click',e=>{if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;tlManual[t]=false;fleetTL[t]=eraDefault(t);el.remove();renderBuilder();lobbyChanged()})}
+  el.addEventListener('click',e=>{const pop=el.querySelector('.fc-pop');if(pop&&(e.target.closest('[data-fpopx]')||!e.target.closest('.fc-pop'))){pop.remove();return}if(pop)return;
+    const lb=e.target.closest('[data-flore],[data-fmech]');if(lb){e.stopPropagation();const f=lb.dataset.flore||lb.dataset.fmech,F=FACTIONS[f],lore=!!lb.dataset.flore;   /* Nov 25 (David): Lore and Mechanics pop-ups on the faction cards */
+      const d=document.createElement('div');d.className='fc-pop';d.innerHTML=`<div class="fc-pop-in" style="border-color:${F.color}"><b style="color:${F.color};font-size:16px">${F.full||f}</b> <span class="dim">· ${lore?'Lore':'Mechanics'} · ${facQuad(f)} Quadrant</span><p>${lore?F.lore:F.blurb}</p><div class="row" style="gap:8px">${lore?`<button class="btn" data-fpopsw="mech">⚙ Mechanics</button>`:F.lore?`<button class="btn" data-fpopsw="lore">📜 Lore</button>`:''}<button class="btn" data-fpopx>Close</button></div></div>`;
+      d.querySelector('[data-fpopsw]')&&d.querySelector('[data-fpopsw]').addEventListener('click',ev=>{ev.stopPropagation();d.remove();const n=document.createElement('span');n.dataset[ev.target.dataset.fpopsw==='lore'?'flore':'fmech']=f;el.querySelector('.fp-in').appendChild(n);n.click();n.remove()});
+      el.appendChild(d);return}
+    if(e.target===el||e.target.closest('[data-fpclose]')){el.remove();return}const b=e.target.closest('[data-pickfac]');if(!b)return;const f=b.dataset.pickfac;fleetFaction[t]=f;tlManual[t]=false;fleetTL[t]=eraDefault(t);el.remove();renderBuilder();lobbyChanged()})}
 /* ---- Nov 22 (David): game modes — Skirmish (free fleet building), Scenario (a set battle, either side), Campaign (missions in order, fixed side) ---- */
 let SCEN=null,skirmBak=null;
 const CAMPAIGNS={sdi2:{name:'Second Dogahr Invasion — Part 2',side:'Martian',era:'dog2',blurb:'The Dogahr are back, and the Martian navy has only its TL2 refits and a handful of new Condors to stop them.',missions:['bloodynose']}};
