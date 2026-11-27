@@ -163,7 +163,9 @@ body.mob.open-l .mcard,body.mob.open-r .mcard{display:none!important}
 #mobready.on{opacity:1;pointer-events:auto}body:not(.mob) #mobready{display:none}
 body.mob #toast{top:228px}
 /* Nov 26 (David): game modes as a 2×2 grid */
-#modepick .fp-g{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:720px;margin:0 auto}
+#modepick .fp-g{display:grid!important;grid-template-columns:repeat(2,minmax(0,330px));gap:12px;margin:0}
+#modepick .fp-in:has(> .fp-g){width:auto;padding:12px 14px}
+body.mob #modepick .fp-g{grid-template-columns:repeat(2,minmax(0,1fr))}body.mob #modepick .fp-in:has(> .fp-g){width:100%}
 #modepick .fp-g>.faccard{width:auto!important;min-height:120px;margin:0}
 body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 </style>
@@ -173,7 +175,7 @@ body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 <div id="rside"></div>
 <div id="dcAlert"></div>
 <div id="bar"></div>
-<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> (or <span class="k">Q</span><span class="k">E</span>) pivot 30° · <span class="k">J</span> evade · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> recenter · <span class="k">M</span> music <input id="musicvolB" type="range" min="0" max="100" step="1" value="40" autocomplete="off" title="Music volume" style="width:80px;vertical-align:middle;accent-color:#5ad18c;cursor:pointer"> · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select> · <button id="ranim" class="btn" style="padding:1px 7px;font-size:11px" title="Reduced animations: every point-defense shot and interceptor plays at once, then every missile impact at once (instead of one after another). Turns on automatically in battles with more than 6 ships; click to switch any time.">Anim: full</button></div>
+<div id="help"><span class="k">W</span><span class="k">X</span> accel/reverse · <span class="k">S</span> reverse · <span class="k">Z</span><span class="k">C</span> (or <span class="k">Q</span><span class="k">E</span>) pivot 30° · <span class="k">J</span> evade · <span class="k">Tab</span> ship · <span class="k">T</span> target · <span class="k">⌫</span> undo · <span class="k">Enter</span> go · <span class="k">F</span> fire/damage-control tab · <span class="k">V</span> arcs · <span class="k">R</span> centre on ship · <span class="k">M</span> music <input id="musicvolB" type="range" min="0" max="100" step="1" value="40" autocomplete="off" title="Music volume" style="width:80px;vertical-align:middle;accent-color:#5ad18c;cursor:pointer"> · <span class="k">N</span> fx · speed <select id="anim"><option value="350">slow</option><option value="170" selected>normal</option><option value="70">fast</option></select> · <button id="ranim" class="btn" style="padding:1px 7px;font-size:11px" title="Reduced animations: every point-defense shot and interceptor plays at once, then every missile impact at once (instead of one after another). Turns on automatically in battles with more than 6 ships; click to switch any time.">Anim: full</button></div>
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1 style="display:flex;align-items:center;gap:12px">SPACE HEX TACTICS <button class="btn" id="tomodes" style="font-size:12px;margin-left:auto" title="Skirmish, Scenario or Campaign">◂ Game modes</button></h1>
  <div class="dim">Build up to 8 fleets and put them on teams (same team = allies). You command your own fleet; AI fleets fight on their own.</div>
@@ -547,7 +549,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={ovk:1,pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null,arcHover=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -951,10 +953,14 @@ function recShow(txt,name,ok){let el=$('recBox');if(!el){el=document.createEleme
   $('recClose').onclick=()=>el.style.display='none';
   $('recCopy').onclick=()=>{const ta=$('recTxt');ta.select();let c=false;try{c=document.execCommand('copy')}catch(e){}if(!c&&navigator.clipboard)navigator.clipboard.writeText(txt).then(()=>{$('recCopy').textContent='Copied ✓'}).catch(()=>{});else $('recCopy').textContent=c?'Copied ✓':'Select all + copy'}}
 const alertBox=t=>recShow(t,'',false);
+/* Nov 26 (David): each armed weapon keeps the target it was armed against — arm some guns, switch target, arm others, and each group fires at its own target */
+function syncFT(s){if(!s||!s.fireSel)return;const F=s.fireTgt||(s.fireTgt={});for(const k of Object.keys(F))if(!s.fireSel.has(k))delete F[k];const t=s.target;for(const k of s.fireSel)if(!F[k]&&t)F[k]=t}
+function keyTgt(s,k){const F=s.fireTgt,x=F&&F[k];if(x)return x.dead?null:x;return tgt(s)}
+function fireGroups(s){if(isAI(s)){const t=tgt(s);return t?[[t,s.fireChoice||[]]]:[]}syncFT(s);const G=new Map();for(const k of s.fireSel){const t=keyTgt(s,k);if(!t)continue;if(!G.has(t))G.set(t,[]);G.get(t).push(k)}return [...G]}
 function commit(){
   if(phase==='over')return;initAudio();recImpulse();
   /* Nov 21 (David): fire happens with the facing the ship had when it gave its orders — pivoting away this impulse no longer cancels shots that were in arc */
-  const preArc=new Map();for(const s of alive()){const t=tgt(s);if(!t)continue;const sel=isAI(s)?(s.fireChoice||[]):[...s.fireSel];preArc.set(s,new Set(sel.filter(k=>canFireMount(s,k,t))))}
+  const preArc=new Map(),FG=new Map();for(const s of alive()){const G=fireGroups(s);FG.set(s,G);const ok=new Set();for(const [t,sel] of G)for(const k of sel)if(canFireMount(s,k,t))ok.add(k);preArc.set(s,ok)}
   for(const s of alive())s.preF=s.f;   // Nov 22 (David): ships are drawn at the facing they fired from until the shots have landed; the pivot shows afterwards
   for(const s of alive())applyQueue(s);
   const shots=[];
@@ -977,7 +983,7 @@ function commit(){
   for(const s of alive()){if(!s.mslLight)continue;s.mslLight=false;const t=tgt(s);if(!t)continue;let n=0;
     for(const m of missiles){if(m.dead||!m.dorm||m.owner!==s)continue;const a=Math.atan2(t.px.y-m.px.y,t.px.x-m.px.x);m.dorm=false;m.target=t;m.age=0;m.h=a;m.ld=Math.round(Math.hypot(t.px.x-m.px.x,t.px.y-m.px.y)/HS);m.vx+=Math.cos(a)*HS;m.vy+=Math.sin(a)*HS;n++}
     if(n){s.darkFiredT=T;fireRec(s,'MS','missile',0,t,n);sfx('missile',fr(s)?1:.65);if(own(s))log(`${s.name}: ${n} deployed missile${n>1?'s':''} lit → ${t.name}`,'good')}}
-  for(const s of alive()){const t=tgt(s);if(!t)continue;collect(s,t,isAI(s)?(s.fireChoice||[]):s.fireSel)}
+  for(const s of alive()){if(s.dead)continue;for(const [t,sel] of (FG.get(s)||[]))if(!t.dead||true)collect(s,t,sel);if(!isAI(s))s.fireTgt={}}
   for(const s of alive()){const DL=defLaunchers(s);if(!DL.length)continue;
     const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&(!m.claim||m.claim.dead));   /* Nov 21 (David): Defend launches the moment a missile aimed at the ship appears, at any range (was within 16 hexes) */
     for(const th of thr){const w=DL.find(w=>w.state==='ready'&&w.ammo>0);if(!w)break;
@@ -1014,7 +1020,9 @@ function fireHist(t){const L=t.fireLog||[];const seen=new Set(),out=[];for(let i
 let deathQ=[],reducedAnim=false;
 function flushDeaths(delay){const L=deathQ;deathQ=[];const f0=FXD;for(const t of L){FXD=delay;const p={x:t.px.x,y:t.px.y};
   burst(p,110,'#ffcf6b',true);burst(p,40,'#ffffff');burst(p,50,t.color||'#ff8a5a',true);ring(p,HS*1.4,'#ffb36b',true);ring(p,HS*.8,'#fff3c4',true);sfxAt('boom',1);
-  fx.push({type:'hulk',n:t.name,t:.05,max:.05,d:delay})}FXD=f0}
+  fx.push({type:'hulk',n:t.name,t:.05,max:.05,d:delay});
+  /* Nov 26 (David): the camera stays on a target that dies until its explosion has played (plus 2.5 s), instead of jumping to the next target */
+  {const C=camShip&&camShip();if(C&&C.target===t)cam.kill={p,n:t.name,hold:2.5}}}FXD=f0}
 const hulkShown=s=>s.dead&&fx.some(f=>f.type==='hulk'&&f.n===s.name&&f.d>0);
 function logArr(){return REC&&REC.log||[]}
 function recShot(sh,b0,h0,L0){if(!REC||MP.role==='guest')return;const t=sh.t;const e={t:when(T),by:ships.indexOf(sh.s),at:t?ships.indexOf(t):null,w:sh.key?wLabel(sh.s,sh.key):sh.kind,kind:sh.kind,rng:sh.rng,p0:sh.p0,p:sh.p,mods:sh.mods&&sh.mods.length?sh.mods:undefined,roll:sh.roll,hit:sh.hit,dmg:sh.dmg};
@@ -1310,7 +1318,26 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}return r}
+function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}if(AIV.ovk)aiOverkill(s,r);return r}
+/* Nov 26 (David): don't massively overkill. The AI adds up the damage it can expect — missiles already flying at the target (after its point defense and
+   interceptors), what allied AI ships committed this impulse, then its own shots in order (cheap guns first, missiles, lances, torpedoes last) — and stops once the
+   expected damage reaches the target's shields + reinforcement + hull with a small margin (×1.2 + 4) — and, when one hit is enough to kill, once the chance
+   that every such shot misses is 15% or less. Weapons it holds back stay loaded. */
+function msLeak(t,n){if(n<=0)return 0;const pd=(t.pd||[]).reduce((a,p)=>a+(p.alive===false?0:(p.shots||0)),0);const ic=t.msMode==='off'||t.msDef?defLaunchers(t).filter(w=>w.state==='ready'&&w.ammo>0).length:0;
+  const D=pd*.8+ic*.7;return Math.max(n-D,n*.15)}
+function aiOverkill(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire||!r.fire.length)return;
+  const need=(t.shield||0)+reinfAmt(t)+Math.max(0,t.hull);const goal=need*1.2+4;
+  const fly=missiles.filter(m=>!m.dead&&!m.intercept&&m.target===t);const flyN=fly.length,mD=fly.length?fly.reduce((a,m)=>a+(m.dmg||10),0)/fly.length:10;
+  const plan=t._plan&&t._plan.T===T?t._plan:(t._plan={T,dmg:0,ms:0});
+  let acc=plan.dmg+msLeak(t,flyN+plan.ms)*mD;
+  let pNo0=1;if(mD>=need){const lk=msLeak(t,flyN+plan.ms);pNo0=Math.pow(.1,Math.min(lk,3))}
+  const kindOf=k=>k[0]==='w'?s.weapons[+k.slice(1)].T.kind:k.startsWith('pd')?'pd':'pcr';
+  const rank={pd:0,beam:1,rail:1,slug:2,missile:3,lance:4,ap:5,torp:6,pcr:7};
+  const keys=[...r.fire].sort((a,b)=>(rank[kindOf(a)]??3)-(rank[kindOf(b)]??3));const keep=new Set();let msN=0,dir=0,pNo=pNo0,killers=pNo0<1?1:0;
+  for(const k of keys){if(acc>=goal&&(!killers||pNo<=.15))break;const K=kindOf(k);keep.add(k);
+    if(K==='missile'){const before=msLeak(t,flyN+plan.ms+msN);msN++;const w=s.weapons[+k.slice(1)];const lk=msLeak(t,flyN+plan.ms+msN)-before;acc+=lk*(w.T.dmg||10);if((w.T.dmg||10)>=need){killers++;pNo*=1-Math.min(.9,lk)}continue}
+    let e;if(K==='pcr')e=30;else if(K==='pd'){const p=s.pd[+k.slice(2)];e=hitP(s,k,t)*(p.shots||1)}else{const w=s.weapons[+k.slice(1)];const d=K==='torp'?torpDmg(w):K==='lance'?lanceDmg(w.T,hexDist(s,t)):w.T.dmg;e=hitP(s,k,t)*d;if(d>=need){killers++;pNo*=1-hitP(s,k,t)}}acc+=e;dir+=e}
+  const before=r.fire.length;r.fire=r.fire.filter(k=>keep.has(k));plan.dmg+=dir;plan.ms+=msN;s.ovkHeld=before-r.fire.length}
 /* Nov 22 (David): Martian-doctrine ships fire their torpedoes together with the coilguns — whenever a coilgun takes a 50%+ shot, every torpedo bearing on the target with at least one stage's worth of charge goes too */
 /* Nov 22 (David: '7 is too far out to fire'): Martian-doctrine torpedoes fire only when both the torpedoes and the coilguns have 65%+ to hit
    (coilguns destroyed: torpedoes alone at 65%+). The kill-shot rule (target nearly dead) is exempt. */
@@ -1784,7 +1811,7 @@ function fireStrip(s,t,sd){if(!t||!sd)return '';const d=hexDist(s,t);let h='';
   const ms=s.weapons.map((w,i)=>({w,i})).filter(x=>x.w.T.kind==='missile');if(ms.length)h+=missileRow(s,ms,t,sd,'#c7a6ff').replace('class="wrow"','class="wrow msl"');
   s.pd.forEach((p,i)=>{const key='pd'+i;if(p.alive&&canFireMount(s,key,t))h+=fireBtn(s,key,`PD ${p.arc==='ALL'?'360':p.arc} ${sixths(hitP(s,key,t))}`,'offensive fire, 1 dmg per hit')});
   return h?`<div class="firestrip">${h}</div>`:`<div class="row dim sm">Nothing can fire at ${t.name} right now</div>`}
-function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))$(id).innerHTML='';return}const dec=phase==='decide';let h='',rh='';
+function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))$(id).innerHTML='';return}for(const x of ships)if(!x.dead&&own(x)&&!isAI(x))syncFT(x);const dec=phase==='decide';let h='',rh='';
   const ownS=ships.filter(x=>own(x));const st=`<span class="${dec?'warn':'dim'}">${dec?'ORDERS':phase==='over'?'OVER':'RUNNING'}</span>`;
   // ---- right panel: turn, fleet, target scan, enemies, queue, log ----
   const s=P;const ct=s&&!s.dead?tgt(s):null;
@@ -1855,7 +1882,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
     else el.style.display='none'}
   $('side').innerHTML=h;$('rside').innerHTML=rh;$('log').innerHTML=logLines.map(l=>`<div class="${l.cls}">${l.text}</div>`).join('');$('log').scrollTop=1e6;
   let b='';if(dec&&s&&!s.dead&&!s.ai){const B=(k,lab,a)=>{const act={type:'burn',a,cost:burnCost(s,a)};const dir=Math.sign(BURNS[a].turn||0),m=dir?turnPen(s,dir):0;return `<button class="btn big ${m?'thrwarn':''}" data-act="burn:${a}" ${canQueue(s,act)?'':'disabled'} title="${+act.cost.toFixed(2)} energy${m?` — ${thrName(dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
-    const pv=(k,lab,dir)=>{const m=turnPen(s,+dir);return `<button class="btn big ${m?'thrwarn':''}" data-act="pivot:${dir}" ${canQueue(s,{type:'pivot',dir:+dir,cost:pivotCost(s,+dir)})?'':'disabled'} title="${isFinite(pivotCost(s,+dir))?+pivotCost(s,+dir).toFixed(2)+' energy':'thrusters destroyed'}${m?` — ${thrName(+dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
+    const pv=(k,lab,dir)=>{const m=turnPen(s,+dir);return `<button class="btn big ${m?'thrwarn':''}" data-act="pivot:${dir}" ${canQueue(s,{type:'pivot',dir:+dir,cost:pivotCost(s,+dir)})?'':'disabled'} title="${isFinite(pivotCost(s,+dir))?+pivotCost(s,+dir).toFixed(2)+' energy':'thrusters destroyed'}${m?` — ${thrName(+dir)} damaged: +${Math.round((m-1)*100)}%`:''}"><span class="k">${k}</span> ${lab}${isFinite(pivotCost(s,+dir))?' '+(+pivotCost(s,+dir).toFixed(2)):''}${m?`<b class="pen">⚠${Math.round((m-1)*100)}%</b>`:''}</button>`};
     const db=decelBurn(s);
     b=`
       <div style="display:flex;flex-direction:column;gap:4px"><button class="btn big accel" data-act="burn:F" ${canQueue(s,{type:'burn',a:'F',cost:burnCost(s,'F')})?'':'disabled'} title="${burnCost(s,'F')} energy"><span class="k">W</span> ▲ ACCEL${nBurnQ(s)===1?' ×2':nBurnQ(s)===2?'<b class="pen">⚠ CRIT</b>':''}</button>
@@ -1871,7 +1898,7 @@ const pim=x=>(+x.toFixed(2))+'/imp';   // Nov 22 (David): load buttons show the 
 function upkeepRow(s){const L=upkeepList(s);const tot=L.reduce((a,x)=>a+x.c,0),net=income(s)-tot;
   return `<div class="row sm upk" title="Ongoing energy expenses, paid every impulse. Income is +${income(s).toFixed(2)} per impulse."><span class="lab">Upkeep</span><b class="${tot?'warn':'dim'}">−${tot.toFixed(2)}</b><span class="dim">/imp</span>${L.length?' <span class="dim">'+L.map(x=>`${x.lab} ${x.c.toFixed(2)}`).join(' · ')+'</span>':''}<span style="margin-left:auto" class="${net<0?'bad':'good'}">net ${net>=0?'+':''}${net.toFixed(2)}</span></div>`}
 const offBtn=(key,label)=>`<button class="btn fire off" data-arcprev="${key}" title="Ready, but the target is outside this mount's arc — hold the pointer here to see the arc">${label}</button>`;   // Nov 24 (David)
-const fireBtn=(s,key,label,title)=>`<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+label:label}</button>`;
+const fireBtn=(s,key,label,title)=>{const ft=s.fireSel.has(key)&&s.fireTgt&&s.fireTgt[key],o=ft&&ft!==s.target;return `<button class="btn fire ${s.fireSel.has(key)?'armed':''}" data-fire="${key}" ${o?`title="Armed against ${ft.name}${ft.dead?' (destroyed — will not fire)':''} — click to disarm"`:title?`title="${title}"`:''}>${s.fireSel.has(key)?'✓ '+(o?'→ '+ft.name:label):label}</button>`};
 function qLabel(s,x){if(x.type==='dc'){const b=s.damaged.find(q=>q.id===x.id);return 'damage control → '+(b?boxName(s,b):'?')}if(x.type==='dccancel')return 'recall damage control team';return (x.type==='burn'?`burn ${x.a}`:x.type==='pivot'?`pivot ${x.dir>0?'R':'L'}`:x.type==='evade'?'evasive maneuvers':x.type==='gen'?`generator ${x.lvl*100}%`:x.type==='reinf'?`reinforce +${x.n}`:x.type==='repair'?`repair +${x.n}`:x.type==='start'?`${s.weapons[x.i].T.ab} ${s.weapons[x.i].T.kind==='torp'?'charge':'load'}`:x.type==='hold'?`${s.weapons[x.i].T.ab} hold`:x.type==='pausew'?`${s.weapons[x.i].T.ab} pause`:x.type==='pd'?'PD load':'')+(x.cost?` (${x.cost})`:'')}
 function selectShip(x){if(x&&own(x)&&!x.dead){P=x;buildHUD()}}
 function cycleSel(){const own=mine();if(!own.length)return;const i=own.indexOf(P);selectShip(own[(i+1)%own.length])}
@@ -1903,10 +1930,10 @@ function engPrompt(L,key){let el=$('critbox');if(!el){el=document.createElement(
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close();buildHUD()}else if(ev.key==='Enter'){ev.preventDefault();go(true)}};
   addEventListener('keydown',kh,true);$('engauto').onclick=()=>go(true);$('engno').onclick=()=>go(false);$('engback').onclick=()=>{close();buildHUD()}}
 function ffPrompt(L){let el=$('critbox');if(!el){el=document.createElement('div');el.id='critbox';document.body.appendChild(el)}
-  const lines=L.map(x=>{const t=tgt(x),n=[...x.fireSel].filter(q=>canFireMount(x,q,t)).length;return `<li><b>${x.name}</b> → <b style="color:${own(t)?'var(--good)':'#6fb8ff'}">${t.name}</b> (${own(t)?'your ship':'ally'}) — ${n} weapon${n>1?'s':''} armed</li>`}).join('');
+  const lines=L.map(x=>{const fq=[...x.fireSel].filter(q=>{const u=keyTgt(x,q);return u&&u.team===x.team&&canFireMount(x,q,u)}),t=keyTgt(x,fq[0])||tgt(x),n=fq.length;return `<li><b>${x.name}</b> → <b style="color:${own(t)?'var(--good)':'#6fb8ff'}">${t.name}</b> (${own(t)?'your ship':'ally'}) — ${n} weapon${n>1?'s':''} armed</li>`}).join('');
   el.innerHTML=`<div class="critcard"><div class="crith">⚠ FRIENDLY FIRE</div><div>You are about to fire on your own side:</div><ul style="margin:6px 0 8px 18px;padding:0">${lines}</ul><div class="dim">Fire anyway, or stand down (those weapons are disarmed and stay loaded).</div><div class="row" style="margin-top:10px;gap:8px"><button class="btn" id="ffno">Stand down (Esc)</button><button class="btn" id="ffyes" style="border-color:#ff5a3d;color:#ff8a7a">Fire on friendlies (Enter)</button></div></div>`;
   el.style.display='flex';const close=()=>{el.style.display='none';removeEventListener('keydown',kh,true)};
-  const no=()=>{close();for(const x of L){const t=tgt(x);for(const q of [...x.fireSel])if(canFireMount(x,q,t))x.fireSel.delete(q)}log('Friendly fire cancelled — weapons disarmed','dim');buildHUD()};
+  const no=()=>{close();for(const x of L){for(const q of [...x.fireSel]){const t=keyTgt(x,q);if(t&&t.team===x.team&&canFireMount(x,q,t))x.fireSel.delete(q)}}log('Friendly fire cancelled — weapons disarmed','dim');buildHUD()};
   const go=()=>{close();ffOK=true;doAct('go');ffOK=false};
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();no()}else if(ev.key==='Enter'){ev.preventDefault();go()}};
   addEventListener('keydown',kh,true);$('ffno').onclick=no;$('ffyes').onclick=go}
@@ -1922,7 +1949,7 @@ function doAct0(a){const [k,v]=a.split(':');if(k==='unsubmit'){mpUnsubmit();retu
     const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
     if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
-  if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!engOK){const L=mine().filter(dcAvail),key=engKey(L);if(L.length&&key!==engSeen){engPrompt(L,key);return}}if(!ffOK){const L=mine().filter(x=>{const t=tgt(x);return t&&t.team===x.team&&[...x.fireSel].some(q=>canFireMount(x,q,t))});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
+  if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!engOK){const L=mine().filter(dcAvail),key=engKey(L);if(L.length&&key!==engSeen){engPrompt(L,key);return}}if(!ffOK){const L=mine().filter(x=>{syncFT(x);return [...x.fireSel].some(q=>{const t=keyTgt(x,q);return t&&t.team===x.team&&canFireMount(x,q,t)})});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
   if(k==='pause'){pauseReq=true;log('Stopping at the next impulse…','dim');return}
   if(k==='aipd'&&P&&!P.dead&&!P.ai){P.aiPD=!P.aiPD;log(`${P.name}: PD auto-reload ${P.aiPD?'on':'off'}`,'dim');if(phase==='decide'&&P.aiPD&&MP.role!=='guest')autoPD(P);buildHUD();return}
   if(k==='aipdall'){const L=ships.filter(x=>own(x)&&!x.dead&&!x.ai),on=!L.every(x=>x.aiPD);for(const x of L){x.aiPD=on;if(on&&phase==='decide'&&MP.role!=='guest')autoPD(x)}log(`All ships: PD auto-reload ${on?'on':'off'}`,'dim');buildHUD();return}
@@ -1994,13 +2021,18 @@ const sx=x=>(x-cam.x)*cam.s+vcx(),sy=y=>(y-cam.y)*cam.s+vcy();
 const animK=()=>phase==='moving'?clamp(animT/ANIM,0,1):1;
 function posOf(o){const k=animK();const a=o.ppx||o.px,b=o.px;return{x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k}}
 function camShip(){return (P&&!P.dead)?P:(mine()[0]||ships.find(x=>own(x)&&!x.dead)||ships.find(x=>fr(x)&&!x.dead)||alive()[0])}
-function updateCam(dt){if(phase==='over')return;const C=camShip();if(!C)return;const dpr=devicePixelRatio,m=70*dpr;const A=posOf(C),tg=C.target&&C.target.dead&&hulkShown(C.target)?C.target:(tgt(C)||C),B=posOf(tg);   /* Nov 22 (David): the camera holds still at the end of a battle and keeps a dying target framed until it explodes */
+/* R (Nov 26, David): centre the camera on your own ship; press R again to go back to framing your ship and its target. Panning or zooming keeps the mode. */
+function camFocusToggle(){pan.x=pan.y=0;zoomMul=1;cam.focus=!cam.focus;if(!cam.focus)cam.base=null;else cam.focusS=Math.max(.6*devicePixelRatio,Math.min(1.2*devicePixelRatio,cam.s/zoomMul||.9*devicePixelRatio));log(cam.focus?'Camera: centred on your ship (R again: ship + target)':'Camera: framing your ship and its target','dim')}
+function updateCam(dt){if(phase==='over')return;const C=camShip();if(!C)return;const dpr=devicePixelRatio,m=70*dpr;
+  const K=cam.kill;if(K){if(!fx.some(f=>f.type==='hulk'&&f.n===K.n&&f.d>0))K.hold-=dt;if(K.hold<=0)cam.kill=null}
+  if(cam.focus){const A=posOf(C);const want=(cam.focusS||.9*dpr)*zoomMul;cam.s+=(want-cam.s)*Math.min(1,dt*4);cam.x+=(A.x+pan.x-cam.x)*Math.min(1,dt*6);cam.y+=(A.y+pan.y-cam.y)*Math.min(1,dt*6);return}
+  const A=posOf(C),tg=cam.kill?null:C.target&&C.target.dead&&hulkShown(C.target)?C.target:(tgt(C)||C),B=cam.kill?cam.kill.p:posOf(tg);   /* Nov 22 (David): the camera holds still at the end of a battle and keeps a dying target framed until it explodes */
   // frame BOTH your ship and its target in the visible area (right of the side panel, above the order bar)
   const cx=(A.x+B.x)/2,cy=(A.y+B.y)/2;const vw=W-SIDE()-RSIDE()-2*m,vh=Hh-BAR()-2*m-30*dpr;
   const fit=Math.min(vw/(Math.abs(A.x-B.x)+140),vh/(Math.abs(A.y-B.y)+140));
   const ts=clamp(fit,.1*dpr,1.6*dpr);
   // hold zoom steady unless the pair no longer fits, or there is lots of wasted room
-  if(cam.base==null||ts<cam.base*.98||ts>cam.base*1.5)cam.base=ts;
+  if(!cam.kill&&(cam.base==null||ts<cam.base*.98||ts>cam.base*1.5))cam.base=ts;
   const want=cam.base*zoomMul;if(cam.snap){cam.s=want;cam.x=cx+pan.x;cam.y=cy+pan.y;cam.snap=false}else{cam.s+=(want-cam.s)*Math.min(1,dt*4);
   cam.x+=(cx+pan.x-cam.x)*Math.min(1,dt*6);cam.y+=(cy+pan.y-cam.y)*Math.min(1,dt*6)}}
 function arrow(a,b,col,dash){const dpr=devicePixelRatio;ctx.strokeStyle=col;ctx.lineWidth=1.5*dpr;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
@@ -2540,7 +2572,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(k==='tab'){e.preventDefault();cycleSel();return}
     if(k==='t'){cycleTarget();return}
     if(phase==='decide'){const km={w:'F',s:'R'};if(k==='q')doAct('pivot:-1');if(k==='e')doAct('pivot:1');if(km[k])doAct('burn:'+km[k]);if(k==='x')doAct('burn:R');if(k==='z')doAct('pivot:-1');if(k==='c')doAct('pivot:1');if(k==='j')doAct('evade');if(k==='backspace'){e.preventDefault();doAct('undo')}}
-    if(k==='f'&&phase==='decide'){dgTab=dgTab==='fire'?'dc':'fire';buildHUD()}if(k==='v'){arcSel=null;showArcs=!showArcs;if(phase==='decide')buildHUD()}if(k==='r'){pan.x=pan.y=0;zoomMul=1;cam.base=null}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
+    if(k==='f'&&phase==='decide'){dgTab=dgTab==='fire'?'dc':'fire';buildHUD()}if(k==='v'){arcSel=null;showArcs=!showArcs;if(phase==='decide')buildHUD()}if(k==='r'){camFocusToggle()}if(k==='m')toggleMusic();if(k==='n')sfxOn=!sfxOn});
   canvas.addEventListener('contextmenu',e=>e.preventDefault());canvas.addEventListener('mousedown',e=>{if(e.button===2)mouse.pan=true;if(e.button===0)clickMap(e)});addEventListener('mouseup',e=>{if(e.button===2)mouse.pan=false});
   canvas.addEventListener('mousemove',e=>{const nx=e.clientX*devicePixelRatio,ny=e.clientY*devicePixelRatio;if(mouse.pan&&mouse.x!=null){pan.x-=(nx-mouse.x)/cam.s;pan.y-=(ny-mouse.y)/cam.s}mouse.x=nx;mouse.y=ny});
   canvas.addEventListener('wheel',e=>{e.preventDefault();zoomMul=clamp(zoomMul*(e.deltaY>0?.9:1.1),.2,4)},{passive:false});
@@ -2631,7 +2663,7 @@ function mpApplySlot(pid,m){const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.ow
 // ---- host → guest snapshots (each guest gets its own view) ----
 const teamOfPid=pid=>{const sh=ships.find(x=>x.owner===pid);if(sh)return sh.team;const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===pid);return s?s.team:-1};
 function serShip(s,pid){const o={};for(const k in s){if(k==='d'||k==='drawAng'||k==='hist'||k==='fireChoice')continue;o[k]=s[k]}
-  o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.owner===pid?[...s.fireSel]:[];o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
+  o.target=s.target?ships.indexOf(s.target):-1;o.fireSel=s.owner===pid?[...s.fireSel]:[];o.fireTgt=s.owner===pid&&s.fireTgt?Object.fromEntries(Object.entries(s.fireTgt).map(([k,x])=>[k,ships.indexOf(x)])):{};o.weapons=s.weapons.map(w=>{const x={...w};delete x.T;return x});
   if(s.owner!==pid){o.queue=[];o.order=null}   // never reveal anyone else's orders
   return o}
 function serMissile(m,_,L){return{...m,owner:ships.indexOf(m.owner),target:ships.includes(m.target)?{s:ships.indexOf(m.target)}:{m:L.indexOf(m.target)},claim:m.claim?L.indexOf(m.claim):-1}}
@@ -2649,7 +2681,7 @@ function mpTryCommit(){if(phase!=='decide')return;
 // ---- guest side ----
 let mpBid=null;
 function mpApplyState(m){ME=m.me;MYTEAM=m.myteam;forfeited=m.ff||[];const first=$('start').style.display!=='none'||!ships.length||m.bid!==mpBid;mpBid=m.bid;const old=ships,pi=old.indexOf(P);
-  ships=m.ships.map(o=>{const s={...o};s.d=SHIPS[o.key];s.weapons=o.weapons.map(w=>({...w,T:WT[w.t]}));s.fireSel=new Set(o.fireSel);s.isPlayer=s.owner===ME;s.hist=[];
+  ships=m.ships.map(o=>{const s={...o};s.d=SHIPS[o.key];s.weapons=o.weapons.map(w=>({...w,T:WT[w.t]}));s.fireSel=new Set(o.fireSel);s.fireTgt={};s.isPlayer=s.owner===ME;s.hist=[];
     const prev=old.find(x=>x.name===o.name&&x.key===o.key&&x.team===s.team);if(prev)s.drawAng=prev.drawAng;return s});
   ships.forEach((s,i)=>{const ti=m.ships[i].target;s.target=ti>=0?ships[ti]:null});
   for(const s of ships){s.damaged=s.damaged||[];s.dc=(s.dc||[]).map(j=>({...j,box:s.damaged.find(b=>b.id===j.box.id)||j.box}))}
@@ -2667,12 +2699,12 @@ function mpApplyState(m){ME=m.me;MYTEAM=m.myteam;forfeited=m.ff||[];const first=
   if(phase==='over'){stopMusic();showEnd();mpBanner('')}
   buildHUD()}
 function mpSendOrders(){if(mpSent)return;mpSent=true;
-  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>own(s)&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight,order:s.order||null,pcrHex:s.pcrHex||null}));
+  const orders=ships.map((s,i)=>({s,i})).filter(({s})=>own(s)&&!s.dead).map(({s,i})=>({i,queue:s.queue,fireSel:[...s.fireSel],fireTgt:(syncFT(s),Object.fromEntries(Object.entries(s.fireTgt||{}).map(([k,x])=>[k,ships.indexOf(x)]))),msMode:s.msMode,subMode:!!s.subMode,target:s.target?ships.indexOf(s.target):-1,auto:s.auto,ai:!!s.ai,aiE:!!s.aiE,aiDC:!!s.aiDC,aiPD:!!s.aiPD,dark:!!s.dark,msDef:s.msDef||0,msDeploy:!!s.msDeploy,mslLight:!!s.mslLight,order:s.order||null,pcrHex:s.pcrHex||null}));
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the other players…');buildHUD()}
 function mpApplyOrders(orders,pid){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.owner!==pid||s.dead)continue;
     s.pcrHex=o.pcrHex&&typeof o.pcrHex==='object'?o.pcrHex:null;s.ai=o.ai;s.order=o.order&&o.order.k?{k:String(o.order.k),a:String(o.order.a||'')}:null;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
-    if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);aiAssist(s)}}
+    if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);s.fireTgt={};for(const [k,j] of Object.entries(o.fireTgt||{}))if(ships[j])s.fireTgt[k]=ships[j];aiAssist(s)}}
   MP.ready[pid]=true;mpTryCommit()}
 
 function mpOnMsg(m,c){if(!m||!m.t)return;
@@ -2925,7 +2957,7 @@ const tP=()=>P&&!P.dead?P:null;
 const wOf=k=>{const s=tP();return s?s.weapons.filter(w=>w.T&&w.T.grp===k||k==='lasers'&&w.T.kind==='beam'):[]};
 const tLasers=()=>{const s=tP();return s?s.weapons.filter(w=>w.T.kind==='beam'):[]};
 const tTorp=()=>{const s=tP();return s?s.weapons.find(w=>w.T.kind==='torp'):null};
-const droneDead=n=>TUT.drones[n]&&TUT.drones[n].dead;
+const droneDead=n=>{const d=typeof n==='number'?TUT.drones[n]:TUT.drones.find(x=>x.name===n);return !!d&&d.dead};
 
 const TUTS={mw:{name:'Maneuvering and Weapons',blurb:'Fly a Martian Peregrine: how a ship moves in space with no friction, then every part of the fire control panel, firing lasers, missiles and an energy torpedo, reloading, and hitting moving targets.',
  steps:[
@@ -2933,15 +2965,16 @@ const TUTS={mw:{name:'Maneuvering and Weapons',blurb:'Fly a Martian Peregrine: h
   ['Welcome aboard, Captain.','This is the Martian frigate Peregrine — fast, light, and now yours. This training run teaches you how a starship moves and how to use every weapon you have.\n\nClick Next (or press Enter) to move on. Nothing in the battle moves until you have read each message.','none'],
   ['How the game runs','The battle is split into turns, and every turn into 8 impulses. At the start of every impulse the game stops so you can give orders: burn, pivot, load weapons, fire. Then you press Continue and everything happens at once — your orders and the enemy\'s.','clock'],
  ]},
- {id:'02',title:'Moving in space',obj:'Practice: pivot, burn, and press Continue a few times. Watch your speed change.',pops:[
+ {id:'02',title:'Moving in space',obj:'Practice: fly for two full turns — pivot, burn, and press Continue. Change your speed at least once.',pops:[
   ['There is no friction in space','On a planet a ship slows down by itself. Out here nothing slows you down. Once you are moving, you keep moving in the same direction at the same speed — forever — until you burn your engine to change it.\n\nRight now the Peregrine is drifting forward at 2 hexes per turn.','map'],
   ['Your speed and course','This line shows your speed in hexes per turn and the way your nose points. On the map, the arrow in front of your ship is your drift: where your ship will be one turn from now if you do nothing.','velLine'],
   ['Pivoting','Pivoting (Z and C, or Q and E) turns your ship 30° at a time WITHOUT changing the direction you are travelling. A pivot only changes where your nose — and your guns — point. Cruisers pay 1 energy per 30°, small ships like this one 0.5.\n\nThere is a limit to how far you can turn in one impulse: 60° for cruisers, 90° for frigates and destroyers like the Peregrine.','pivots'],
   ['Burning','ACCEL (W) fires your main engine along the way your nose points and adds 1 hex per turn of velocity in that direction. Your new course is your old velocity plus the push — so to turn your course, pivot first and then burn.\n\nYou can burn twice in one impulse if you have the energy. A third burn is a critical burn: it pushes the engine too hard and damages it, and the game asks before it lets you.','accel'],
   ['Slowing down','To slow down, push against the way you are moving. Either pivot to point your nose backwards and burn, or use REVERSE (X or S), which fires the forward thrusters. Reverse costs double and can only be used every other impulse — turning around and burning is usually cheaper.','reverse'],
-  ['Evasive maneuvers','Evade (J) jinks the ship side to side for one impulse. Shots at you — and your own shots — are 30% less likely to hit that impulse. It costs about as much as a pivot and you cannot pivot in the same impulse.','evade'],
-  ['Continue','When your orders are in, press Continue (or Enter). Orders you gave this impulse show in the queue and can be undone with Backspace until then.\n\nTry it now: pivot a little, burn once or twice, and press Continue a few times. Watch your drift arrow and your speed change.','cont'],
- ],goal:()=>{const s=tP();if(!s)return false;const v=Math.hypot(s.vq-TUT.v0[0],s.vr-TUT.v0[1]);return v>.5&&T>=TUT.T0+2}},
+  ['Evasive maneuvers','Evade (J) jinks the ship side to side for one impulse. Shots at you — and your own shots — are 30% less likely to hit that impulse. It costs the same as two pivots (one each way) and you cannot pivot in the same impulse.','evade'],
+  ['Moving the view','The camera follows your ship and your target. You can move it yourself:\n\n• Right-click and drag the map to pan.\n• Scroll the mouse wheel to zoom in and out.\n• Press R to centre the camera on your own ship; press R again to go back to framing your ship and its target.','map'],
+  ['Continue','When your orders are in, press Continue (or Enter). Orders you gave this impulse show in the queue and can be undone with Backspace (or ⌫ Undo) until then.\n\nTry it now: fly for two full turns (16 impulses). Pivot, burn, turn your course around, slow down. Watch your drift arrow and your speed change.','cont'],
+ ],prog:()=>`Impulses flown: ${Math.min(16,T-TUT.T0)}/16`,goal:()=>{const s=tP();if(!s)return false;const v=Math.hypot(s.vq-TUT.v0[0],s.vr-TUT.v0[1]);return v>.5&&T>=TUT.T0+16}},
  {id:'03',title:'Fire control',obj:'',setup(){tutDrone(0,6,0,'Drone A')},pops:[
   ['A target','A training drone has appeared 6 hexes ahead so the fire control panel has something to aim at. Before you shoot it, here is a tour of everything on your panels.','map'],
   ['Your ship','This panel is your ship. The bar shows your energy: your reactor refills it every impulse, and everything — engines, weapons, shields — is paid from it. The pool can never hold more than one turn of reactor output, so energy you do not spend is wasted.','energy'],
@@ -2971,25 +3004,29 @@ const TUTS={mw:{name:'Maneuvering and Weapons',blurb:'Fly a Martian Peregrine: h
  ]},
  {id:'04',title:'Lasers',obj:'Destroy the drone dead ahead: arm your lasers with their Fire buttons, then press Continue.',pops:[
   ['Target practice','Time to shoot. The drone dead ahead is unarmed and one hit will destroy it.\n\nArm the lasers that can reach it — click their Fire buttons — then press Continue.','lasers'],
- ],goal:()=>droneDead(0)},
+ ],goal:()=>droneDead('Drone A')},
  {id:'05',title:'Reloading',obj:'Load your empty lasers (their Load buttons, or ⚡ Charge), then press Continue.',pops:[
   ['Good shot!','Your lasers are now empty. A weapon that has fired does nothing until you load it again.\n\nClick Load on each empty laser (or ⚡ Charge to load everything) and watch how many impulses it takes to be ready.','loadBtns'],
  ],goal:()=>tLasers().every(w=>!w.alive||w.state!=='idle')&&T>TUT.T0},
- {id:'06',title:'Turning to fire',obj:'A drone is dead behind you. Pivot until your lasers bear on it, then destroy it.',setup(){tutDrone(180,5,0,'Drone B')},pops:[
-  ['Behind you!','Another drone is drifting along right behind you, matching your course and speed. None of your guns point backwards.\n\nPivot until your lasers bear on it — their arc boxes light up when they can hit — and fire. Remember: you can only turn 90° per impulse, so this takes more than one impulse. Make sure your lasers have finished loading.','pivots'],
- ],goal:()=>droneDead(1)},
+ {id:'06',title:'Turning to fire',obj:'Three drones are behind you. Pivot to bring more guns to bear and destroy all three (lasers and coilgun — save the torpedo and missiles).',setup(){tutDrone(160,5,0,'Drone B1');tutDrone(180,5,0,'Drone B2');tutDrone(200,5,0,'Drone B3')},pops:[
+  ['Behind you!','Three drones are drifting along behind you, matching your course and speed. Look at your weapon rows: only a side laser can reach behind you — the arc boxes that light up show which. One laser can hit one drone per load, and there are three of them.\n\nTo bring more guns to bear, pivot. Your front laser (FX) covers a wide arc ahead, and your coilgun only fires straight ahead.','lasers'],
+  ['Turning around','Pivot until the drones are in front of you — remember you can only turn 90° per impulse, so this takes more than one impulse. Each gun can shoot at a different drone: arm a gun, click another drone on the map (or press T) to target it, and arm the next gun. Make sure your lasers have finished loading.\n\nSave your torpedo and missiles for later.','pivots'],
+ ],goal:()=>['Drone B1','Drone B2','Drone B3'].every(droneDead)},
  {id:'07',title:'Missiles',obj:'Launch a missile wave at the drone ahead (Msl: Attack, then All), and press Continue until it hits.',setup(){const s=tP();if(s){s.msMode='off';s.msDef=0}tutDrone(0,12,0,'Drone C')},pops:[
   ['Missile wave','A drone has appeared 12 hexes ahead. Make sure your launchers are on Attack, press All to launch every ready missile, then press Continue and watch them fly. Missiles steer themselves — they do not need you to point at the target.','mslCtl'],
- ],goal:()=>droneDead(2)},
- {id:'08',title:'Energy torpedo',obj:'Point your nose at the drone and fire the energy torpedo.',setup(){tutDrone(0,6,0,'Drone D');TUT.tFired=false},pops:[
+ ],goal:()=>droneDead('Drone C')},
+ {id:'08',title:'Energy torpedo',obj:'Point your nose at the drone and fire the energy torpedo.',setup(){const w=tTorp();if(w&&w.alive&&(w.stages||0)<3){w.stages=3;w.paid=0;w.charging=false;w.holding=true;w.state='holding';w.cdT=0}tutDrone(0,6,0,'Drone D');TUT.tFired=false},pops:[
   ['The big gun','One more drone, dead ahead. Your energy torpedo is fully charged. It only fires within 15° of your nose, so keep the drone right in front of you, arm the torpedo and press Continue.','torp'],
- ],goal:()=>{const w=tTorp();if(w&&(w.stages<1||w.state==='idle'))TUT.tFired=true;return TUT.tFired&&droneDead(3)}},
- {id:'09',title:'Recharging',obj:'Start charging the torpedo again, then keep pressing Continue until it is fully charged (3 turns).',pops:[
-  ['Recharging the torpedo','The torpedo is empty. Click Charge to start charging it again, then keep pressing Continue and watch the stages fill.\n\nIt takes three full turns — 24 impulses — to reach full charge. That is why a captain thinks hard about when to fire it. You can stop at any stage with Hold and fire with whatever charge you have.','torp'],
- ],goal:()=>{const w=tTorp();return !!w&&w.stages>=3}},
- {id:'10',title:'Moving targets',obj:'Destroy all four moving drones.',setup(){tutDrone(40,12,[3,-150]);tutDrone(-70,11,[2,60]);tutDrone(150,13,[5,-30]);tutDrone(-160,14,[6,90])},pops:[
+ ],goal:()=>{const w=tTorp();if(w&&(w.stages<1||w.state==='idle'))TUT.tFired=true;return TUT.tFired&&droneDead('Drone D')}},
+ {id:'09',title:'Recharging',obj:'Start charging the torpedo again, then keep pressing Continue until it reaches stage 1 (one turn).',pops:[
+  ['Recharging the torpedo','The torpedo is empty. Click Charge to start charging it again, then keep pressing Continue and watch it fill.\n\nEach stage takes one full turn — 8 impulses — and a full charge takes three. That is why a captain thinks hard about when to fire it.','torp'],
+ ],goal:()=>{const w=tTorp();return !!w&&w.stages>=1}},
+ {id:'09b',title:'Stage 1',obj:'',pops:[
+  ['33% charged','Stage 1 of 3: the torpedo is now 33% charged. If you fired it now it would hit for 8 damage — a third of the 24 it does at full charge.\n\nYou can fire it at any charge, hold it where it is with Hold (holding costs a little energy every turn), or keep charging for two more turns to reach full power. It keeps charging unless you stop it.','torp'],
+ ]},
+ {id:'10',title:'Moving targets',obj:'Destroy all four moving drones.',setup(){tutDrone(40,12,[3,-150],'Mover 1');tutDrone(-70,11,[2,60],'Mover 2');tutDrone(150,13,[5,-30],'Mover 3');tutDrone(-160,14,[6,90],'Mover 4')},pops:[
   ['Moving targets','Four drones are flying past on their own courses, at speeds from 2 to 6. Use everything you have learned: pivot and burn to stay in range, keep your guns loaded, and bring the right weapon to bear. Press T to switch targets.','map'],
- ],goal:()=>TUT.drones.slice(4).every(d=>d.dead)},
+ ],goal:()=>['Mover 1','Mover 2','Mover 3','Mover 4'].every(droneDead)},
  {id:'11',title:'Training complete',obj:'',pops:[
   ['Well done, Captain.','You have flown your ship, used every weapon on it and hit moving targets. Next time: shields, damage control and fighting a real enemy.\n\nPress Next to return to the game modes.','none'],
  ],end:true},
@@ -3014,11 +3051,11 @@ function startTutorial(id){const Tu=TUTS[id];if(!Tu)return;if(typeof setMobile==
 function tutNext(){const Tu=TUTS[TUT.id];TUT.step++;const st=Tu.steps[TUT.step];if(!st){tutExit();return}
   TUT.T0=T;const s=tP();TUT.v0=s?[s.vq,s.vr]:[0,0];if(st.setup)st.setup();TUT.pop=0;tutObj();tutShowPop()}
 function tutObj(){let el=$('tutobj');if(!el){el=document.createElement('div');el.id='tutobj';document.body.appendChild(el)}const Tu=TUTS[TUT.id],st=Tu.steps[TUT.step];
-  el.innerHTML=`<b>🎓 ${Tu.name}</b> · <span class="dim">${TUT.step+1}/${Tu.steps.length} ${st.title}</span>${st.obj?`<div class="to-obj">${st.obj}</div>`:''}<div class="to-b"><button class="btn" id="tutagain">↺ Show again</button>${st.goal?'<button class="btn" id="tutskip">Skip ▸</button>':''}<button class="btn" id="tutquit">✕ Quit</button></div>`;
+  el.innerHTML=`<b>🎓 ${Tu.name}</b> · <span class="dim">${TUT.step+1}/${Tu.steps.length} ${st.title}</span>${st.obj?`<div class="to-obj">${st.obj}</div>`:''}${st.prog?'<div class="to-prog dim" id="tutprog"></div>':''}<div class="to-b"><button class="btn" id="tutagain">↺ Show again</button>${st.goal?'<button class="btn" id="tutskip">Skip ▸</button>':''}<button class="btn" id="tutquit">✕ Quit</button></div>`;
   $('tutagain').onclick=()=>{TUT.pop=0;tutShowPop()};if($('tutskip'))$('tutskip').onclick=()=>tutNext();$('tutquit').onclick=()=>tutExit()}
 function tutRect(els){let L=1e9,Tt=1e9,Rr=-1e9,B=-1e9;for(const e of els){const r=e.getBoundingClientRect();if(!r||r.width===0&&r.height===0)continue;L=Math.min(L,r.left);Tt=Math.min(Tt,r.top);Rr=Math.max(Rr,r.right);B=Math.max(B,r.bottom)}return L<1e9?{left:L-4,top:Tt-4,right:Rr+4,bottom:B+4}:null}
 let tutVO=null;
-function tutShowPop(){const st=TUTS[TUT.id].steps[TUT.step];const p=st.pops[TUT.pop];if(!p){tutHidePop();if(st.end)tutExit();else if(!st.goal)tutNext();return}
+function tutShowPop(){const st=TUTS[TUT.id].steps[TUT.step];const p=st.pops[TUT.pop];if(!p){tutHidePop();if(st.end){tutDone(TUT.id);tutExit()}else if(!st.goal)tutNext();return}
   const pid='mw.'+st.id+'.'+(TUT.pop+1);let blk=$('tutblock');if(!blk){blk=document.createElement('div');blk.id='tutblock';document.body.appendChild(blk)}blk.style.display='block';
   let ring=$('tutring');if(!ring){ring=document.createElement('div');ring.id='tutring';document.body.appendChild(ring)}
   let card=$('tutpop');if(!card){card=document.createElement('div');card.id='tutpop';document.body.appendChild(card)}
@@ -3036,31 +3073,39 @@ function tutPlace(){const card=$('tutpop'),ring=$('tutring');if(!card||card.styl
   else{x=Math.min(Math.max(10,(r.left+r.right)/2-W/2),innerWidth-W-10);y=r.top-H-18>10?r.top-H-18:Math.min(r.bottom+18,innerHeight-H-10)}
   card.style.left=x+'px';card.style.top=y+'px'}
 function tutHidePop(){for(const x of ['tutpop','tutring','tutblock']){const e=$(x);if(e)e.style.display='none'}try{if(tutVO){tutVO.pause();tutVO=null}}catch(e){}}
+/* Nov 26 (David): completed tutorials are remembered in this browser and marked ✓ on the menus */
+function tutDoneSet(){try{return new Set(JSON.parse(localStorage.getItem('shtTutDone')||'[]'))}catch(e){return new Set()}}
+function tutDone(id){const S=tutDoneSet();S.add(id);try{localStorage.setItem('shtTutDone',JSON.stringify([...S]))}catch(e){}}
 const tutPopOpen=()=>{const c=$('tutpop');return !!c&&c.style.display!=='none'};
 function tutExit(){tutHidePop();for(const x of ['tutobj']){const e=$(x);if(e)e.remove()}TUT=null;ships=[];missiles=[];fx=[];P=null;phase='select';buildHUD();
   $('end').style.display='none';$('start').style.display='flex';try{menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}}catch(e){}renderBuilder();openModePicker()}
 // goal checks and keeping highlights on target while the HUD redraws
-setInterval(()=>{if(!TUT)return;if(tutPopOpen()){tutPlace();return}const st=TUTS[TUT.id].steps[TUT.step];if(st&&st.goal&&phase!=='over'&&st.goal())tutNext()},250);
+setInterval(()=>{if(!TUT)return;{const st=TUTS[TUT.id].steps[TUT.step],pe=$('tutprog');if(st&&st.prog&&pe)pe.textContent=st.prog()}if(tutPopOpen()){tutPlace();return}const st=TUTS[TUT.id].steps[TUT.step];if(st&&st.goal&&phase!=='over'&&st.goal())tutNext()},250);
 addEventListener('resize',()=>{if(TUT)tutPlace()});
+// while a pop-up is open: clicks only reach the pop-up, the objective bar, and the controls the pop-up highlights; scrolling and zooming still work
+for(const ev of ['pointerdown','mousedown','mouseup','click','dblclick','contextmenu']){addEventListener(ev,e=>{if(!TUT||!tutPopOpen())return;const el=e.target;if(!(el instanceof Element))return;
+  if(el.closest('#tutpop,#tutobj'))return;if(el.id==='side'||el.id==='rside')return;   // their scrollbars
+  const card=$('tutpop'),hl=card&&card.dataset.hl;if(hl==='map'&&el.id==='c')return;const L=(HL[hl]||HL.none)().filter(x=>x instanceof Element);if(L.some(x=>x.contains(el)))return;
+  e.preventDefault();e.stopImmediatePropagation()},true)}
 // while a pop-up is open the game takes no keys: Enter / Space / → = Next, ← = Back
 addEventListener('keydown',e=>{if(!TUT||!tutPopOpen())return;e.preventDefault();e.stopImmediatePropagation();
   if(e.key==='Enter'||e.key===' '||e.key==='ArrowRight'){const b=$('tpnext');if(b)b.click()}else if(e.key==='ArrowLeft'){const b=$('tpback');if(b)b.click()}},true);
 
 /* ---- entry on the Game modes screen ---- */
 (function(){const css=document.createElement('style');css.textContent=`
-#tutblock{position:fixed;inset:0;z-index:9000;display:none;background:transparent}
+#tutblock{display:none!important}
 #tutring{position:fixed;z-index:9001;pointer-events:none;border-radius:8px;display:none;transition:all .25s}
 #tutring.on{border:2px solid #ffd84d;box-shadow:0 0 0 9999px rgba(2,6,12,.62),0 0 18px #ffd84d}
 #tutring:not(.on){box-shadow:0 0 0 9999px rgba(2,6,12,.55)}
 #tutpop{position:fixed;z-index:9002;display:none;width:400px;max-width:44vw;background:#0d1a27;border:1px solid #ffd84d;border-radius:10px;padding:14px 16px;color:#e4edf6;box-shadow:0 8px 30px #000a;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
 #tutpop .tp-h{font-size:17px;font-weight:bold;color:#ffd84d;margin-bottom:8px}#tutpop .tp-t{margin-bottom:12px}#tutpop .tp-b{display:flex;gap:8px;align-items:center}
 #tutobj{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:8000;background:#0d1a27ee;border:1px solid #5ad18c;border-radius:8px;padding:6px 12px;max-width:560px;text-align:center;font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;color:#e4edf6}
-#tutobj .to-obj{color:#ffd84d;margin:3px 0}#tutobj .to-b{display:flex;gap:6px;justify-content:center;margin-top:3px}#tutobj .btn{margin:0;font-size:11px;padding:2px 8px}`;document.head.appendChild(css);
+#tutobj .to-obj{color:#ffd84d;margin:3px 0}#tutobj .to-prog{font-size:12px}.tutdone{display:inline-block;align-self:flex-start;margin-top:4px;color:#5ad18c;font-weight:bold;font-size:12px;border:1px solid #5ad18c;border-radius:5px;padding:0 6px}#tutobj .to-b{display:flex;gap:6px;justify-content:center;margin-top:3px}#tutobj .btn{margin:0;font-size:11px;padding:2px 8px}`;document.head.appendChild(css);
   // add a Tutorial card to the mode picker each time it opens
   const orig=openModePicker;openModePicker=function(){orig();const el=$('modepick');if(!el)return;const add=()=>{const g=el.querySelector('.fp-g');if(!g||g.querySelector('[data-tut]'))return;
       const b=document.createElement('button');b.className='faccard';b.dataset.tut='1';b.style.setProperty('--fc','#4da6ff');
-      b.innerHTML=`<div class="fc-t"><b style="color:#4da6ff;font-size:16px">🎓 Tutorial</b><span class="dim">Learn to fly and fight, step by step. Desktop only.</span></div>`;g.prepend(b);
-      b.onclick=e=>{e.stopPropagation();const g2=el.querySelector('.fp-in');g2.innerHTML=`<div class="fp-h"><button class="btn" id="tutback" style="margin:0">◂</button><b style="font-size:17px">Tutorials</b></div>`+Object.entries(TUTS).map(([id,Tu],k)=>`<div class="faccard" style="--fc:#4da6ff;display:block;cursor:default;margin-bottom:8px"><b style="color:#4da6ff;font-size:16px">${k+1}. ${Tu.name}</b><div style="margin:6px 0">${Tu.blurb}</div><button class="btn big" data-tutgo="${id}" style="min-width:200px;border-color:#4da6ff;color:#4da6ff">Start ▶</button>${MP.on?' <span class="dim sm">(offline only — you are hosting or joined)</span>':''}</div>`).join('')+'<div class="dim sm">More tutorials coming: shields and damage control, fleets.</div>';
+      b.innerHTML=`<div class="fc-t"><b style="color:#4da6ff;font-size:16px">🎓 Tutorial</b><span class="dim">Learn to fly and fight, step by step. Desktop only.</span>${(()=>{const n=Object.keys(TUTS).filter(i=>tutDoneSet().has(i)).length;return n?`<span class="tutdone">✓ ${n}/${Object.keys(TUTS).length} completed</span>`:''})()}</div>`;g.prepend(b);
+      b.onclick=e=>{e.stopPropagation();const g2=el.querySelector('.fp-in');g2.innerHTML=`<div class="fp-h"><button class="btn" id="tutback" style="margin:0">◂</button><b style="font-size:17px">Tutorials</b></div>`+Object.entries(TUTS).map(([id,Tu],k)=>`<div class="faccard" style="--fc:#4da6ff;display:block;cursor:default;margin-bottom:8px"><b style="color:#4da6ff;font-size:16px">${k+1}. ${Tu.name}</b>${tutDoneSet().has(id)?' <span class="tutdone">✓ Completed</span>':''}<div style="margin:6px 0">${Tu.blurb}</div><button class="btn big" data-tutgo="${id}" style="min-width:200px;border-color:#4da6ff;color:#4da6ff">Start ▶</button>${MP.on?' <span class="dim sm">(offline only — you are hosting or joined)</span>':''}</div>`).join('')+'<div class="dim sm">More tutorials coming: shields and damage control, fleets.</div>';
         $('tutback').onclick=ev=>{ev.stopPropagation();openModePicker()};g2.querySelectorAll('[data-tutgo]').forEach(x=>x.onclick=ev=>{ev.stopPropagation();if(MP.on)return;startTutorial(x.dataset.tutgo)})}};
     add();new MutationObserver(add).observe(el,{childList:true,subtree:true})}})();
 
