@@ -179,6 +179,7 @@ body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 <div id="start" class="overlay"><div class="box" style="max-width:980px">
  <h1 style="display:flex;align-items:center;gap:12px">SPACE HEX TACTICS <button class="btn" id="tomodes" style="font-size:12px;margin-left:auto" title="Skirmish, Scenario or Campaign">◂ Game modes</button></h1>
  <div class="dim">Build up to 8 fleets and put them on teams (same team = allies). You command your own fleet; AI fleets fight on their own.</div>
+ <div id="topsel" class="row" style="justify-content:center;gap:14px;margin:10px 0 0;padding:8px 10px;border:1px solid #2a4258;border-radius:6px;background:#0b1622;flex-wrap:wrap"></div>
  <div id="mp" style="margin:10px 0;padding:8px 10px;border:1px solid #2a4258;border-radius:6px;background:#08121b"></div>
  <div id="builder" class="cards"></div>
  <div id="forms" class="row" style="justify-content:center;gap:14px;margin-bottom:8px"></div>
@@ -2411,7 +2412,7 @@ const ERAS={
   dog2:{name:'Second Dogahr Invasion',allow:{Martian:[2],Earthling:[2],Dogahr:[3]},extra:['condor3']},
   dbw:{name:'Dogahr/Blokai War',allow:{Martian:[3,4],Earthling:[3,4],Dogahr:[3],Hunibler:[3],Blokai:[5]}},
   hun:{name:'Hunifer Invasion',allow:{Hunifer:[4],Blokai:[5],Dogahr:[3,4],Hunibler:[3,4],Martian:[3,4],Earthling:[3,4]}}};
-let era='open';
+let era='open',globalTL=0;   /* Nov 26 (David): skirmish Tech level setter at the top — only works in the Open era; picking an era clears it */
 const facListed=f=>!!(ERAS[era]&&ERAS[era].allow&&ERAS[era].allow[f]);
 const shipOK=k=>{const E=ERAS[era],d=SHIPS[k];if(!d)return false;if(!E||!E.allow||!E.allow[d.faction])return true;return E.allow[d.faction].includes(d.tl)||(E.extra||[]).includes(k)};   /* Nov 22 (David): factions not in the era are allowed at any tech level, picked by hand */
 const tlManual=[false,false,false,false,false,false,false,false];
@@ -2419,7 +2420,8 @@ const facTLs=f=>[...new Set(Object.keys(SHIPS).filter(k=>SHIPS[k].faction===f&&s
 const facOK=f=>facTLs(f).length>0;
 /* Nov 22 (David): any tech level can be picked in any era (with a warning when it breaks the era's rules). Changing era applies that era's default tech level to every fleet; ships already chosen stay. */
 const allTLs=f=>[...new Set(Object.values(SHIPS).filter(d=>d.faction===f).map(d=>d.tl))].sort((a,b)=>b-a);
-function eraDefault(i){const f=fleetFaction[i],E=ERAS[era],tls=allTLs(f);if(!E||!E.allow)return tls.includes(4)?4:tls[0];const al=E.allow[f];return al?Math.max(...al):0}
+const nearTL=(tls,want)=>tls.length?tls.slice().sort((a,b)=>Math.abs(a-want)-Math.abs(b-want)||b-a)[0]:0;
+function eraDefault(i){const f=fleetFaction[i],E=ERAS[era],tls=allTLs(f);if(!E||!E.allow)return globalTL&&tls.length?nearTL(tls,globalTL):tls.includes(4)?4:tls[0];const al=E.allow[f];return al?Math.max(...al):0}
 const tlBreaks=(f,tl)=>era!=='open'&&facListed(f)&&tl>0&&!Object.keys(SHIPS).some(k=>SHIPS[k].faction===f&&SHIPS[k].tl===tl&&shipOK(k));
 /* Nov 25 (David): factions grouped by quadrant on the selection screens — Alpha (most races), Beta (Billyon), Gamma (Motoran, Si'gian) */
 const QUADS=['Alpha','Beta','Gamma','Nonaligned'],QUAD_OF={Billyon:'Beta',Motoran:'Gamma',"Si'gian":'Gamma',Nonaligned:'Nonaligned'},facQuad=f=>QUAD_OF[f]||'Alpha',quadLabel=q=>q==='Nonaligned'?'Nonaligned':q+' Quadrant';   /* Nov 26 (David): a Nonaligned group below the quadrants */
@@ -2475,10 +2477,13 @@ function renderBuilder(){renderHistory();if(SCEN&&SCEN.lobby){renderScenLobby();
 
   const eraSel=`<label title="Era: limits which factions and tech levels can be fielded"><span class="dim">Era</span> <select id="era" ${MP.role==='guest'?'disabled':''}>${Object.entries(ERAS).map(([k,E])=>`<option value="${k}" ${era===k?'selected':''}>${E.name}</option>`).join('')}</select></label>${ERAS[era].allow?`<div class="dim sm" style="flex-basis:100%;text-align:center">${Object.entries(ERAS[era].allow).map(([f,l])=>`<span style="color:${FACTIONS[f].color}">${f}</span> TL${l.join('/')}`).join(' · ')}${(ERAS[era].extra||[]).map(k=>' · plus '+SHIPS[k].name).join('')} · other factions: pick their tech level by hand</div>`:''}`;
   const coopSel=COOP?`<div style="flex-basis:100%;text-align:center;border:1px solid #5ad18c;border-radius:6px;padding:6px;margin-bottom:4px"><b style="color:#5ad18c">⚑ Scenario: ${COOPS[COOP].name}</b> <span class="dim sm">${COOPS[COOP].blurb} Everyone just picks a faction; fleets built here are ignored.</span>${MP.role==='guest'?'':` <button class="btn" id="coopx" style="margin:0 0 0 6px">✕ Leave scenario</button>`}</div>`:'';
-  const smSel=coopSel+' '+eraSel+` <label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
+  {const ts=$('topsel');if(ts){const open=era==='open',dis=MP.role==='guest';
+    {const k=eraSel.indexOf('</label>')+8;ts.innerHTML=eraSel.slice(0,k)+` <label title="${open?'Set every fleet to this tech level (factions without it get their nearest one). Only in the Open era.':'Choosing an era sets the tech levels — switch the era to Open to use this'}" style="${open?'':'opacity:.45'}"><span class="dim">Tech level</span> <select id="gtl" ${open?'':'disabled'}><option value="0" ${!globalTL||!open?'selected':''}>${open?'— per fleet —':'— set by era —'}</option>${open?[1,2,3,4,5].map(l=>`<option value="${l}" ${globalTL===l?'selected':''}>TL${l}</option>`).join(''):''}</select></label>`+eraSel.slice(k)}}}
+  const smSel=coopSel+` <label><span class="dim">Start</span> <select id="smode" ${MP.role==='guest'?'disabled':''}><option value="stations" ${startMode==='stations'?'selected':''}>Battle stations (weapons loaded)</option><option value="cold" ${startMode==='cold'?'selected':''}>Weapons cold (all empty)</option></select></label> <label title="Over time: lasers, coilguns, railguns and plasma lances drain their load cost evenly while they reload, like torpedoes (pausing if you run short). Up front: pay the whole cost when you load."><span class="dim">Weapon charging</span> <select id="cmode" ${MP.role==='guest'?'disabled':''}><option value="time" ${chargeMode==='time'?'selected':''}>Over time</option><option value="front" ${chargeMode==='front'?'selected':''}>Up front</option></select></label>`;
   $('forms').innerHTML=smSel;
   $('smode').onchange=e=>{startMode=e.target.value;renderBuilder();lobbyChanged()};
-  $('era').onchange=e=>{era=e.target.value;tlManual.fill(false);for(let i=0;i<MAXSLOTS;i++)if(canEditSlot(i))fleetTL[i]=eraDefault(i);renderBuilder();lobbyChanged()};
+  {const g=$('gtl');if(g)g.onchange=e=>{globalTL=+e.target.value;if(globalTL)for(let i=0;i<MAXSLOTS;i++)if(SLOTS[i]&&canEditSlot(i)){const tls=allTLs(fleetFaction[i]);fleetTL[i]=nearTL(tls,globalTL);tlManual[i]=false}renderBuilder();lobbyChanged()}}
+  $('era').onchange=e=>{era=e.target.value;if(era!=='open')globalTL=0;tlManual.fill(false);for(let i=0;i<MAXSLOTS;i++)if(canEditSlot(i))fleetTL[i]=eraDefault(i);renderBuilder();lobbyChanged()};
   $('cmode').onchange=e=>{chargeMode=e.target.value;renderBuilder();lobbyChanged()};
   {const cx=$('coopx');if(cx)cx.onclick=()=>{COOP='';renderBuilder();lobbyChanged()}}
   document.querySelectorAll('#builder [data-sspeed],#teamsbar [data-sspeed]').forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=e=>{startSpeed[+el.dataset.sspeed]=+e.target.value;lobbyChanged()}});
