@@ -2298,7 +2298,9 @@ function bindShipTips(root){let tip=$('shiptip');if(!tip){tip=document.createEle
       let x=r.right+8;if(x+W>innerWidth-6)x=r.left-W-8;if(x<6)x=Math.max(6,Math.min(innerWidth-W-6,r.left));let y=Math.min(innerHeight-H-6,Math.max(6,r.top-10));tip.style.left=x+'px';tip.style.top=y+'px'});
     el.addEventListener('mouseleave',()=>{tip.style.display='none'})})}
 /* Nov 26 (David): the faction card shows the faction's heavy cruiser, or the nearest equivalent by points class (ties → the heavier ship), at its top tech level */
+if(SHIPS.chemdbl)SHIPS.chemdbl.cardShip=true;   // Nov 26 (David): the Chemantar card shows the Double Artillery Cruiser
 function facFlag(L){const top=Math.max(...L.map(x=>x.tl||4)),A=L.filter(d=>(d.tl||4)===top),key=d=>Object.keys(SHIPS).find(k=>SHIPS[k]===d);
+  const pick=A.find(d=>d.cardShip);if(pick)return pick;   // David's choice overrides (Chemantar: the Double)
   const ca=A.filter(d=>/Heavy Cruiser$/.test(d.cls)&&!d.bays).sort((a,b)=>b.weight-a.weight)[0];if(ca)return ca;
   const v=d=>{const k=key(d);return k?(PTS3[ptsClass(k)]||0):0};return A.filter(d=>!d.bays).concat(A.filter(d=>d.bays)).slice().sort((a,b)=>Math.abs(v(a)-150)-Math.abs(v(b)-150)||b.weight-a.weight)[0]}
 function openFactionPicker(t,first){const old=$('facpick');if(old)old.remove();const el=document.createElement('div');el.id='facpick';el.className='facpick'+(first?' first':'');
