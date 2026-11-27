@@ -163,10 +163,10 @@ body.mob.open-l .mcard,body.mob.open-r .mcard{display:none!important}
 #mobready.on{opacity:1;pointer-events:auto}body:not(.mob) #mobready{display:none}
 body.mob #toast{top:228px}
 /* Nov 26 (David): game modes as a 2×2 grid */
-#modepick .fp-g{display:grid!important;grid-template-columns:repeat(2,minmax(0,330px));gap:12px;margin:0}
+#modepick .fp-g{display:grid!important;grid-template-columns:repeat(2,minmax(0,250px));gap:8px;margin:0}
 #modepick .fp-in:has(> .fp-g){width:auto;padding:12px 14px}
 body.mob #modepick .fp-g{grid-template-columns:repeat(2,minmax(0,1fr))}body.mob #modepick .fp-in:has(> .fp-g){width:100%}
-#modepick .fp-g>.faccard{width:auto!important;min-height:120px;margin:0}
+#modepick .fp-g>.faccard{width:auto!important;min-height:0;margin:0;padding:8px 10px}#modepick .fp-g>.faccard .fc-t{gap:3px}#modepick .fp-g>.faccard .dim{font-size:11.5px;line-height:1.35}
 body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 </style>
 </head><body>
@@ -1131,7 +1131,9 @@ function hitP(s,key,t){if(key.startsWith('pcrh')){const h=s.pcrHex&&s.pcrHex[+ke
 function hitP0(s,key,t){const d=hexDist(s,t),ev=t.d.evade||0;if(key.startsWith('pd'))return Math.max(0,accAt(accK(s,'laser'),d)-(s.d.pdKind==='chain'?.15:0)-ev);const T_=s.weapons[+key.slice(1)].T;return T_.acc?Math.max(0,accAt(accK(s,T_.acc),d)-ev):1}   // evade: sleek hulls (Hunibler) are 5% harder to hit
 
 // ---- damage ----
-function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
+/* Nov 26 (David): the damaged look changes when the hit is SHOWN, not when it is computed — missile hits are worked out first and animated afterwards */
+function applyDamage(t,dmg,src,fromPt,sub){if(t.dead)return;if(t.visHull==null)t.visHull=t.hull;applyDamage0(t,dmg,src,fromPt,sub);if(FXD>0)fx.push({type:'hvis',sh:t,h:t.hull,t:.01,max:.01,d:FXD});else t.visHull=t.hull}
+function applyDamage0(t,dmg,src,fromPt,sub){if(t.dead)return;let left=dmg;
   // reinforcement absorbs first, then base shields in proportion to generator level
   for(const x of t.reinf){const a=Math.min(x.amt,left);x.amt-=a;left-=a;if(!left)break}
   t.lastHitT=T;const sp=Math.min(t.shield,left);t.shield-=sp;left-=sp;   // shields absorb fully until they run out
@@ -2137,6 +2139,7 @@ function drawJink(s,pos,ang){const p=Math.min(1,jinkP(s)),e=Math.sin(Math.PI*p),
 /* Nov 26 (David): hull-damage looks. Slightly (hull ≤ 75%), moderately (≤ 50%) and heavily (≤ 25%) damaged ships show scorch marks, cracks and,
    when heavy, holes with glowing rims; moderately and heavily damaged ships leak debris. Marks are fixed per ship design (seeded), so they don't jump around. */
 const dmgLvl=s=>{const f=s.hull/Math.max(1,s.d.hull);return f>.75?0:f>.5?1:f>.25?2:3};
+const dmgLvlV=s=>{const h=s.visHull!=null&&!(s.visHull<s.hull)?s.visHull:s.hull,f=h/Math.max(1,s.d.hull);return f>.75?0:f>.5?1:f>.25?2:3};   // what the sprite shows
 function hullPath(d){const P=new Path2D();let mv=true;for(const p of d.shape){if(!p){P.closePath();mv=true;continue}mv?P.moveTo(p[0],p[1]):P.lineTo(p[0],p[1]);mv=false}P.closePath();return P}
 let _scr=null;
 /* Nov 26 (David): three different damage looks per ship design for each damage level (variant 0-2, seeded per design so each stays stable);
@@ -2168,13 +2171,13 @@ function drawSprite(ctx,d,color,lvl,sc,dpr,v=0){const P=d._hp||(d._hp=hullPath(d
       const fl=typeof performance!=='undefined'?.75+.25*Math.sin(performance.now()/140+i*2):1;ctx.strokeStyle=`rgba(255,${120+Math.round(60*fl)},40,${.9*fl})`;ctx.shadowColor='#ff8a2a';ctx.shadowBlur=6*dpr;ctx.lineWidth=1.3/sc*dpr;ctx.stroke();ctx.shadowBlur=0}
     ctx.restore()}}
 /* debris leaking from moderately / heavily damaged ships (called every frame) */
-function leakDebris(dt){for(const s of ships){if(s.dead||!s.px)continue;const L=dmgLvl(s);if(L<2)continue;const rate=L>=3?7:2.5;if(Math.random()>rate*dt)continue;
+function leakDebris(dt){for(const s of ships){if(s.dead||!s.px)continue;const L=dmgLvlV(s);if(L<2)continue;const rate=L>=3?7:2.5;if(Math.random()>rate*dt)continue;
   const M=dmgMarks(s.d,dmgVar(s,L)),src=L>=3&&Math.random()<.6?M.holes[Math.floor(Math.random()*3)]:M.cracks[Math.floor(Math.random()*4)].o;const lx=src.x??src[0],ly=src.y??src[1];
   const a=s.drawAng??fAng(s.f),k=.75,p=posOf(s),wx=p.x+(lx*Math.cos(a)-ly*Math.sin(a))*k,wy=p.y+(lx*Math.sin(a)+ly*Math.cos(a))*k;const ang=Math.random()*7,v=6+Math.random()*(L>=3?26:16),ember=Math.random()<(L>=3?.35:.2);
   fx.push({type:'deb',x:wx,y:wy,vx:Math.cos(ang)*v,vy:Math.sin(ang)*v,t:1.4+Math.random()*1.4,max:2.8,rot:Math.random()*7,vr:(Math.random()-.5)*6,sz:ember?1.2:1.4+Math.random()*1.6,color:ember?'#ffb060':['#8b9098','#6d727a','#a3a8b0'][Math.floor(Math.random()*3)],ember})}}
 function drawShip(s,pos,ang,alpha){const dpr=devicePixelRatio,X=sx(pos.x),Y=sy(pos.y),sc=Math.max(cam.s*.75,.35*dpr);const PT=P&&!P.dead?tgt(P):null;
   const g=genLvl(s),sh=s.shield+reinfAmt(s);if(g>0&&sh>0){ctx.beginPath();ctx.arc(X,Y,42*sc,0,7);ctx.strokeStyle=`rgba(88,184,255,${.12+.4*Math.min(1,sh/s.d.shield)*g+(s.flash||0)})`;ctx.lineWidth=(1.5+(reinfAmt(s)>0?2:0)+(s.flash||0)*8)*dpr;ctx.stroke()}
-  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);{const L=s.dead?0:dmgLvl(s);drawSprite(ctx,s.d,s.color,L,sc,dpr,L?dmgVar(s,L):0)}
+  ctx.save();ctx.translate(X,Y);ctx.rotate(ang);ctx.scale(sc,sc);{const L=dmgLvlV(s);drawSprite(ctx,s.d,s.color,L,sc,dpr,L?dmgVar(s,L):0)}
   if(s.burnFx>0){ctx.fillStyle=`rgba(255,180,90,${s.burnFx})`;ctx.beginPath();ctx.moveTo(-36,-5);ctx.lineTo(-52-Math.random()*8,0);ctx.lineTo(-36,5);ctx.closePath();ctx.fill()}
   ctx.restore();ctx.fillStyle=s.color;ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillStyle=REL[rel(s)];if(cam.s/dpr>=.55||s===P||s===PT){const nm=s.name+(own(s)?(s.ai?' (AI)':''):'')+(nTeams()>2&&!fr(s)?' ['+TLET[s.team]+']':'')+(fr(s)&&!own(s)?(s.owner!=null?' (P'+(s.owner+1)+')':' (ally)'):''),ly=Y+48*sc+8*dpr;
     {const vt=`  v ${vlen(s.vq,s.vr)}`;ctx.font=`bold ${12*dpr}px monospace`;const w1=ctx.measureText(nm).width,w2=ctx.measureText(vt).width,x0=X-(w1+w2)/2;ctx.textAlign='left';ctx.fillText(nm,x0,ly);ctx.fillStyle=REL2[rel(s)];ctx.fillText(vt,x0+w1,ly);ctx.textAlign='center'}}/* speed after every ship's name: enemies yellow, yours light blue (Nov 20, David) */if(PT===s){ctx.strokeStyle='#ffd24d';ctx.lineWidth=1.5*dpr;ctx.setLineDash([4,4]);ctx.beginPath();ctx.arc(X,Y,52*sc,0,7);ctx.stroke();ctx.setLineDash([]);ctx.lineWidth=1}}
@@ -2583,7 +2586,7 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     if(phase==='moving'){animT+=dt*1000;if(animT>=ANIM&&msHold>0)msHold-=dt;else if(animT>=ANIM&&MP.role!=='guest'){for(const s of ships)s.ppx=null;for(const m of missiles)m.ppx=null;phase='post';afterMove()}}
     if(phase==='resolving'&&MP.role!=='guest'){resolveT-=dt;if(resolveT<=0)finishResolve()}
     if(deathQ.length&&phase!=='moving')flushDeaths(0);
-    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&own(x)&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='deb'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.99;f.vy*=.99;f.rot+=f.vr*dt}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
+    for(const f of fx){if(f.d>0){f.d-=dt;continue}if(f.snd&&!f.played){f.played=1;sfxRaw(...f.snd)}if(f.type==='hvis'&&!f.played){f.played=1;f.sh.visHull=f.h}if(f.type==='note'&&!f.played){f.played=1;const x=ships[f.si];if(x&&own(x)&&!isAI(x))toast((f.cls==='bad'?'⚠ ':'⚡ ')+f.msg,f.cls==='bad'?'warnt':'')}f.t-=dt;if(f.type==='p'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.97;f.vy*=.97}if(f.type==='deb'){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vx*=.99;f.vy*=.99;f.rot+=f.vr*dt}if(f.type==='text')f.y-=14*dt}fx=fx.filter(f=>f.t>0);
     for(const s of ships){if(s.flash)s.flash=Math.max(0,s.flash-dt);if(s.burnFx)s.burnFx=Math.max(0,s.burnFx-dt*1.2)}
     if(phase!=='select'&&ships.length)leakDebris(dt);updateCam(dt);render();requestAnimationFrame(loop)}
   requestAnimationFrame(loop)}
