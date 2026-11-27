@@ -162,6 +162,10 @@ body.mob.open-l .mcard,body.mob.open-r .mcard{display:none!important}
 #mobready{position:fixed;left:6px;right:6px;top:176px;z-index:44;background:#0d2010ee;border:1px solid #5fd35f;color:#d6f5d6;border-radius:7px;padding:6px 10px;font-size:12.5px;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none}
 #mobready.on{opacity:1;pointer-events:auto}body:not(.mob) #mobready{display:none}
 body.mob #toast{top:228px}
+/* Nov 26 (David): game modes as a 2×2 grid */
+#modepick .fp-g{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-width:720px;margin:0 auto}
+#modepick .fp-g>.faccard{width:auto!important;min-height:120px;margin:0}
+body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 </style>
 </head><body>
 <canvas id="c"></canvas>
