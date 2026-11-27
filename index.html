@@ -567,7 +567,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={pdGap:1,torpQuit:1,ovk:1,pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={pdGap:1,torpQuit:1,ovk:1,killAlpha:1,pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null,arcHover=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -1414,7 +1414,10 @@ function msLeak(t,n){if(n<=0)return 0;const pd=(t.pd||[]).reduce((a,p)=>a+(p.ali
   const D=pd*.8+ic*.7;return Math.max(n-D,n*.15)}
 function aiOverkill(s,r){const t=s.target;if(!t||t.dead||t.team===s.team||!r.fire||!r.fire.length)return;
   const need=(t.shield||0)+reinfAmt(t)+Math.max(0,t.hull);const goal=need*1.2+4;
-  const fly=missiles.filter(m=>!m.dead&&!m.intercept&&m.target===t);const flyN=fly.length,mD=fly.length?fly.reduce((a,m)=>a+(m.dmg||10),0)/fly.length:10;
+  /* Nov 27 (David's record): count only missiles that will actually arrive soon — closing on the target fast enough to reach it within ~half a turn (or already within 2 hexes).
+     A missile trailing a target that outruns it (it expired 5 hexes short) had made the AI Condor hold every gun for three turns against a 2-hull wreck. */
+  const tv=tgtVel(t),fly=missiles.filter(m=>{if(m.dead||m.intercept||m.dorm||m.target!==t)return false;const rx=t.px.x-m.px.x,ry=t.px.y-m.px.y,dd=Math.hypot(rx,ry);if(dd<=2*HS)return true;
+    const cl=((m.vx-tv.x)*rx+(m.vy-tv.y)*ry)/dd;return cl>0&&dd/cl<=.5&&(m.age||0)<IMP*3-2});const flyN=fly.length,mD=fly.length?fly.reduce((a,m)=>a+(m.dmg||10),0)/fly.length:10;
   const plan=t._plan&&t._plan.T===T?t._plan:(t._plan={T,dmg:0,ms:0});
   let acc=plan.dmg+msLeak(t,flyN+plan.ms)*mD;
   let pNo0=1;if(mD>=need){const lk=msLeak(t,flyN+plan.ms);pNo0=Math.pow(.1,Math.min(lk,3))}
@@ -1596,7 +1599,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
    if(s.hangBack){want={range:20,radial:1.1,orbit:.6,maxClose:8};if(s.mode==='hunt'||s.mode==='dive')s.mode='standoff'}}
   // kill shot (Nov 18): target's shields gone and hull low — close in and shoot everything with a real chance
   s.killing=AIV.kill&&t.shield+reinfAmt(t)<6&&(t.hull<=Math.max(30,t.d.hull*.3)||t.reactor<=t.reactor0*.3)&&s.mode!=='brace';
-  if(s.killing&&s.d.doctrine!=='alpha'){const tHot=torpHot(s,t)&&t.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=3);
+  if(s.killing&&(s.d.doctrine!=='alpha'||AIV.killAlpha&&!(torpHot(s,t)&&t.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=1)))){   /* Nov 27: alpha-strike ships close in for the kill too (it sat at 15 hexes beside a 2-hull wreck) */const tHot=torpHot(s,t)&&t.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=3);
     want={range:tHot?7:3,radial:1.3,orbit:tHot?1.5:.3,chase:true,maxClose:14};face=a;if(s.mode==='snipe')s.mode='dive'}
   // energy triage (Nov 18): nothing loaded — load a gun before spending on burns, pivots or PD
   const gc=w=>w.T.kind==='torp'?w.T.perTurn/IMP*3:w.T.kind==='ap'?w.T.cost/AP_IMP*3:drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
@@ -2593,7 +2596,7 @@ function renderBuilder(){renderHistory();if(SCEN&&SCEN.lobby){renderScenLobby();
   const right=rightSel>=0?`<div style="flex:1;display:flex;flex-direction:column">${tabs}${side(rightSel)}</div>`:`<div class="fleetcol dim">No other fleets — add an AI fleet below.</div>`;
   box.innerHTML=side(selSlot)+right;
   let tb=$('teamsbar');if(!tb){tb=document.createElement('div');tb.id='teamsbar';tb.style.cssText='border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:8px 0;background:#0b1622';$('forms').before(tb)}
-  tb.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><b>Fleets &amp; teams</b><span class="dim sm">${used}/${MAXSLOTS} fleets · same team = allies · click a fleet to show it on the right</span>${canManage()&&used<MAXSLOTS?`<button class="btn" id="addai" style="margin-left:auto">+ Add AI fleet</button>`:''}</div><div>${SLOTS.map((s,i)=>s?card(i):'').join('')}</div>${MP.on?`<div class="dim sm">${MP.role==='host'?'Players join with your code; you set teams and build the AI fleets.':'The host sets teams and builds the AI fleets; build your own fleet on the left.'}</div>`:''}`;
+  tb.innerHTML=`<div class="row" style="gap:8px;flex-wrap:wrap"><b>Fleets &amp; teams</b><span class="dim sm">${used}/${MAXSLOTS} fleets · same team = allies · click a fleet to show it on the right</span><span style="margin-left:auto"></span>${rightSel>=0&&canEditSlot(selSlot)&&canEditSlot(rightSel)?`<button class="btn" id="invfl" title="Swap the ships (and faction, tech level, formation and starting speed) between your fleet and the fleet shown on the right">⇄ Invert fleets</button>`:''}${canManage()&&used<MAXSLOTS?`<button class="btn" id="addai">+ Add AI fleet</button>`:''}</div><div>${SLOTS.map((s,i)=>s?card(i):'').join('')}</div>${MP.on?`<div class="dim sm">${MP.role==='host'?'Players join with your code; you set teams and build the AI fleets.':'The host sets teams and builds the AI fleets; build your own fleet on the left.'}</div>`:''}`;
 
   const eraSel=`<label title="Era: limits which factions and tech levels can be fielded"><span class="dim">Era</span> <select id="era" ${MP.role==='guest'?'disabled':''}>${Object.entries(ERAS).map(([k,E])=>`<option value="${k}" ${era===k?'selected':''}>${E.name}</option>`).join('')}</select></label>${ERAS[era].allow?`<div class="dim sm" style="flex-basis:100%;text-align:center">${Object.entries(ERAS[era].allow).map(([f,l])=>`<span style="color:${FACTIONS[f].color}">${f}</span> TL${l.join('/')}`).join(' · ')}${(ERAS[era].extra||[]).map(k=>' · plus '+SHIPS[k].name).join('')} · other factions: pick their tech level by hand</div>`:''}`;
   const coopSel=COOP?`<div style="flex-basis:100%;text-align:center;border:1px solid #5ad18c;border-radius:6px;padding:6px;margin-bottom:4px"><b style="color:#5ad18c">⚑ Scenario: ${COOPS[COOP].name}</b> <span class="dim sm">${COOPS[COOP].blurb} Everyone just picks a faction; fleets built here are ignored.</span>${MP.role==='guest'?'':` <button class="btn" id="coopx" style="margin:0 0 0 6px">✕ Leave scenario</button>`}</div>`:'';
@@ -2611,6 +2614,11 @@ function renderBuilder(){renderHistory();if(SCEN&&SCEN.lobby){renderScenLobby();
   tb.querySelectorAll('[data-steam]').forEach(b=>{b.onclick=e=>e.stopPropagation();b.onchange=()=>{SLOTS[+b.dataset.steam].team=+b.value;renderBuilder();lobbyChanged()}});
   tb.querySelectorAll('[data-sdel]').forEach(b=>b.onclick=e=>{e.stopPropagation();const i=+b.dataset.sdel;SLOTS[i]=null;fleet[i]=[];renderBuilder();lobbyChanged()});
   document.querySelectorAll('#builder [data-slotsel],#teamsbar [data-slotsel]').forEach(b=>b.onclick=()=>{rightSel=+b.dataset.slotsel;renderBuilder()});
+  /* Nov 27 (David): ⇄ Invert fleets — swap the two fleets on screen (ships, faction, tech level, formation, starting speed); ships keep the control style of the slot they land in */
+  {const iv=$('invfl');if(iv)iv.onclick=()=>{const A=selSlot,B=rightSel;if(A<0||B<0)return;const hA=SLOTS[A].kind==='human',hB=SLOTS[B].kind==='human';
+    const fa=fleet[A],fb=fleet[B];fleet[A]=fb.map(x=>({...x,ai:hA?false:true,cmd:undefined}));fleet[B]=fa.map(x=>({...x,ai:hB?false:true,cmd:undefined}));
+    for(const arr of [fleetFaction,fleetTL,fleetForm,startSpeed]){const t=arr[A];arr[A]=arr[B];arr[B]=t}
+    renderBuilder();if(typeof lobbyChanged==='function')lobbyChanged()}}
   const ad=$('addai');if(ad)ad.onclick=()=>{const i=SLOTS.findIndex(x=>!x);if(i<0)return;const usedT=new Set(SLOTS.filter(Boolean).map(x=>x.team));let tm=0;while(usedT.has(tm)&&tm<7)tm++;SLOTS[i]={kind:'ai',owner:null,team:tm,name:''};fleet[i]=[];fleetFaction[i]='Dogahr';fleetTL[i]=4;tlManual[i]=false;fleetTL[i]=eraDefault(i);fleetForm[i]='line';startSpeed[i]=4;rightSel=i;renderBuilder();lobbyChanged()};
   box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder();lobbyChanged()});
   box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder();lobbyChanged()});
