@@ -2041,7 +2041,7 @@ function updateCam(dt){if(phase==='over')return;const C=camShip();if(!C)return;c
   const fit=Math.min(vw/(Math.abs(A.x-B.x)+140),vh/(Math.abs(A.y-B.y)+140));
   const ts=clamp(fit,.1*dpr,1.6*dpr);
   // hold zoom steady unless the pair no longer fits, or there is lots of wasted room
-  if(!cam.kill&&(cam.base==null||ts<cam.base*.98||ts>cam.base*1.5))cam.base=ts;
+  if(cam.base==null||!cam.kill&&(ts<cam.base*.98||ts>cam.base*1.5))cam.base=ts;
   const want=cam.base*zoomMul;if(cam.snap){cam.s=want;cam.x=cx+pan.x;cam.y=cy+pan.y;cam.snap=false}else{cam.s+=(want-cam.s)*Math.min(1,dt*4);
   cam.x+=(cx+pan.x-cam.x)*Math.min(1,dt*6);cam.y+=(cy+pan.y-cam.y)*Math.min(1,dt*6)}}
 function arrow(a,b,col,dash){const dpr=devicePixelRatio;ctx.strokeStyle=col;ctx.lineWidth=1.5*dpr;ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
@@ -2571,7 +2571,7 @@ function start(){if(MP.role==='guest')return;if(COOP)coopPrep();else COOPW=0;BID
   if(SCEN&&SCENARIOS[SCEN.id].place){SCEN.engaged=false;SCENARIOS[SCEN.id].place(ships);for(const sh of ships)sh.target=nearestEnemy(sh)}
   if(SCEN&&SCEN.coop){SCEN.lobby=false;SCEN.cmdLost=false;SCEN.failed=false;const c=scenCmdIdx(SCENARIOS[SCEN.id],SCEN.side),ck=c&&SCENARIOS[SCEN.id].fleets[c.fi].ships[c.j];const cs=ck&&ships.find(x=>x.slot===c.fi&&x.key===ck);SCEN.cmd=cs?cs.name:null;setTimeout(()=>log(`${SCENARIOS[SCEN.id].name} (co-op). ${SCENARIOS[SCEN.id].goal[SCEN.side]||''}`,'warn'),0)}
   P=mine()[0]||null;forfeited=[];ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
-  const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;
+  const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;cam.kill=null;cam.focus=false;pan.x=pan.y=0;zoomMul=1;
   $('start').style.display='none';$('end').style.display='none';log(`${[...new Set(ships.map(s=>s.team))].sort((a,b)=>a-b).map(t=>'Team '+TLET[t]+' ('+ships.filter(s=>s.team===t).length+')').join(' vs ')}${SCEN?'':' at '+R.startDist+' hexes'}. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}.`,'warn');
   for(const sh of alive()){if(isAI(sh)){const a=aiDecide(sh);sh.queue=a.queue;sh.fireChoice=a.fire}else autoQueue(sh)}
   recStart();phase='decide';mpResetReady();if(!P&&!MP.on)commit();else if(MP.on&&mpAllReady())commit();buildHUD();net()}
