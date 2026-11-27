@@ -580,6 +580,19 @@ const PDCAP=1;for(const k in SHIPS){const d=SHIPS[k];if(d.pd&&!d.pdSplit){d.pd=d
  for(const k of ['lcruiser','earthcl','chematk','golthanart','baangraid'])dur(k,120,20);
  for(const k of ['sigcl','billcl'])dur(k,Math.round(120*.9),20);
  dur('blokaicl',120,30);dur('chemdbl',270,40)}
+/* Nov 26 (David: 'two destroyers should beat a light cruiser most of the time'): small-ship ladder raised.
+   Destroyers 15 / 70, frigates 12 / 60, heavy frigates 65 hull (shields 13), light frigates 55 hull (shields 11), corvettes 10 / 30.
+   Sleek hulls keep 90% of their class hull; Blokai keep 1.5x shields. TL3/TL2 copies get the same hull. TL1 early frigates and the Martian corvettes are unchanged. */
+{const dur=(k,h,sh)=>{for(const v of [k,k+'3',k+'2'])if(SHIPS[v]){SHIPS[v].hull=h;if(!SHIPS[v].noShield&&sh!=null)SHIPS[v].shield=sh}};
+ for(const k of ['destroyer','patrol','mdestroyer','earthdd','chemdd','golthandd'])dur(k,70,15);
+ for(const k of ['hundd','hunferdd'])dur(k,Math.round(70*.9),15);
+ dur('blokaidd',70,Math.round(15*1.5));
+ for(const k of ['earthff','golthanff'])dur(k,60,12);
+ for(const k of ['hunolddd','huniferdd'])dur(k,Math.round(60*.9),12);
+ dur('blokaiff',60,18);
+ dur('peregrine',65,null);
+ for(const k of ['dfrigate','chemff'])dur(k,55,null);
+ dur('dcorvette',30,10)}
 /* Nov 26 (David, showing his Grandma): a deliberately ugly Golthan ship — the Heavy Cruiser tripled and stuck together:
    three egg bodies with three engine sections, the middle one pushed forward, the outer two jammed into its flanks. Open era only, no TL3 version. */
 {const G=SHIPS.golthan,off=[[8,0],[-6,-31],[-6,31]],mv=([dx,dy])=>p=>p&&[p[0]+dx,p[1]+dy];
