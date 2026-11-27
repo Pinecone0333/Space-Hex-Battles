@@ -171,6 +171,9 @@ body.mob #modepick .fp-g{gap:8px}body.mob #modepick .fp-g>.faccard{min-height:0}
 /* Nov 26 (David): Fire control / Damage control side by side; helper toggles wrap inside the panel */
 .row.wtabs{flex-wrap:wrap;gap:4px;clear:both}.row.wtabs .btn{flex:1 1 auto;white-space:nowrap}
 .row.aiw{flex-wrap:wrap}.aiw .btn{flex:1 1 auto;min-width:0}
+#stickstat{position:sticky;top:-5px;height:0;z-index:6;margin:0 0 -5px}
+#stickstat .ssin{position:absolute;background:#0b121c;left:0;right:0;top:0;padding:4px 6px;box-shadow:0 4px 10px #000a;opacity:0;pointer-events:none;transition:opacity .12s}
+#stickstat.on .ssin{opacity:1}
 </style>
 </head><body>
 <canvas id="c"></canvas>
@@ -1921,7 +1924,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
      ${own(s)&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
-     <div class="row"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
+     <div class="row" id="enrow"><span class="lab">Energy</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="val">${avail.toFixed(1)}/${+s.reactor.toFixed(1)} <span class="dim">+${income(s).toFixed(1)}</span></span></div>
      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}${s.d.armor?` <span class="dim" title="front armor: soaks hits from the front 180° after shields">⛨${Math.ceil(s.armor)}</span>`:''}</span></div>
       <div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}/${s.d.shield}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}</span></div></div>
      ${s.d.noShield?`<div class="row dim sm">No shield generator (tech level ${s.d.tl})</div>${upkeepRow(s)}`:`     <div class="row"><span class="lab">Generator</span><b class="${g>=1?'good':g?'warn':'bad'}">${g?Math.round(g*100)+'%':'OFF'}</b>${sd?[0,.25,.5,.75,1].map(l=>btn('gen:'+l,l?Math.round(l*100)+'%':'Off',canQueue(s,{type:'gen',lvl:l,cost:0}),!l?'Turn the generator off: no drain, but shields collapse to 0.':(gc*l)+' energy per turn, drained '+(+(gc*l/IMP).toFixed(3))+' each impulse. '+(l<1?'Below 100%: shields capped at '+Math.round(s.d.shield*l)+', regen ×'+l+', no reinforcement or repair.':'Full strength: full shields and regen; reinforcement and repair allowed.')+' Shields collapse to 0 if the generator goes off.')).join(''):''}</div>
@@ -1933,6 +1936,9 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
      ${dcPanel(s,sd,true)}
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab to take control.</div>`;
+    /* Nov 26 (David): energy / hull / shields stay in view while scrolling the weapons — a compact strip that sticks to the top of the panel once the ship card scrolls away */
+    h+=`<div id="stickstat"><div class="panel ssin"><div class="row"><b style="color:${s.color};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:90px">${s.name}</b><span class="lab s">E</span>${bar(avail,s.reactor,avail<0?'over':'en')}<span class="v2">${avail.toFixed(1)}</span></div>
+      <div class="g2"><div class="row"><span class="lab s">Hull</span>${bar(s.hull,s.d.hull)}<span class="v2">${Math.ceil(s.hull)}/${s.d.hull}</span></div><div class="row"><span class="lab s">Shld</span>${bar(s.shield,s.d.shield,'sh')}<span class="v2">${s.shield.toFixed(0)}${reinfAmt(s)?`<span style="color:#a5d8ff">+${reinfAmt(s).toFixed(0)}</span>`:''}/${s.d.shield}</span></div></div></div></div>`;
     h+=`<div class="panel"><h2>Weapons <span style="float:right">${sd?`<button class="btn chg" data-act="chargeall" title="Queues every idle weapon, torpedo charge and PD shot you can afford">⚡ Charge</button>`:''}<button class="btn ${s.subMode?'armed':''}" data-act="submode" ${sd?'':'disabled'} title="Aim for systems (lasers and PD only): damage that gets past the target's shields is twice as likely to land on a system it exposes to you as on plain structure (normally the other way round), but every third point of that damage is lost. Coilguns, torpedoes and missiles always hit normally.">Aim: ${s.subMode?'Systems':'Hull'}</button>${(()=>{const hasMs=s.weapons.some(w=>w.alive&&w.T.kind==='missile');return `<button class="btn" data-act="msmode" ${sd&&hasMs?'':'disabled'} title="${hasMs?'Missile launchers: offense / defensive interceptors / hold':s.weapons.some(w=>w.T.kind==='missile')?'All missile launchers destroyed':'This ship carries no missiles'}">Msl: ${hasMs?{off:'Attack',def:'Defend',hold:'Hold'}[s.msMode]:'none'}</button>`})()}</span></h2>`;
     {const nDmg=(s.damaged||[]).filter(b=>b.k!=='rea').length+((s.damaged||[]).some(b=>b.k==='rea')?1:0);h+=`<div class="row wtabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire control</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage control${nDmg?` <b class="warn">${nDmg}</b>`:''}</button>${dgTab==='fire'?`<button class="btn ${showArcs?'mfire':''}" data-act="arcs" title="Show every weapon's firing arc on the map, out to its targeting-computer range (V). Bright inner part = 50%+ to hit. Click a weapon's arc label to show just that mount.">◔ Arcs${showArcs?': on':''}</button>`:''}</div>`}
     if(dgTab==='fire'){
@@ -2698,6 +2704,11 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
     for(const s of ships){if(s.flash)s.flash=Math.max(0,s.flash-dt);if(s.burnFx)s.burnFx=Math.max(0,s.burnFx-dt*1.2)}
     if(phase!=='select'&&ships.length)leakDebris(dt);updateCam(dt);render();requestAnimationFrame(loop)}
   requestAnimationFrame(loop)}
+
+/* Nov 26 (David): show the sticky status strip only while the ship card's energy row is scrolled out of view */
+function updStick(){const sd=$('side'),e=$('enrow'),k=$('stickstat');if(!sd||!k)return;const hide=!e||e.getBoundingClientRect().bottom>sd.getBoundingClientRect().top+6;k.classList.toggle('on',!hide)}
+{const _bh=buildHUD;buildHUD=function(){const r=_bh.apply(this,arguments);try{updStick()}catch(e){}return r}}
+{const sd=document.getElementById('side');if(sd)sd.addEventListener('scroll',updStick,{passive:true})}
 
 // =====================================================================
 //  ONLINE PLAY, up to 8 players (PeerJS, browser-to-browser; Nov 21, David)
