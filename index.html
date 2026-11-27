@@ -1015,6 +1015,15 @@ function commit(){
     for(const th of thr){const w=DL.find(w=>w.state==='ready'&&w.ammo>0);if(!w)break;
       w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
       const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5)}}
+  /* Nov 26 (David): fleet missile defense — after every ship has covered itself, launchers still on Defend fire interceptors at missiles aimed at friendly ships
+     (same team) that are still unclaimed, if the missile is within interceptor range (16 hexes) of the defending ship; the missile closest to hitting goes first. */
+  for(const s of alive()){const DL=defLaunchers(s).filter(w=>w.state==='ready'&&w.ammo>0);if(!DL.length)continue;
+    const tti=m=>Math.hypot(m.target.px.x-m.px.x,m.target.px.y-m.px.y);
+    const thr=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target&&m.target!==s&&m.target.team===s.team&&!m.target.dead&&m.owner.team!==s.team&&(!m.claim||m.claim.dead)&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=R.defRange).sort((a,b)=>tti(a)-tti(b));
+    const cov={};for(const th of thr){const w=DL.find(w=>w.state==='ready'&&w.ammo>0);if(!w)break;
+      w.ammo--;if(w.ammo>0){w.state='cycling';w.readyT=T+IMP}else if(w.T.noReload){w.state='empty';w.readyT=Infinity}else{w.state='reloading';w.readyT=T+IMP*R.magReloadTurns;w.wasReload=true}
+      const ic=newMissile(s,th,{intercept:true});s.darkFiredT=T;th.claim=ic;missiles.push(ic);sfx('missile',.5);cov[th.target.name]=(cov[th.target.name]||0)+1}
+    if(fr(s))for(const k in cov)log(`${s.name}: ${cov[k]} interceptor${cov[k]>1?'s':''} launched to cover ${k}`,'dim')}
   let endT=0;shots.forEach((sh,i)=>{const A=sh.s.px,B=sh.hex?hp(sh.hex.q,sh.hex.r):sh.t.px;const off=sh.hit?0:rnd(25,55)*(Math.random()<.5?1:-1);const ang=Math.atan2(B.y-A.y,B.x-A.x)+Math.PI/2;const tx=B.x+Math.cos(ang)*off,ty=B.y+Math.sin(ang)*off;
     const d=Math.min(i*.14,1.6),vol=fr(sh.s)?1:.65;let f;
     if(sh.kind==='lance'||sh.kind==='ap')f={type:'lance',x1:A.x,y1:A.y,x2:tx,y2:ty,t:.85,max:.85,color:sh.kind==='ap'?'#f2e8ff':sh.s.d.torp,w:4+sh.dmg/8,snd:['rail',vol]};   // plasma lance: a spear of plasma thrust out to the target, not a ball
