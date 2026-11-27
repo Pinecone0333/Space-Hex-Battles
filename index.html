@@ -759,28 +759,67 @@ function nearestEnemy(s){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=
 function tgt(s){if(!s.target||s.target.dead||s.ai&&s.target.team===s.team)s.target=isAI(s)&&AIV.focus?pickTarget(s):nearestEnemy(s);return s.target}
 const foeTgt=s=>{const t=tgt(s);return t&&t.team!==s.team?t:nearestEnemy(s)};   // a player ship may target a friendly to inspect it; AI planning always uses an enemy
 const flagship=()=>P&&!P.dead&&own(P)&&!P.ai?P:(mine()[0]||null);   // 'me' for fleet orders: the ship you're flying
-const ORD_LBL={free:'AI (own judgment)',follow:'Follow me',attack:'Attack my target',defend:'Defend'};
-function ordText(x){const o=x.order;if(!o||o.k==='free')return '';const a=shipByName(o.a);return o.k==='follow'?'⇢ follows '+(a?a.name:'?'):o.k==='attack'?'⚔ attacks '+(a?a.name:'?')+"'s target":'⛨ guards '+(a?a.name:'?')}
+/* Nov 26 (David): fleet orders reworked. s.order = {k, a:<anchor ship name>, t:<enemy name>, adv:<hexes>}
+   follow  — keep this ship's formation slot on the anchor (my ship), aiming for where the anchor WILL be after this impulse's orders; fight its target. adv shifts the slot ahead (+) or behind (−).
+   cover   — stay ~2 hexes off the anchor (me, or a friendly ship I targeted) between it and the nearest threat; launchers on Defend; fight whatever enemy is closest to the anchor.
+   attack  — attack the enemy that was targeted when the order was given, and stay on it.
+   Formation: every ship gets a slot from the starting formation (relative to its group's leader and the formation's heading = the leader's course, or its facing when slow).
+   A ship is IN FORMATION when it is within 2 hexes of its slot (3 in wide formations) and moving within 2 hexes/turn of the anchor's velocity. Advance / Fall back need it in formation. */
+const ORD_LBL={free:'AI (own judgment)',follow:'Follow me',cover:'Cover me'};const FORM_STEP=4;
+function fleetOrdBar(){const f=flagship(),t=f.target&&!f.target.dead?f.target:null,b=(v,l,tt)=>`<button class="btn" data-act="ordall:${v}" title="${tt}">${l}</button>`;
+  const L=ships.filter(x=>own(x)&&x.ai&&!x.dead&&x!==f),nf=L.filter(x=>inForm(x,f)).length;
+  return `<div class="row" style="margin:3px 0 0;gap:3px;flex-wrap:wrap"><span class="dim sm" style="width:100%">Orders to every AI ship you own (from ${f.name}) · ${nf}/${L.length} in formation:</span>
+    ${b('follow','⇢ Follow me','Keep your formation slot on my ship, steering for where I will be after this impulse; fight my target')}${b('cover','⛨ Cover me','Stay about 2 hexes off my ship between it and the nearest threat, launchers on Defend (interceptors cover me), fight whatever enemy is closest to me')}
+    ${t&&t.team===f.team?b('covert','⛨ Cover '+t.name,'Same as Cover me, guarding '+t.name):''}${t&&t.team!==f.team?b('attackt','⚔ Attack '+t.name,'Attack '+t.name+' and stay on it even if I switch targets'):''}
+    ${b('adv','▲ Advance','Ships in formation move their slot '+FORM_STEP+' hexes ahead of my ship (stacks)')}${b('back','▼ Fall back','Ships in formation move their slot '+FORM_STEP+' hexes behind my ship (stacks)')}${b('rejoin','⟲ Rejoin formation','Return to the starting formation slot on my ship')}${b('free','◇ Free','Cancel orders: the AI uses its own judgment')}</div>`}
+function ordSelect(x){const f=flagship(),t=f.target&&!f.target.dead?f.target:null,o=x.order;const cur=!o?'free':o.k==='follow'?'follow':o.k==='cover'?(o.a===f.name?'cover':t&&o.a===t.name?'covert':'keep'):o.k==='attack'?(t&&o.t===t.name?'attackt':'keep'):'free';
+  const fm=inForm(x,f),op=(v,l,dis)=>`<option value="${v}" ${cur===v?'selected':''} ${dis?'disabled':''}>${l}</option>`;
+  return `<select class="ordsel" data-ord="${ships.indexOf(x)}" title="Orders for this AI ship">${op('free',ORD_LBL.free)}${op('follow','Follow me')}${op('cover','Cover me')}${t&&t.team===x.team&&t!==x?op('covert','Cover '+t.name):''}${t&&t.team!==x.team?op('attackt','Attack '+t.name):''}${op('adv','▲ Advance '+FORM_STEP,!fm)}${op('back','▼ Fall back '+FORM_STEP,!fm)}${op('rejoin','⟲ Rejoin formation')}${cur==='keep'?`<option value="keep" selected>${ordText(x)}</option>`:''}</select>`}
+function formTag(x){const f=flagship();if(!f||x===f||x.dead||!own(x))return '';const g=formGap(x,f);if(!g)return '';return inForm(x,f)?'<div class="sm good" style="width:100%">▣ in formation</div>':`<div class="sm dim" style="width:100%">out of formation (${g.d.toFixed(1)} hexes${g.dv>2?', Δv '+g.dv.toFixed(1):''})</div>`}
+function ordText(x){const o=x.order;if(!o||o.k==='free')return '';const a=shipByName(o.a);
+  if(o.k==='follow')return '⇢ follows '+(a?a.name:'?')+(o.adv?(o.adv>0?` · ▲ ${o.adv} hexes ahead`:` · ▼ ${-o.adv} hexes back`):'');
+  if(o.k==='attack'){const t=shipByName(o.t);return '⚔ attacks '+(t?t.name:'?')}
+  return '⛨ covers '+(a?a.name:'?')}
 function setOrder(x,k){const f=flagship();if(!x||x.dead||!own(x)||!x.ai)return false;if(k==='free'){x.order=null;return true}
-  if(!f||f===x)return false;let a=f;if(k==='defendt'){const t=f.target;if(!t||t.dead||t.team!==x.team||t===x)return false;a=t;k='defend'}
-  x.order={k,a:a.name};return true}
+  if(!f||f===x)return false;const t=f.target&&!f.target.dead?f.target:null;
+  if(k==='follow'||k==='rejoin'){x.order={k:'follow',a:f.name,adv:0};return true}
+  if(k==='cover'){x.order={k:'cover',a:f.name};return true}
+  if(k==='covert'){if(!t||t.team!==x.team||t===x)return false;x.order={k:'cover',a:t.name};return true}
+  if(k==='attackt'){if(!t||t.team===x.team)return false;x.order={k:'attack',a:f.name,t:t.name};return true}
+  if(k==='adv'||k==='back'){if(!inForm(x,f))return false;const o=x.order,adv=(o&&o.k==='follow'&&o.a===f.name?o.adv||0:0)+(k==='adv'?FORM_STEP:-FORM_STEP);x.order={k:'follow',a:f.name,adv};return true}
+  return false}
 const shipByName=n=>n&&ships.find(x=>x.name===n&&!x.dead)||null;
-/* Nov 22 (David): fleet orders for AI wingmen — s.order={k:'follow'|'attack'|'defend', a:<anchor ship name>}.
-   follow: keep station on the anchor (my ship), fight its target; attack: fight my current target; defend: stay close to the anchor ship, fight whatever threatens it. */
-function orderAnchor(s){const o=s.order;if(!o||o.k==='free')return null;const a=shipByName(o.a);if(!a||a.team!==s.team||a===s){s.order=null;return null}return a}
+function orderAnchor(s){const o=s.order;if(!o||o.k==='free')return null;if(o.k==='defend')o.k='cover';const a=shipByName(o.a);if(!a||a.team!==s.team||a===s){s.order=null;return null}return a}
 function orderTarget(s){const a=orderAnchor(s);if(!a)return null;const o=s.order;
-  if(o.k==='follow'||o.k==='attack'){const t=a.target;if(t&&!t.dead&&t.team!==s.team)return t;return null}
-  if(o.k==='defend'){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(e,a);if(d<bd){bd=d;b=e}}return bd<=16?b:null}
+  if(o.k==='attack'){const t=shipByName(o.t);if(t&&t.team!==s.team)return t;s.order=null;if(own(s))log(`${s.name}: target destroyed — acting on its own`,'dim');return null}
+  if(o.k==='follow'){const t=a.target;if(t&&!t.dead&&t.team!==s.team)return t;return null}
+  if(o.k==='cover'){let b=null,bd=1e9;for(const e of enemiesOf(s)){const d=hexDist(e,a);if(d<bd){bd=d;b=e}}return bd<=16?b:null}
   return null}
-function orderVd(s){const a=orderAnchor(s);if(!a)return null;const o=s.order;if(o.k==='attack')return null;
-  const L=ships.filter(x=>!x.dead&&x.order&&x.order.k===o.k&&x.order.a===o.a).sort((x,y)=>(y.d.weight||0)-(x.d.weight||0)||(x.name<y.name?-1:1));const j=Math.max(0,L.indexOf(s));
-  const fa=fAng(a.f);let back,sidev;
-  if(o.k==='follow'){const row=1+Math.floor(j/2);back=2*row;sidev=(j%2?1:-1)*2*row}   // wedge behind my ship, 2 hexes back and 2 out per step
-  else{back=-1;sidev=(j%2?1:-1)*(2+Math.floor(j/2)*2)}   // escort: alongside, 2 hexes out
-  const ux=Math.cos(fa),uy=Math.sin(fa);const st={x:a.px.x+(-ux*back-uy*sidev)*HS,y:a.px.y+(-uy*back+ux*sidev)*HS};
-  if(o.k==='defend'){const e=orderTarget(s);if(e){const ang=Math.atan2(e.px.y-a.px.y,e.px.x-a.px.x);st.x=a.px.x+Math.cos(ang)*2*HS;st.y=a.px.y+Math.sin(ang)*2*HS}}   // put itself between the threat and the ship it guards
-  const Va=hp(a.vq,a.vr),dx=(st.x-s.px.x)/HS,dy=(st.y-s.px.y)/HS,dist=Math.hypot(dx,dy),k=Math.min(8,dist*1.2)/(dist||1);
-  return{x:Va.x+dx*k*HS,y:Va.y+dy*k*HS}}
+// where the anchor will be after this impulse: its queued pivots and burns applied to its velocity, then one impulse of movement
+function predOf(a){let f=a.f,vq=a.vq,vr=a.vr,E=a.E,nbx=0;for(const q of a.queue||[]){if(E<q.cost-1e-9)continue;
+    if(q.type==='burn'){if(++nbx>3||nbx>1&&(q.a!=='F'||(a.dmgEng||0)>=3))continue;const b=burnResult(a,q.a,f);f=b.f;vq+=b.dq;vr+=b.dr}else if(q.type==='pivot')f=(f+q.dir+NF)%NF;E-=q.cost}
+  const V=hp(vq,vr);return{f,V,px:{x:a.px.x+V.x/IMP,y:a.px.y+V.y/IMP}}}
+function formHead(a,V){V=V||hp(a.vq,a.vr);return Math.hypot(V.x,V.y)>=2*HS?Math.atan2(V.y,V.x):(a.fhead??fAng(a.f))}
+function slotOff(s,a){if(s.fslot&&a.fslot&&s.fl&&s.fl===a.fl)return{fw:s.fslot.fw-a.fslot.fw,sd:s.fslot.sd-a.fslot.sd};
+  const L=ships.filter(x=>!x.dead&&x!==a&&x.team===a.team&&x.owner===s.owner).sort((x,y)=>(y.d.weight||0)-(x.d.weight||0)||(x.name<y.name?-1:1));const j=Math.max(0,L.indexOf(s)),row=1+Math.floor(j/2);
+  return{fw:-2*row,sd:(j%2?1:-1)*2*row}}   // no starting slot on this anchor (e.g. a ship from another fleet): a wedge behind it
+function slotPos(s,a,pred){const P0=pred||{px:a.px,V:hp(a.vq,a.vr)};const h=formHead(a,P0.V),ux=Math.cos(h),uy=Math.sin(h),o=slotOff(s,a);const fw=o.fw+(s.order&&s.order.k==='follow'&&s.order.a===a.name?s.order.adv||0:0);
+  return{x:P0.px.x+(ux*fw-uy*o.sd)*HS,y:P0.px.y+(uy*fw+ux*o.sd)*HS}}
+function formGap(s,a){if(!a||s===a||a.dead||s.dead)return null;const p=slotPos(s,a),Vs=hp(s.vq,s.vr),Va=hp(a.vq,a.vr);return{d:Math.hypot(p.x-s.px.x,p.y-s.px.y)/HS,dv:Math.hypot(Vs.x-Va.x,Vs.y-Va.y)/HS}}
+function inForm(s,a){const g=formGap(s,a);return !!g&&g.d<=(s.ftol||2)+.01&&g.dv<=2.01}
+function orderVd(s){const a=orderAnchor(s);if(!a)return null;const o=s.order;if(o.k==='attack')return null;const pr=predOf(a);let st;
+  if(o.k==='follow')st=slotPos(s,a,pr);
+  else{const L=ships.filter(x=>!x.dead&&x.order&&x.order.k==='cover'&&x.order.a===o.a).sort((x,y)=>(y.d.weight||0)-(x.d.weight||0)||(x.name<y.name?-1:1));const j=Math.max(0,L.indexOf(s));
+    const e=orderTarget(s),h=formHead(a,pr.V);let ang=e?Math.atan2(e.px.y-a.px.y,e.px.x-a.px.x):h+(j%2?1:-1)*Math.PI/2;if(e&&L.length>1)ang+=((j%2?1:-1)*Math.ceil(j/2))*0.5;   // between the anchor and the threat, spread a little if several cover it
+    st={x:pr.px.x+Math.cos(ang)*2*HS,y:pr.px.y+Math.sin(ang)*2*HS}}
+  const nx=s.px.x+hp(s.vq,s.vr).x/IMP,ny=s.px.y+hp(s.vq,s.vr).y/IMP;const dx=(st.x-nx)/HS,dy=(st.y-ny)/HS,dist=Math.hypot(dx,dy),k=Math.min(8,dist*1.2)/(dist||1);
+  return{x:pr.V.x+dx*k*HS,y:pr.V.y+dy*k*HS}}
+// starting formation slots, per owner: relative to that owner's lead ship (the one he flies; else his first ship), in the formation's frame
+function initFormSlots(){for(const s of ships){s.fhead=fAng(s.f);s.fslot=null;s.fl=null}
+  const owners=[...new Set(ships.map(s=>s.owner).filter(o=>o!=null))];
+  for(const o of owners){const G=ships.filter(s=>s.owner===o);const L=G.find(s=>!s.ai)||G[0];if(!L)continue;const h=fAng(L.f),ux=Math.cos(h),uy=Math.sin(h);
+    for(const s of G){const dx=(s.px.x-L.px.x)/HS,dy=(s.px.y-L.px.y)/HS;s.fslot={fw:+(dx*ux+dy*uy).toFixed(2),sd:+(-dx*uy+dy*ux).toFixed(2)};s.fl=L.name;
+      const fk=typeof fleetForm!=='undefined'?fleetForm[s.slot]:'';s.ftol=/T$/.test(fk||'')||FORM_ALIAS[fk]?2:3}}}
 // AI target choice: close, weakened, and already under fire from allies (focus fire beats spreading damage)
 function pickTarget(s){let b=null,bv=1e9;for(const e of enemiesOf(s)){const d=hexDist(s,e);if(d>30&&b)continue;const hpF=(e.hull+e.shield)/(e.d.hull+e.d.shield);
     const allies=ships.filter(x=>x!==s&&!x.dead&&x.team===s.team&&x.target===e).length;const v=d+10*hpF-3*Math.min(allies,2);if(v<bv){bv=v;b=e}}return b||nearestEnemy(s)}
@@ -901,6 +940,7 @@ function nextImpulse(){
   T++;
   if(impOf(T)===1)log(`— Turn ${turnOf(T)} —`,'warn');
   for(const s of ships)if(!s.dead){upkeep(s);s.ppx=hp(s.pq,s.pr);s.pq+=s.vq/IMP;s.pr+=s.vr/IMP;const h=hexRound(s.pq,s.pr);s.q=h.q;s.r=h.r;s.px=hp(s.pq,s.pr)}
+  for(const s of ships)if(!s.dead){const v=hp(s.vq,s.vr);if(Math.hypot(v.x,v.y)>=2*HS)s.fhead=Math.atan2(v.y,v.x)}   // formation heading = course when moving
   moveMissiles();
   phase='moving';animT=0;net();
 }
@@ -987,7 +1027,9 @@ function syncFT(s){if(!s||!s.fireSel)return;const F=s.fireTgt||(s.fireTgt={});fo
 function keyTgt(s,k){const F=s.fireTgt,x=F&&F[k];if(x)return x.dead?null:x;return tgt(s)}
 function fireGroups(s){if(isAI(s)){const t=tgt(s);return t?[[t,s.fireChoice||[]]]:[]}syncFT(s);const G=new Map();for(const k of s.fireSel){const t=keyTgt(s,k);if(!t)continue;if(!G.has(t))G.set(t,[]);G.get(t).push(k)}return [...G]}
 function commit(){
-  if(phase==='over')return;initAudio();recImpulse();
+  if(phase==='over')return;initAudio();
+  /* Nov 26 (David): wingmen following or covering a ship you fly react to the orders you gave THIS impulse (they steer for where you will be) */
+  for(const s of alive())if(isAI(s)&&s.order&&(s.order.k==='follow'||s.order.k==='cover')){const a=orderAnchor(s);if(a&&!isAI(a)&&a.queue&&a.queue.some(q=>q.type==='burn'||q.type==='pivot')){const r=aiDecide(s);s.queue=r.queue;s.fireChoice=r.fire}}recImpulse();
   /* Nov 21 (David): fire happens with the facing the ship had when it gave its orders — pivoting away this impulse no longer cancels shots that were in arc */
   const preArc=new Map(),FG=new Map();for(const s of alive()){const G=fireGroups(s);FG.set(s,G);const ok=new Set();for(const [t,sel] of G)for(const k of sel)if(canFireMount(s,k,t))ok.add(k);preArc.set(s,ok)}
   for(const s of alive())s.preF=s.f;   // Nov 22 (David): ships are drawn at the facing they fired from until the shots have landed; the pivot shows afterwards
@@ -1360,7 +1402,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}if(AIV.ovk)aiOverkill(s,r);return r}
+function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);if(s.order&&s.order.k==='cover'&&s.ai)s.msMode='def';   /* Nov 26 (David): covering ships keep their launchers on Defend so their interceptors protect the ship they cover */const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}if(AIV.ovk)aiOverkill(s,r);return r}
 /* Nov 26 (David): don't massively overkill. The AI adds up the damage it can expect — missiles already flying at the target (after its point defense and
    interceptors), what allied AI ships committed this impulse, then its own shots in order (cheap guns first, missiles, lances, torpedoes last) — and stops once the
    expected damage reaches the target's shields + reinforcement + hull with a small margin (×1.2 + 4) — and, when one hit is enough to kill, once the chance
@@ -1473,7 +1515,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   const t=foeTgt(s);
   if(s.dead||!t)return{queue:[],fire:[]};
   s.queue=[];const d=hexDist(s,t);
-  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=(enemyMs>ownMs)&&!(AIV.msClose&&d<=8)?'def':'off';   /* Nov 22 (David): every AI goes to Defend when the enemy has more launchers (was: Martian doctrine, or others at 1.5×; Dogahr never) */   /* r8: every non-Dogahr doctrine goes to Defend when clearly out-launched */
+  const ml=x=>x.weapons.filter(w=>w.alive&&w.T.kind==='missile').length;const enemyMs=enemiesOf(s).reduce((a,e)=>a+ml(e),0),ownMs=ships.filter(x=>!x.dead&&x.team===s.team).reduce((a,x)=>a+ml(x),0);s.msMode=(enemyMs>ownMs)&&!(AIV.msClose&&d<=8)?'def':'off';if(s.order&&s.order.k==='cover')s.msMode='def';   /* Nov 22 (David): every AI goes to Defend when the enemy has more launchers (was: Martian doctrine, or others at 1.5×; Dogahr never) */   /* r8: every non-Dogahr doctrine goes to Defend when clearly out-launched */
   if(!s.d.noShield&&(T===0||impOf(T)===IMP||s.gen.lvl===0)){
     // generator level: run below 100% when the shields are already down and the energy is needed for weapons;
     // pick the lowest level whose cap still holds the current shields, so nothing is lost
@@ -1872,10 +1914,10 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
   // ---- left panel: your fleet, your ship, its orders (Nov 21, David: your side on the left, the enemy on the right) ----
   h+=`<div class="panel"><h2 style="display:flex;align-items:center">Fleet command<button class="btn" data-act="forfeit" style="margin-left:auto;color:var(--bad);font-size:11px;padding:2px 7px;text-transform:none;letter-spacing:0" title="Give up this battle: the enemy wins. Click twice to confirm.">${Date.now()-ffArm<4000?'Confirm forfeit?':'🏳 Forfeit'}</button></h2>
    <div class="row" style="margin:2px 0 0"><button class="btn" data-allai="1" title="Hand every ship to the AI">All → AI</button><button class="btn" data-allai="0" title="Take command of every ship">Command all</button><button class="btn" data-act="aieall" title="Hand (or take back) energy allocation for every ship you command">⚡ AI</button><button class="btn" data-act="aidcall" title="Hand (or take back) damage control for every ship you command">🔧 AI</button><button class="btn" data-act="aipdall" title="Turn PD auto-reload on (or off) for every ship you command">🛡 Auto</button><button class="btn" id="recSave" title="Download a record of this battle so far (every impulse: orders, positions, energy, damage, log) to share with Claude" style="margin-left:auto">💾 Record</button></div>
-   ${ownS.some(x=>x.ai&&!x.dead)&&flagship()?`<div class="row" style="margin:3px 0 0;gap:3px;flex-wrap:wrap"><span class="dim sm" style="width:100%">Orders to every AI ship you own (from ${flagship().name}):</span><button class="btn" data-act="ordall:follow" title="Every AI ship you own keeps station on your ship (a wedge behind you) and fights your target">⇢ Follow me</button><button class="btn" data-act="ordall:attack" title="Every AI ship you own attacks the ship you are targeting (and switches when you switch)">⚔ My target</button><button class="btn" data-act="ordall:defend" title="Every AI ship you own escorts your ship and engages whatever comes closest to it">⛨ Defend me</button>${flagship().target&&!flagship().target.dead&&flagship().target.team===flagship().team?`<button class="btn" data-act="ordall:defendt" title="Every AI ship you own escorts the friendly ship you have targeted (${flagship().target.name})">⛨ Defend ${flagship().target.name}</button>`:''}<button class="btn" data-act="ordall:free" title="Cancel orders: every AI ship fights on its own judgment">◇ Free</button></div>`:''}
+   ${ownS.some(x=>x.ai&&!x.dead)&&flagship()?fleetOrdBar():''}
    ${ownS.length>1||(ownS[0]&&ownS[0].ai)?`<div class="tabs scroll" style="max-height:150px">${ownS.map(x=>`<div class="tab ${x===P?'sel':''} ${x.dead?'dead':''}" data-sel="${ships.indexOf(x)}"><b style="color:${x.color}">${x.name}</b>${x.dead?' ✕':''}
      <div class="mini">${bar(x.hull,x.d.hull)}${bar(x.shield,x.d.shield,'sh')}</div><span class="dim">E ${(x.E-qCost(x)).toFixed(0)}${x.queue.length&&!x.ai?' · '+x.queue.length+'q':''}</span>
-     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label>${x.ai&&!x.dead&&flagship()?`<select class="ordsel" data-ord="${ships.indexOf(x)}" title="Orders for this AI ship">${['free','follow','attack','defend'].map(k=>`<option value="${k}" ${(x.order?x.order.k:'free')===k&&!(k==='defend'&&x.order&&x.order.a!==flagship().name)?'selected':''}>${k==='defend'?'Defend me':ORD_LBL[k]}</option>`).join('')}${flagship().target&&flagship().target.team===x.team&&flagship().target!==x&&!flagship().target.dead?`<option value="defendt" ${x.order&&x.order.k==='defend'&&x.order.a===flagship().target.name?'selected':''}>Defend ${flagship().target.name}</option>`:''}${x.order&&x.order.k==='defend'&&x.order.a!==flagship().name&&!(flagship().target&&x.order.a===flagship().target.name)?`<option value="keep" selected>${ordText(x)}</option>`:''}</select>`:''}${x.ai&&ordText(x)?`<div class="dim sm">${ordText(x)}</div>`:''}</div>`).join('')}</div>`:''}</div>`;
+     <label class="dim" title="Let the AI command this ship"><input type="checkbox" data-ai="${ships.indexOf(x)}" ${x.ai?'checked':''} ${x.dead?'disabled':''}> AI</label>${x.ai&&!x.dead&&flagship()&&x!==flagship()?ordSelect(x):''}${x.ai&&ordText(x)?`<div class="dim sm">${ordText(x)}</div>`:''}${formTag(x)}</div>`).join('')}</div>`:''}</div>`;
   if(s&&!s.dead){const t=ct,d=t?hexDist(s,t):0,avail=s.E-qCost(s),g=genLvl(s),gc=genCost(s);const sd=dec&&!s.ai;
     h+=`<div class="panel"><h2><span style="color:${s.color}">${s.name}</span> <span class="dim" style="text-transform:none">${s.d.name}</span></h2>
      ${own(s)&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}
@@ -1993,8 +2035,8 @@ function critPrompt(s,v){let el=$('critbox');if(!el){el=document.createElement('
   const kh=ev=>{ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();close()}else if(ev.key==='Enter'){ev.preventDefault();go()}};
   addEventListener('keydown',kh,true);$('critno').onclick=close;$('crityes').onclick=go}
 function doAct0(a){const [k,v]=a.split(':');if(k==='unsubmit'){mpUnsubmit();return}
-  if(k==='ordall'){const L=ships.filter(x=>own(x)&&x.ai&&!x.dead);let n=0;for(const x of L)if(setOrder(x,v))n++;
-    const f=flagship();log(n?`${n} AI ship${n>1?'s':''}: ${v==='free'?'free to act on their own':v==='follow'?'follow '+f.name:v==='attack'?'attack '+f.name+"'s target":v==='defend'?'defend '+f.name:'defend '+(f.target?f.target.name:'')}`:'No AI ships to order','dim');buildHUD();return}
+  if(k==='ordall'){const L=ships.filter(x=>own(x)&&x.ai&&!x.dead&&x!==flagship());let n=0,skip=0;for(const x of L){if(setOrder(x,v))n++;else if(v==='adv'||v==='back')skip++}
+    const f=flagship(),t=f&&f.target;log(n?`${n} AI ship${n>1?'s':''}: ${{free:'free to act on their own',follow:'follow '+f.name,rejoin:'rejoin formation on '+f.name,cover:'cover '+f.name,covert:'cover '+(t?t.name:''),attackt:'attack '+(t?t.name:''),adv:'advance '+FORM_STEP+' hexes',back:'fall back '+FORM_STEP+' hexes'}[v]}${skip?` (${skip} out of formation — order them to rejoin first)`:''}`:(v==='adv'||v==='back')?'No AI ships in formation — order them to rejoin first':'No AI ships to order','dim');buildHUD();return}
   if(k==='forfeit'){if(phase==='over'||!ships.length)return;if(Date.now()-ffArm>=4000){ffArm=Date.now();buildHUD();setTimeout(buildHUD,4100);return}ffArm=0;
     if(MP.role==='guest'){mpSend({t:'forfeit'});mpBanner('Forfeit sent to the host…');return}doForfeit(ME);return}
   if(k==='go'){if(phase!=='decide')return;if(!tacOK&&tacShown!==tacKey()&&turnOf(T)===1&&impOf(T)===1){const tp=tacCheck();if(tp){tacShown=tacKey();tacPrompt(tp);return}}if(!engOK){const L=mine().filter(dcAvail),key=engKey(L);if(L.length&&key!==engSeen){engPrompt(L,key);return}}if(!ffOK){const L=mine().filter(x=>{syncFT(x);return [...x.fireSel].some(q=>{const t=keyTgt(x,q);return t&&t.team===x.team&&canFireMount(x,q,t)})});if(L.length){ffPrompt(L);return}}if(MP.role==='guest'){mpSendOrders();return}if(MP.role==='host'){MP.ready[ME]=true;mpTryCommit();return}commit();return}
@@ -2617,6 +2659,7 @@ function start(){if(MP.role==='guest')return;if(COOP)coopPrep();else COOPW=0;BID
   if(SCEN&&SCENARIOS[SCEN.id].place){SCEN.engaged=false;SCENARIOS[SCEN.id].place(ships);for(const sh of ships)sh.target=nearestEnemy(sh)}
   if(SCEN&&SCEN.coop){SCEN.lobby=false;SCEN.cmdLost=false;SCEN.failed=false;const c=scenCmdIdx(SCENARIOS[SCEN.id],SCEN.side),ck=c&&SCENARIOS[SCEN.id].fleets[c.fi].ships[c.j];const cs=ck&&ships.find(x=>x.slot===c.fi&&x.key===ck);SCEN.cmd=cs?cs.name:null;setTimeout(()=>log(`${SCENARIOS[SCEN.id].name} (co-op). ${SCENARIOS[SCEN.id].goal[SCEN.side]||''}`,'warn'),0)}
   P=mine()[0]||null;forfeited=[];ffArm=0;missiles=[];fx=[];T=0;dcEvt=[];dcHide='';msHold=0;FXD=0;logLines=[];pan.x=pan.y=0;zoomMul=1;lastFireOpp=0;seenMissiles=new Set();readyEvt=[];
+  initFormSlots();
   if(typeof wingsInit==='function')wingsInit();
   const C=camShip();cam.x=C.px.x;cam.y=C.px.y;cam.base=null;cam.snap=true;cam.kill=null;cam.focus=false;pan.x=pan.y=0;zoomMul=1;
   $('start').style.display='none';$('end').style.display='none';log(`${[...new Set(ships.map(s=>s.team))].sort((a,b)=>a-b).map(t=>'Team '+TLET[t]+' ('+ships.filter(s=>s.team===t).length+')').join(' vs ')}${SCEN?'':' at '+R.startDist+' hexes'}. ${startMode==='stations'?'Battle stations — all weapons loaded':'Weapons cold — all weapons empty'}.`,'warn');
@@ -2772,7 +2815,7 @@ function mpSendOrders(){if(mpSent)return;mpSent=true;
   mpSend({t:'orders',orders});mpBanner('Orders sent — waiting for the other players…');buildHUD()}
 function mpApplyOrders(orders,pid){if(phase!=='decide')return;
   for(const o of orders){const s=ships[o.i];if(!s||s.owner!==pid||s.dead)continue;
-    s.pcrHex=o.pcrHex&&typeof o.pcrHex==='object'?o.pcrHex:null;s.ai=o.ai;s.order=o.order&&o.order.k?{k:String(o.order.k),a:String(o.order.a||'')}:null;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
+    s.pcrHex=o.pcrHex&&typeof o.pcrHex==='object'?o.pcrHex:null;s.ai=o.ai;s.order=o.order&&o.order.k?{k:String(o.order.k),a:String(o.order.a||''),t:o.order.t!=null?String(o.order.t):undefined,adv:+o.order.adv||0}:null;s.aiE=!!o.aiE;s.aiDC=!!o.aiDC;s.aiPD=!!o.aiPD;s.dark=!!o.dark;s.msDef=o.msDef||0;s.msDeploy=!!o.msDeploy;s.mslLight=!!o.mslLight;s.msMode=o.msMode;s.subMode=!!o.subMode;s.auto=o.auto;if(o.target>=0&&ships[o.target]&&!ships[o.target].dead)s.target=ships[o.target];
     if(s.ai){const a=aiDecide(s);s.queue=a.queue;s.fireChoice=a.fire}else{s.queue=o.queue||[];s.fireSel=new Set(o.fireSel||[]);s.fireTgt={};for(const [k,j] of Object.entries(o.fireTgt||{}))if(ships[j])s.fireTgt[k]=ships[j];aiAssist(s)}}
   MP.ready[pid]=true;mpTryCommit()}
 
