@@ -3623,7 +3623,7 @@ function moveWings(off){if(!wings.length&&!wStrikes.length)return 0;const dt=1/I
     if(s.dead){for(const w of mine_)if(w.state==='docked'||w.state==='rearm'){w.state='dead';w.n=0}continue}
     for(const w of mine_)if(w.state==='rearm'&&T>=w.ready){w.state='docked';w.ms=WING[w.type].ms;w.fired=false;w.pdT=-99}
     if(isAI(s))s.launchAll=true;   /* Nov 27 night (David's record: ships handed to the AI mid-battle never launched their craft) — any ship under AI command launches */
-    {let k=0;const hold=!airGo(s.team);for(const w of mine_){if(k>=2)break;if(w.state!=='docked')continue;if(w.type==='S'?!s.launchS:!(s.launchAll||w.ai!==false&&isCarrier(s)))continue;if(hold&&w.type==='B'&&w.ai!==false)continue;w.state='fly';const a=fAng(s.f)+(k?.6:-.6);w.px={x:s.px.x+Math.cos(a)*HS*.6,y:s.px.y+Math.sin(a)*HS*.6};w.ppx={...s.px};const v=hp(s.vq,s.vr);w.vx=v.x;w.vy=v.y;w.h=fAng(s.f);k++;
+    {let k=0;const hold=!airGo(s.team);for(const w of mine_){if(k>=2)break;if(w.state!=='docked')continue;if(w.type==='S'?!s.launchS:!s.launchAll)continue;   // Nov 28 (David): you order the launch for your own ship; AI ships launch their ownif(hold&&w.type==='B'&&w.ai!==false)continue;w.state='fly';const a=fAng(s.f)+(k?.6:-.6);w.px={x:s.px.x+Math.cos(a)*HS*.6,y:s.px.y+Math.sin(a)*HS*.6};w.ppx={...s.px};const v=hp(s.vq,s.vr);w.vx=v.x;w.vy=v.y;w.h=fAng(s.f);k++;
       if(w.type==='S'){w.order='escort';w.tgt=s}else if(w.ai!==false){if(w.type==='B')setWingOrder(w,'attack',null);else setWingOrder(w,wings.some(e=>wingFlying(e)&&e.team!==w.team)?'intercept':'escort',s)}
       else if(w.order==='attack'&&!w.tgt)w.tgt=s.target&&s.target.team!==s.team?s.target:null}
       if(isAI(s)&&!mine_.some(w=>w.state==='docked'&&w.type!=='S'))s.launchAll=!!isAI(s);if(!mine_.some(w=>w.state==='docked'&&w.type==='S'))s.launchS=false}}
@@ -3707,6 +3707,15 @@ const CRAFT={
  MoF:{k:1,p:[['p',[[1.4,0],[.2,-.3],[-.6,-1],[-.3,-.25],[-1,-.3],[-1,.3],[-.3,.25],[-.6,1],[.2,.3]]]],m:[]},                                         // Motoran: star-swept delta
  BkF:{k:1.05,p:[['c',-.25,0,.75],['pl',[[.42,-.35],[1.05,-.5],[1.3,-.2]]],['pl',[[.42,.35],[1.05,.5],[1.3,.2]]],['l',-1,0,.5,0]],m:[]},              // Blokai: beetle shell with pincers
  BiF:{k:1.1,p:[['a',-.5,1.15,-.9,1.0,1.25]],dot:[.45,0,.13],m:[]},                                                                                 // Billyon: a small crescent
+ /* best-guess bombers for the other factions: wider than their fighters, a gun turret, missiles carried on the wings */
+ EB:{k:.85,p:[['p',[[1.1,0],[-.9,-1.9],[-.6,-.5],[-.9,0],[-.6,.5],[-.9,1.9]]],['c',-.15,0,.22],['l',.07,0,.45,0]],m:[['l',-.55,-.05,-.9],['l',-.7,-.4,-1.35],['l',-.55,-.05,.9],['l',-.7,-.4,1.35]]},
+ GB:{k:.8,p:[['c',.35,0,.85],['l',-.35,-.55,-1.6,-1.4],['l',-.35,.55,-1.6,1.4],['l',-.45,-.2,-1.6,-.55],['l',-.45,.2,-1.6,.55],['c',.45,0,.25],['l',.7,0,1.45,0]],m:[['l',-1.55,-1.05,-1.25],['l',-1.55,-1.05,1.25]]},
+ HbB:{k:.85,p:[['p',[[1,-.35],[1,.35],[-.1,.35],[-1.1,1.8],[-1.1,-1.8],[-.1,-.35]]],['c',-.45,0,.2],['l',-.25,0,.15,0]],m:[['l',-1,-.65,-.95],['l',-1,-.75,-1.35],['l',-1,-.65,.95],['l',-1,-.75,1.35]]},
+ HfB:{k:.85,p:[['p',[[1,-.35],[1,.35],[-.1,.35],[-1.1,1.8],[-1.1,-1.8],[-.1,-.35]]],['r',1,1.3,-.8,.8],['c',-.45,0,.2],['l',-.25,0,.15,0]],m:[['l',-1,-.65,-.95],['l',-1,-.75,-1.35],['l',-1,-.65,.95],['l',-1,-.75,1.35]]},
+ CB:{k:.85,p:[['u',-1.2,1,-1.6,-.9],['u',-1.2,1,.9,1.6],['r',-.8,.3,-.9,.9],['c',-.25,0,.25],['l',0,0,.3,0]],m:[['l',-.9,.4,-1.25],['l',-.9,.4,1.25]]},
+ MoB:{k:.85,p:[['p',[[1.3,0],[.3,-.45],[-.4,-1.8],[-.2,-.4],[-1,-.5],[-1,.5],[-.2,.4],[-.4,1.8],[.3,.45]]],['c',-.45,0,.2],['l',-.25,0,.25,0]],m:[['l',-.22,.08,-.8],['l',-.22,.08,.8]]},
+ BkB:{k:.85,p:[['c',-.2,0,1.1],['pl',[[.75,-.45],[1.45,-.7],[1.75,-.3]]],['pl',[[.75,.45],[1.45,.7],[1.75,.3]]],['l',-1.3,0,.05,0],['c',.35,0,.25],['l',.6,0,1.1,0]],m:[['l',-.9,-.35,-.55],['l',-.9,-.35,.55]]},
+ BiB:{k:.85,p:[['a',-.5,1.6,-1,1.4,1.2],['c',.75,0,.2],['l',.95,0,1.3,0]],m:[['l',.2,.6,-.9],['l',.2,.6,.9]]},
  /* shuttles: boxy little utility craft */
  MS:{k:.9,p:[['r',-.7,.7,-.45,.45],['r',.7,1,-.2,.2]],m:[]},
  DS:{k:.9,p:[['r',-.6,.85,-.5,.5],['r',-.95,-.6,-.5,-.2],['r',-.95,-.6,.2,.5]],m:[]},
@@ -3771,7 +3780,7 @@ function carrierPanel(){const el=$('wingtab');if(!el||!P||P.dead||!own(P))return
   el.querySelectorAll('[data-wai]').forEach(c=>c.onchange=()=>{const w=wings.find(x=>x.id===+c.dataset.wai);if(w){setWingAI(w,c.checked);buildHUD()}});
   el.querySelectorAll('[data-word]').forEach(sl=>sl.onchange=()=>{const w=wings.find(x=>x.id===+sl.dataset.word);if(!w)return;const v=sl.value,me=w.car;if(v==='attack!'||v==='disable!')wingCmd(w,v.slice(0,-1),P.target&&P.target.team!==P.team?P.target:null);else wingCmd(w,v,v==='escort'?me:null);buildHUD()});
   el.querySelectorAll('[data-wall]').forEach(b=>b.onclick=()=>{const v=b.dataset.wall;
-    if(v==='launch'){P.launchAll=true;for(const w of L)if(w.type!=='S'&&w.state==='docked')setWingAI(w,false);if(MP.role==='guest'&&L[0])mpSend({t:'word',id:L[0].id,order:'launch'});log(`${P.name}: launching all wings (two groups per impulse)`,'dim')}
+    if(v==='launch'){P.launchAll=true;if(MP.role==='guest'&&L[0])mpSend({t:'word',id:L[0].id,order:'launch'});log(`${P.name}: launching all wings (two groups per impulse)`,'dim')}
     else if(v==='shuttle'){P.launchS=true;const w=L.find(x=>x.type==='S');if(MP.role==='guest'&&w)mpSend({t:'word',id:w.id,order:'launchS'});log(`${P.name}: launching shuttles`,'dim')}
     else if(v==='ai'){for(const w of L)if(w.type!=='S')setWingAI(w,true)}
     else{const [ty,o]=v.split(':');for(const w of L)if(w.type!=='S'&&(ty==='*'||w.type===ty)){if(o==='attack!'||o==='disable!')wingCmd(w,o.slice(0,-1),P.target&&P.target.team!==P.team?P.target:null);else wingCmd(w,o,o==='escort'?P:null)}}buildHUD()})}
