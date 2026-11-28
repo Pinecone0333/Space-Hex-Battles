@@ -3445,6 +3445,7 @@ function moveWings(off){if(!wings.length)return 0;const dt=1/IMP;const base=Math
   for(const s of ships){if(!isCarrier(s))continue;const mine_=wings.filter(w=>w.car===s);
     if(s.dead){for(const w of mine_)if(w.state==='docked'||w.state==='rearm'){w.state='dead';w.n=0}continue}
     for(const w of mine_)if(w.state==='rearm'&&T>=w.ready){w.state='docked';w.ms=WING[w.type].ms;w.fired=false;w.pdT=-99}
+    if(isAI(s))s.launchAll=true;   /* Nov 27 night (David's record: ships handed to the AI mid-battle never launched their craft) — any ship under AI command launches */
     if(s.launchAll){let k=0;for(const w of mine_){if(k>=2)break;if(w.state!=='docked')continue;w.state='fly';const a=fAng(s.f)+(k?.6:-.6);w.px={x:s.px.x+Math.cos(a)*HS*.6,y:s.px.y+Math.sin(a)*HS*.6};w.ppx={...s.px};const v=hp(s.vq,s.vr);w.vx=v.x;w.vy=v.y;w.h=fAng(s.f);k++;
       if(w.car.wingAI||isAI(s)){if(w.type==='B')setWingOrder(w,'attack',null);else setWingOrder(w,wings.some(e=>wingFlying(e)&&e.team!==w.team)?'intercept':'escort',s)}
       else if(w.order==='attack'&&!w.tgt)w.tgt=s.target&&s.target.team!==s.team?s.target:null}
