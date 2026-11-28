@@ -3398,6 +3398,8 @@ const WMAXV=30,WREARM=8,WRANGE=6,SMS_DMG=2,WDOG=3,PDAUTO=4;   // WDOG: craft PD 
    the Dreadnought carries 2 full squadrons. "No fighters" (skirmish setup) grounds all of them and keeps carriers out. */
 const isCarrierCls=d=>!!(d&&d.bays&&/Carrier/.test(d.cls));
 for(const [k,d] of Object.entries(SHIPS)){if(d.bays)continue;if(k.replace(/[0-9]+$/,'')==='dread'){d.bays=2;d.sqDef='F';continue}const c=ptsClass(k);const h=c==='Heavy Cruiser'||c==='Double Cruiser'?4:c==='Cruiser'||c==='Light Cruiser'?2:0;if(h)d.hangar=h}
+/* Nov 27 night (David): one notation everywhere — craft aboard by type, e.g. 4F, 24F/24B */
+const craftLabel=(d,sq)=>{const per=d.hangar?d.hangar:12,c={F:0,B:0};for(const t of sq)c[t]+=per;return ['F','B'].filter(t=>c[t]).map(t=>c[t]+t).join('/')||'0'};
 const hasCraft=d=>!!(d&&(d.bays||d.hangar));
 const sqN=d=>d.bays||1;
 const defSq=d=>d.hangar?['F']:d.sqDef?Array(d.bays).fill(d.sqDef):defaultSq(d.bays);
@@ -3535,7 +3537,7 @@ function sqPopup(t,i){const x=fleet[t]&&fleet[t][i];const d=x&&SHIPS[x.key];if(!
   draw();document.body.appendChild(el)}
 {const _rb=renderBuilder;renderBuilder=function(){_rb.apply(this,arguments);try{
   document.querySelectorAll('#builder [data-frm]').forEach(b=>{const [t,i]=b.dataset.frm.split(':');const x=fleet[+t]&&fleet[+t][+i];const d=x&&SHIPS[x.key];if(noFighters||!hasCraft(d)||b.parentNode.querySelector('[data-sqed]'))return;
-    if(!x.sq||x.sq.length!==sqN(d))x.sq=defSq(d);const nb=document.createElement('button');nb.className='btn';nb.dataset.sqed=t+':'+i;nb.title=d.hangar?`Hangar: ${d.hangar} craft — fighters or bombers`:'Choose fighter and bomber squadrons';nb.textContent=d.hangar?`✈ ${d.hangar}${x.sq[0]}`:`✈ ${x.sq.filter(v=>v==='F').length}F/${x.sq.filter(v=>v==='B').length}B`;nb.onclick=e=>{e.stopPropagation();sqPopup(+t,+i)};b.before(nb)});
+    if(!x.sq||x.sq.length!==sqN(d))x.sq=defSq(d);const nb=document.createElement('button');nb.className='btn';nb.dataset.sqed=t+':'+i;nb.title=d.hangar?`Hangar: ${d.hangar} craft — fighters or bombers`:'Choose fighter and bomber squadrons';nb.textContent='✈ '+craftLabel(d,x.sq);nb.onclick=e=>{e.stopPropagation();sqPopup(+t,+i)};b.before(nb)});
   document.querySelectorAll('#builder [data-fadd]').forEach(b=>{if(b._sqw)return;b._sqw=1;const [t,k]=b.dataset.fadd.split(':');if(noFighters&&isCarrierCls(SHIPS[k])){b.disabled=true;b.style.opacity=.35;b.title='No fighters is on — carriers can\'t be fielded';b.onclick=null;return}if(!SHIPS[k]||!SHIPS[k].bays)return;b.addEventListener('click',()=>setTimeout(()=>{const L=fleet[+t];const i=L.map(x=>x.key).lastIndexOf(k);if(i>=0)sqPopup(+t,i)},0))})}catch(e){console.error(e)}}}
 
 /* ---- multiplayer: host sends every wing in the state snapshot; guests rebuild them (orders from guests travel as wing-order messages) ---- */
