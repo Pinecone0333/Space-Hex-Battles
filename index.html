@@ -515,7 +515,7 @@ const mkCarriers=(key,base,lbase,F,ab,sty,o={})=>{const B=SHIPS[base],BL=SHIPS[l
     ...bayPods(B,sty,true),weapons:[[G,'FX'],[G,'LS'],[G,'RS'],...ms,...ms],pd:['FX','FX','FX','ALL','ALL','ALL'],pdSplit:false};
   SHIPS[key+'l']={...BL,faction:F,laser:B.laser,torp:B.torp,doctrine:B.doctrine,cls:'Light Carrier',ptsCls:'Light Cruiser',weight:79,name:(o.nm||F)+' Light Carrier',short:ab+' Lt Carrier',hull:180,shield:o.shl||60,reactor:o.rl||30,bays:2,hangar:undefined,big:true,
     ...bayPods(BL,sty,false),weapons:[[G,'FX'],[G,'FX'],...ms],pd:['FX','FX','ALL','ALL'],pdSplit:false}};
-mkCarriers('ecarrier','earthling','earthcl','Earthling','E','wide');
+mkCarriers('ecarrier','earthling','earthling','Earthling','E','wide');   // Nov 28 (David): both Earthling carriers follow the CA's lines
 mkCarriers('gcarrier','golthan','golthanart','Golthan','G','fill');
 mkCarriers('hbcarrier','hunheavy','hunold','Hunibler','Hb','fill');
 mkCarriers('hfcarrier','huniferca','hunifer','Hunifer','Hf','fill');
