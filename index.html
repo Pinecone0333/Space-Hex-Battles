@@ -2643,7 +2643,7 @@ const ERAS={
   dog2:{name:'Second Dogahr Invasion',allow:{Martian:[2],Earthling:[2],Dogahr:[3]},extra:['condor3']},
   dbw:{name:'Dogahr/Blokai War',allow:{Martian:[3,4],Earthling:[3,4],Dogahr:[3],Hunibler:[3],Blokai:[5]}},
   hun:{name:'Hunifer Invasion',allow:{Hunifer:[4],Blokai:[5],Dogahr:[3,4],Hunibler:[3,4],Martian:[3,4],Earthling:[3,4]}}};
-let era='open',globalTL=0,noFighters=false;   /* Nov 27 (David): No fighters — cruisers and the Dreadnought launch nothing, carriers can't be picked */
+let era='open',globalTL=0,noFighters=true;   /* Nov 27 (David): No fighters (on by default — David, Nov 27 night) — cruisers and the Dreadnought launch nothing, carriers can't be picked */
    /* Nov 26 (David): skirmish Tech level setter at the top — only works in the Open era; picking an era clears it */
 const facListed=f=>!!(ERAS[era]&&ERAS[era].allow&&ERAS[era].allow[f]);
 const shipOK=k=>{const E=ERAS[era],d=SHIPS[k];if(!d)return false;if(!E||!E.allow||!E.allow[d.faction])return true;return E.allow[d.faction].includes(d.tl)||(E.extra||[]).includes(k)};   /* Nov 22 (David): factions not in the era are allowed at any tech level, picked by hand */
