@@ -495,16 +495,34 @@ SHIPS.dcarrier={faction:'Dogahr',cls:'Carrier',ptsCls:'Heavy Cruiser',weight:101
    the faction's heavy cruiser outline widened ×1.45 for the launch bays (light carriers: that outline at ×0.68 across), 4 / 2 squadrons,
    a light defensive armament (3 / 2 medium lasers in the faction's colours, 4 / 2 missile launchers, 6 / 4 PD), the faction's doctrine.
    Durability like the Martian and Dogahr carriers: 150% of the faction's heavy / light cruiser (set after the global halving, below). */
-const mkCarriers=(key,base,F,ab,o={})=>{const B=SHIPS[base],W=(L,f)=>(L||[]).map(p=>p&&p.map((v,i)=>i%2?+(v*f).toFixed(1):v)),G=o.gun||'ML',ms=o.noMs?[]:[['MS','ALL'],['MS','ALL']];
+/* Nov 28 (David: "OOGLY" — redone). The faction's own cruiser silhouette stays untouched; launch-bay pods in the faction's style hang off both sides on struts
+   (a flight-deck line down each pod, a bay mouth at its front). Carrier = heavy cruiser + big pods; light carrier = light cruiser + smaller pods. */
+const bayPods=(B,sty,big)=>{const P=(B.shape||[]).filter(Boolean);let x0=1e9,x1=-1e9,hw=0;for(const [x,y] of P){x0=Math.min(x0,x);x1=Math.max(x1,x);hw=Math.max(hw,Math.abs(y))}
+  const Lh=x1-x0,L=Lh*(big?.68:.56),cx=x0+Lh*.46,a=cx-L/2,b=cx+L/2,wp=Math.max(7,hw*(big?.55:.42)),g=big?4:3,y0=hw+g,y1=y0+wp,ym=(y0+y1)/2,c=wp*(sty==='round'?.45:sty==='cap'?.0:.22);
+  // edge of the hull at x (for the struts)
+  const edge=x=>{let m=0;const Q=B.shape;for(let i=0;i<Q.length;i++){const p=Q[i],q=Q[(i+1)%Q.length];if(!p||!q)continue;if((p[0]-x)*(q[0]-x)<=0&&p[0]!==q[0]){const t=(x-p[0])/(q[0]-p[0]);m=Math.max(m,Math.abs(p[1]+t*(q[1]-p[1])))}}return m};
+  const pod=sg=>{const Y=v=>+(sg*v).toFixed(1);let pts;
+    if(sty==='dart')pts=[[a,y0],[b-wp*.9,y0],[b,ym],[b-wp*.9,y1],[a,y1]];
+    else if(sty==='flare')pts=[[a,y0],[b,y0],[b,y1-wp*.35],[b-wp*.5,y1],[a+wp*.2,y1],[a,y1+wp*.35]];
+    else if(sty==='cap')pts=[[a,y0],[b-wp*.5,y0],[b-wp*.15,y0+wp*.15],[b,ym],[b-wp*.15,y1-wp*.15],[b-wp*.5,y1],[a,y1]];
+    else pts=[[a+c,y0],[b-c,y0],[b,y0+c],[b,y1-c],[b-c,y1],[a+c,y1],[a,y1-c],[a,y0+c]];
+    return pts.map(([x,y])=>[+x.toFixed(1),Y(y)])};
+  const shape=[...B.shape,null,...pod(-1),null,...pod(1)];
+  const lines=[...(B.lines||[])],dots=[...(B.dots||[])];
+  for(const sg of [-1,1]){const Y=v=>+(sg*v).toFixed(1);lines.push([+(a+wp*.35).toFixed(1),Y(ym),+(b-wp*.6).toFixed(1),Y(ym)]);   // flight deck
+    const xm=+(b-wp*.95).toFixed(1);lines.push([xm,Y(y0+wp*.2),xm,Y(y1-wp*.2)]);                                                   // bay mouth
+    for(const f of [.3,.72]){const x=+(a+L*f).toFixed(1),e=edge(x);if(e>0&&e<y0)lines.push([x,Y(e),x,Y(y0)])}}                     // struts
+  return{shape,lines,dots}};
+const mkCarriers=(key,base,lbase,F,ab,sty,o={})=>{const B=SHIPS[base],BL=SHIPS[lbase],G=o.gun||'ML',ms=o.noMs?[]:[['MS','ALL'],['MS','ALL']];
   SHIPS[key]={...B,faction:F,cls:'Carrier',ptsCls:'Heavy Cruiser',weight:101,name:(o.nm||F)+' Carrier',short:ab+' Carrier',hull:225,shield:o.sh||76,big:true,reactor:o.r||40,bays:4,hangar:undefined,
-    shape:W(B.shape,1.45),lines:W(B.lines,1.45),dots:W(B.dots,1.45),weapons:[[G,'FX'],[G,'LS'],[G,'RS'],...ms,...ms],pd:['FX','FX','FX','ALL','ALL','ALL'],pdSplit:false};
-  const C=SHIPS[key];SHIPS[key+'l']={...C,cls:'Light Carrier',ptsCls:'Light Cruiser',weight:79,name:(o.nm||F)+' Light Carrier',short:ab+' Lt Carrier',hull:180,shield:o.shl||60,reactor:o.rl||30,bays:2,
-    shape:W(C.shape,.68),lines:W(C.lines,.68),dots:W(C.dots,.68),weapons:[[G,'FX'],[G,'FX'],...ms],pd:['FX','FX','ALL','ALL'],pdSplit:false}};
-mkCarriers('ecarrier','earthling','Earthling','E');
-mkCarriers('gcarrier','golthan','Golthan','G');
-mkCarriers('hbcarrier','hunheavy','Hunibler','Hb');
-mkCarriers('hfcarrier','huniferca','Hunifer','Hf');
-mkCarriers('chcarrier','chemcru','Chemantar','Ch');
+    ...bayPods(B,sty,true),weapons:[[G,'FX'],[G,'LS'],[G,'RS'],...ms,...ms],pd:['FX','FX','FX','ALL','ALL','ALL'],pdSplit:false};
+  SHIPS[key+'l']={...BL,faction:F,laser:B.laser,torp:B.torp,doctrine:B.doctrine,cls:'Light Carrier',ptsCls:'Light Cruiser',weight:79,name:(o.nm||F)+' Light Carrier',short:ab+' Lt Carrier',hull:180,shield:o.shl||60,reactor:o.rl||30,bays:2,hangar:undefined,big:true,
+    ...bayPods(BL,sty,false),weapons:[[G,'FX'],[G,'FX'],...ms],pd:['FX','FX','ALL','ALL'],pdSplit:false}};
+mkCarriers('ecarrier','earthling','earthcl','Earthling','E','dart');
+mkCarriers('gcarrier','golthan','golthanart','Golthan','G','round');
+mkCarriers('hbcarrier','hunheavy','hunold','Hunibler','Hb','flare');
+mkCarriers('hfcarrier','huniferca','hunifer','Hunifer','Hf','flare');
+mkCarriers('chcarrier','chemcru','chematk','Chemantar','Ch','cap');
 /* Nov 23 (David): a TL4 ship automatically gets a TL3 version; any other tech level only when David says so. TL2 versions exist for these ships only: */
 const TL2_SHIPS=['albatross','peregrine','earthling','earthdd','mcarrier','earthcl'];   // Nov 27 (David): + Earthling Light Cruiser
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -606,7 +624,7 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 
 // ---- internal systems: each damageable system is one of the ship's hull points ----
 // weapons, PD mounts and missile launchers 1 box each; main engine 3; port thrusters 3; starboard thrusters 3; reactor 10 (−10% output each); sensors 5 (−2 hexes scan range each)
-mkCarriers('bkcarrier','blokai','Blokai','Bk',{gun:'HL',noMs:true,r:52,rl:35,sh:114,shl:90});SHIPS.bkcarrier.tl=5;SHIPS.bkcarrierl.tl=5;   // Nov 28: Blokai carriers are TL5 only (no missiles — the Blokai use none)
+mkCarriers('bkcarrier','blokai','blokaicl','Blokai','Bk','round',{gun:'HL',noMs:true,r:52,rl:35,sh:114,shl:90});SHIPS.bkcarrier.tl=5;SHIPS.bkcarrierl.tl=5;   // Nov 28: Blokai carriers are TL5 only (no missiles — the Blokai use none)
 // Nov 21 (David): all shield values halved (rounded to whole points); reinforcement and base-shield repair now 1 energy per point
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 // Nov 21 (David): every reactor 2 lower — energy allocation should matter more
