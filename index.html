@@ -491,6 +491,20 @@ SHIPS.dcarrier={faction:'Dogahr',cls:'Carrier',ptsCls:'Heavy Cruiser',weight:101
 {const N=(L,f)=>L.map(p=>p&&p.map((v,i)=>i%2?+(v*f).toFixed(1):v)),mk=(k,o)=>{const B=SHIPS[k];SHIPS[k+'l']={...B,...o,ptsCls:'Light Cruiser',weight:79,hull:180,shield:30,reactor:28,genCost:7.5,genRegen:3,bays:2,shape:N(B.shape,.68),lines:N(B.lines,.68),dots:N(B.dots,.68)}};
  mk('mcarrier',{cls:'Light Starfighter Carrier',name:'Martian Light Starfighter Carrier',short:'M Lt Carrier',weapons:[['ML','FX'],['MS','ALL'],['MS','ALL']],pd:['FX','FX','ALL','ALL']});
  mk('dcarrier',{cls:'Light Carrier',name:'Dogahr Light Carrier',short:'D Lt Carrier',weapons:[['ML','FX'],['ML','FX'],['MS','ALL'],['MS','ALL']],pd:['FX','FX','ALL','ALL']});}
+/* Nov 28 (David): carriers and light carriers for every Alpha Quadrant faction (except the Baangzon). Claude's design, like the first two:
+   the faction's heavy cruiser outline widened ×1.45 for the launch bays (light carriers: that outline at ×0.68 across), 4 / 2 squadrons,
+   a light defensive armament (3 / 2 medium lasers in the faction's colours, 4 / 2 missile launchers, 6 / 4 PD), the faction's doctrine.
+   Durability like the Martian and Dogahr carriers: 150% of the faction's heavy / light cruiser (set after the global halving, below). */
+const mkCarriers=(key,base,F,ab,o={})=>{const B=SHIPS[base],W=(L,f)=>(L||[]).map(p=>p&&p.map((v,i)=>i%2?+(v*f).toFixed(1):v)),G=o.gun||'ML',ms=o.noMs?[]:[['MS','ALL'],['MS','ALL']];
+  SHIPS[key]={...B,faction:F,cls:'Carrier',ptsCls:'Heavy Cruiser',weight:101,name:(o.nm||F)+' Carrier',short:ab+' Carrier',hull:225,shield:o.sh||76,big:true,reactor:o.r||40,bays:4,hangar:undefined,
+    shape:W(B.shape,1.45),lines:W(B.lines,1.45),dots:W(B.dots,1.45),weapons:[[G,'FX'],[G,'LS'],[G,'RS'],...ms,...ms],pd:['FX','FX','FX','ALL','ALL','ALL'],pdSplit:false};
+  const C=SHIPS[key];SHIPS[key+'l']={...C,cls:'Light Carrier',ptsCls:'Light Cruiser',weight:79,name:(o.nm||F)+' Light Carrier',short:ab+' Lt Carrier',hull:180,shield:o.shl||60,reactor:o.rl||30,bays:2,
+    shape:W(C.shape,.68),lines:W(C.lines,.68),dots:W(C.dots,.68),weapons:[[G,'FX'],[G,'FX'],...ms],pd:['FX','FX','ALL','ALL'],pdSplit:false}};
+mkCarriers('ecarrier','earthling','Earthling','E');
+mkCarriers('gcarrier','golthan','Golthan','G');
+mkCarriers('hbcarrier','hunheavy','Hunibler','Hb');
+mkCarriers('hfcarrier','huniferca','Hunifer','Hf');
+mkCarriers('chcarrier','chemcru','Chemantar','Ch');
 /* Nov 23 (David): a TL4 ship automatically gets a TL3 version; any other tech level only when David says so. TL2 versions exist for these ships only: */
 const TL2_SHIPS=['albatross','peregrine','earthling','earthdd','mcarrier','earthcl'];   // Nov 27 (David): + Earthling Light Cruiser
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
@@ -592,6 +606,7 @@ const when=t=>`T${turnOf(t)}·${impOf(t)}`;
 
 // ---- internal systems: each damageable system is one of the ship's hull points ----
 // weapons, PD mounts and missile launchers 1 box each; main engine 3; port thrusters 3; starboard thrusters 3; reactor 10 (−10% output each); sensors 5 (−2 hexes scan range each)
+mkCarriers('bkcarrier','blokai','Blokai','Bk',{gun:'HL',noMs:true,r:52,rl:35,sh:114,shl:90});SHIPS.bkcarrier.tl=5;SHIPS.bkcarrierl.tl=5;   // Nov 28: Blokai carriers are TL5 only (no missiles — the Blokai use none)
 // Nov 21 (David): all shield values halved (rounded to whole points); reinforcement and base-shield repair now 1 energy per point
 for(const k in SHIPS){const d=SHIPS[k];if(d.shield>0)d.shield=Math.round(d.shield/2)}
 // Nov 21 (David): every reactor 2 lower — energy allocation should matter more
@@ -626,6 +641,9 @@ const PDCAP=1;for(const k in SHIPS){const d=SHIPS[k];if(d.pd&&!d.pdSplit){d.pd=d
  for(const k of ['dfrigate','chemff'])dur(k,55,null);
  dur('dcorvette',30,10)}
 {for(const k of ['mcarrier','dcarrier'])for(const v of [k,k+'3',k+'2'])if(SHIPS[v]){const d=SHIPS[v];d.hull=225;if(!d.noShield)d.shield=38;d.reactor=d.tl===4?40:d.tl===3?30:25.5}}
+{const CA=(k,l)=>{for(const v of [k,k+'3',k+'l',k+'l3'])if(SHIPS[v]){const d=SHIPS[v],lt=v.includes('l'),t3=d.tl===3;const b=SHIPS[{ecarrier:'earthling',gcarrier:'golthan',hbcarrier:'hunheavy',hfcarrier:'huniferca',chcarrier:'chemcru',bkcarrier:'blokai'}[k]+(t3?'3':'')],bl=SHIPS[(l||'lcruiser')+(t3?'3':'')];
+    d.hull=lt?180:225;if(!d.noShield)d.shield=lt?(d.tl===5?45:30):(d.tl===5?57:38);d.reactor=lt?(bl?bl.reactor:d.reactor):d.tl===5?(b?b.reactor:d.reactor):t3?30:40}};
+  for(const k of ['ecarrier','gcarrier','hbcarrier','hfcarrier','chcarrier'])CA(k);CA('bkcarrier','blokaicl')}   // Nov 28: Alpha carriers — 150% durability, the faction's CA / light-cruiser reactor
 {for(const k of ['mcarrierl','dcarrierl'])for(const v of [k,k+'3'])if(SHIPS[v]){const d=SHIPS[v];d.hull=180;if(!d.noShield)d.shield=30;const c=SHIPS['lcruiser'+(d.tl===3?'3':'')];d.reactor=c?c.reactor:d.tl===3?21:28}}   // Nov 27: light carriers keep 180/30 (150% of a light cruiser's 120/20) and a light cruiser's reactor   // Nov 26 (David): carriers = 150% of a CA (38/225); reactor 40 (TL3 30, TL2 25.5)
 /* Nov 26 (David, showing his Grandma): a deliberately ugly Golthan ship — the Heavy Cruiser tripled and stuck together:
    three egg bodies with three engine sections, the middle one pushed forward, the outer two jammed into its flanks. Open era only, no TL3 version. */
