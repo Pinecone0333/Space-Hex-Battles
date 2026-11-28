@@ -524,7 +524,13 @@ SHIPS.freighter4.name='Earthling Freighter';SHIPS.freighter1.name='Earthling Fre
 SHIPS.corvette={faction:'Martian',cls:'Light Corvette',weight:30,name:'Martian Corvette',short:'Corvette',color:'#ff6a50',laser:'#46ff6e',torp:'#5dff7a',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:6.5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
     shape:[[-16,-12],[-11,-12],[-8,-6],[18,-4],[18,4],[-8,6],[-11,12],[-16,12]],lines:[[-14,0,18,0]],dots:[[3,-5],[3,5]],   // placeholder outline until David's sprite
     weapons:[['RG','LS'],['RG','RS'],['MS','ALL'],['MS','ALL']],pd:['FX','FX']};
-SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8.5};   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
+SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Improved Corvette',short:'Imp Corvette',reactor:8.5};
+/* Nov 27 (David): Earthling Corvette, TL1 and TL2 — 2 missile launchers, 3 FX chain-gun PD, 2 Small Railgun Turrets on the Earthling arcs (LX, RX).
+   Corvette class: hull 30, no shields; reactor on the corvette ladder (set with the Martian corvettes below). TL2 version gets laser PD (David's rule: chain guns are TL1 only). */
+SHIPS.ecorv1={faction:'Earthling',cls:'Corvette',weight:31,name:'Earthling Corvette',short:'Earthling Corvette',color:'#5a9cff',laser:'#ff3b3b',torp:'#ff4d4d',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:8.5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
+  shape:SHIPS.earlyeff.shape.map(p=>p&&p.map(v=>Math.round(v*.75*10)/10)),lines:(SHIPS.earlyeff.lines||[]).map(p=>p.map(v=>Math.round(v*.75*10)/10)),dots:(SHIPS.earlyeff.dots||[]).map(p=>p.map(v=>Math.round(v*.75*10)/10)),
+  weapons:[['RG','LX'],['RG','RX'],['MS','ALL'],['MS','ALL']],pd:['FX','FX','FX']};
+SHIPS.ecorv2={...SHIPS.ecorv1,name:'Earthling Corvette (TL2)',short:'Earthling Corvette II',tl:2,weight:31.5,pdKind:undefined};   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',full:'Blokai Commonwealth',lore:'Technologically advanced arboreal aliens governed by direct democracy. Xenophobic and isolationist. Those who upset the social order are exiled.',blurb:'Heavy shields, plasma lances, long-range targeting'};
 // Nov 24 (David): original egg; the fork (25% smaller) sits straight on it, no neck — two side prongs and a thin centre prong, equal length: side prongs curved on the outside edge to a point and straight on the inside, a straight-sided centre prong with a flat end, straight parallel-sided slots between them
@@ -567,7 +573,7 @@ function inArc(s,arc,t){if(s.q===t.q&&s.r===t.r)return true;const [c,hw]=ARCS[ar
 const vlen=(q,r)=>hexDist({q:0,r:0},{q:Math.round(q),r:Math.round(r)});
 
 // ---- state ----
-let AIV={pdGap:1,torpQuit:1,ovk:1,killAlpha:1,pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
+let AIV={pdGap:1,torpQuit:1,ovk:1,killAlpha:1,outrange:1,brake:1,uni:1,uniN:1,uniC:1,uniA:1,pdPri:1,faceKeep:1,rfMs:1,msDef2:1,torpCoil:1,bank:1,tmem:1,rfFloor:1,lastGasp:1,strip:1,reinf2:1,brace:1,msHold:0,hotReinf:1,genKeep:1,pdBudget:0,msClose:0,crip:0,fireReady:1,extend:1,trig65:1,pdFirst:1,fast:0,mhold:1,dStand:0,salvo:0,align:1,avoid:1,wfirst:1,focus:1,triage:1,kill:1,nowob:1,apfix:1,agile:1,hangback:1,mbr:1,r5:1,r6:1,r7:1,dogHold:0,r8:1,dbl:1,r9:1,evade:1};   // AI variants (for testing)
 let FXD=0,msHold=0,dcEvt=[],dcHide='',REC=null;
 let P=null,ships=[],missiles=[],fx=[],T=0,phase='select',logLines=[],over=false,pauseReq=false,animT=0,ANIM=170,resolveT=0,pending=[];
 const cam={x:0,y:0,s:.6},pan={x:0,y:0};let zoomMul=1;const mouse={x:null,y:null,pan:false};let showArcs=false,arcSel=null,arcHover=null;   /* arcSel: null | 'w3' | 'pd1' — one mount's arc (Nov 22, David) */
@@ -644,7 +650,7 @@ SHIPS.drone={faction:'Nonaligned',cls:'Drone',weight:1,name:'Training Drone',sho
  for(const f of ['freighter','mfreighter']){const r3=SHIPS[f+'3'].reactor;SHIPS[f+'2'].reactor=h(r3*.85);SHIPS[f+'1'].reactor=h(r3*.7)}
  const T1={earlyca:'dogahr3',earlyeca:'albatross3',earlyff:'hunolddd3',earlyffl:'hunolddd3',earlyeff:'hunolddd3'};   // class: heavy cruiser, medium cruiser, frigate (Nov 22, David: Early Frigates are normal frigates)
  for(const k in T1)SHIPS[k].reactor=h(SHIPS[T1[k]].reactor*.7);
- SHIPS.corvette2i.reactor=h(SHIPS.dcorvette3.reactor*.7);SHIPS.corvette.reactor=h(SHIPS.corvette2i.reactor*2/3)}   // corvette class on the TL1 ladder; light corvette = 2/3 of a corvette
+ SHIPS.corvette2i.reactor=h(SHIPS.dcorvette3.reactor*.7);SHIPS.ecorv1.reactor=SHIPS.corvette2i.reactor;SHIPS.ecorv2.reactor=h(SHIPS.dcorvette3.reactor*.85);SHIPS.corvette.reactor=h(SHIPS.corvette2i.reactor*2/3)}   // corvette class on the TL1 ladder; light corvette = 2/3 of a corvette
 /* Nov 22 (David): outline touch-ups — Chemantar Attack Frigate side engines; longer Chemantar Artillery Cruisers (single and Double) and Golthan stern; small wings on Hunibler, Hunifer and the Chemantar cruisers. Applied to every tech-level variant. */
 {const pieces=sh=>{const o=[[]];for(const p of sh){if(p)o[o.length-1].push(p);else o.push([])}return o.filter(x=>x.length)},
    join=ps=>ps.reduce((a,x,i)=>a.concat(i?[null]:[],x),[]),
@@ -1405,7 +1411,7 @@ function aiDecideOld(s){if(T>0&&impOf(T)===1&&!s.isPlayer)s.target=nearestEnemy(
     if(pp>=.35)fire.push(key)});
   const q=s.queue;s.queue=[];return{queue:q,fire}}
 
-function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);if(s.order&&s.order.k==='cover'&&s.ai)s.msMode='def';   /* Nov 26 (David): covering ships keep their launchers on Defend so their interceptors protect the ship they cover */const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)){aiTorpCoil(s,r);aiTorpGate(s,r)}if(AIV.ovk)aiOverkill(s,r);return r}
+function aiDecide(s){if(s.d.drone)return{queue:[],fire:[]};const r=aiDecide0(s);s._lastQ=r.queue.map(q=>q.type+(q.type==='start'?s.weapons[q.i].T.grp:'')).join(',');if(typeof QC!=='undefined'&&s.ai)for(const q of r.queue){const k=s.d.short+' '+q.type+(q.type==='start'?s.weapons[q.i].T.grp:'');QC[k]=(QC[k]||0)+(q.cost||0)}if(s.order&&s.order.k==='cover'&&s.ai)s.msMode='def';   /* Nov 26 (David): covering ships keep their launchers on Defend so their interceptors protect the ship they cover */const t=s.target;if(t&&r.fire)r.fire=r.fire.filter(k=>{const w=k[0]==='w'&&s.weapons[+k.slice(1)];return !w||w.T.kind!=='lance'||hexDist(s,t)<=(s.d.lanceRange||9)});aiDark(s,r);if(AIV.r7)aiBudget(s,r);if(s.d.pcr)aiPCR(s,r);if(AIV.torpCoil&&MDOC(s)&&(!U(s)||AIV.uniTC)){aiTorpCoil(s,r);aiTorpGate(s,r)}if(AIV.ovk)aiOverkill(s,r);return r}
 /* Nov 26 (David): don't massively overkill. The AI adds up the damage it can expect — missiles already flying at the target (after its point defense and
    interceptors), what allied AI ships committed this impulse, then its own shots in order (cheap guns first, missiles, lances, torpedoes last) — and stops once the
    expected damage reaches the target's shields + reinforcement + hull with a small margin (×1.2 + 4) — and, when one hit is enough to kill, once the chance
@@ -1507,7 +1513,56 @@ function aiDark(s,r){if(!s.d.runDark)return;const t=s.target&&!s.target.dead?s.t
   s.mslLight=dm.length>0&&(d<=10||wave||s.hull<s.d.hull*.4||dm.some(m=>Math.hypot(m.px.x-t.px.x,m.px.y-t.px.y)/HS<=6))}   /* light the reserve as the first wave arrives (PD busy), up close, or before dying */
 // AI round 5 (Nov 21, David): doctrine families. Martian doctrine: Martians and Earthlings. Dogahr doctrine (torpedo stand-off, nose avoidance,
 // liberal reinforcement): Dogahr and, for now, Golthan. Everyone else hunts without the Dogahr's torpedo-shyness and reinforces only when it matters.
-const MDOC=s=>s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>s.d.faction==='Dogahr'||s.d.faction==='Golthan';
+/* ===== Nov 27 (David): one AI for every ship — principles, not faction playbooks (flag uni) =====
+   The ship's role comes from its own loadout, re-read every impulse (weapons get destroyed):
+   - 'close'  — its punch is in weapons that charge and hit hardest up close (energy torpedoes, plasma lances / PCCG): at least 35% of its volley damage.
+                While the punch charges it fights at mid range (~9 hexes) with its best battery toward the enemy; once it is ready it closes OBLIQUELY
+                (enemy one facing off the nose, spinal mounts out of the line of fire) and turns nose-on to fire at close range with a high chance to hit.
+   - 'gun'    — artillery / gunships (laser batteries, coilguns, railguns, antiproton lances): hold at the range where its guns still hit well
+                (damage-weighted 65% range) and fire from there.
+   Shared principles: never fly at the nose of an enemy whose big charging weapons are hot (hold outside their 65% band, slide off their nose line, brace);
+   out-range enemies with shorter targeting computers and kite; brake before reaching the range it wants; face the battery with the most loaded guns;
+   fire what bears; keep point defense loaded unless the ship is doomed in a fleet battle (then everything goes into its guns);
+   finish wrecks; crippled ships hang back from intact ones; Defend when out-launched; fleet interceptor cover. */
+const U=s=>AIV.uni&&(!AIV.uniFac||AIV.uniFac===s.d.faction);
+const punchW=w=>w.alive&&(w.T.kind==='torp'||w.T.kind==='lance');
+const punchDmg=w=>w.T.kind==='torp'?Math.round(w.T.perTurn*3*2*(w.T.dmgMul||1)):lanceDmg(w.T,0);
+function aiRole(s){if(s._roleT===T&&s._role)return s._role;let P=0,G=0;
+  for(const w of s.weapons){if(!w.alive||w.T.kind==='missile')continue;if(punchW(w))P+=punchDmg(w);else G+=w.T.dmg||0}
+  if(s.torpQuit)P=0;s._role=P>0&&P>=.35*(P+G)?'close':'gun';s._roleT=T;return s._role}
+// damage-weighted range at which a set of weapons still hits at thr or better
+function rangeAt(s,ws,thr){let n=0,sum=0;for(const w of ws){if(!w.T.acc)continue;let r=0;for(let k=0;k<=30;k++)if(accAt(accK(s,w.T.acc),k)>=thr-1e-6)r=k;const wt=(w.T.kind==='torp'||w.T.kind==='lance')?punchDmg(w):(w.T.dmg||1);n+=wt;sum+=r*wt}return n?sum/n:0}
+function gunRange(s){const g=s.weapons.filter(w=>w.alive&&w.T.kind!=='missile'&&!punchW(w));const r=rangeAt(s,g,.65);return clamp(Math.round(r)||9,5,(TCR_TL[s.d.tl||4]||18)-2)}
+function strikeRange(s){return Math.max(2,Math.round(rangeAt(s,s.weapons.filter(punchW),.85))||3)}
+// an enemy's charging punch that is (believed) hot, and the range inside which it is dangerous (its 65% band + 2)
+function hotPunch(s,e){const P=e.weapons.filter(punchW);if(!P.length)return 0;
+  const seen=sensRange(s)>0&&hexDist(e,s)<=sensRange(s);
+  const hot=seen?P.some(w=>w.T.kind==='torp'?w.stages>=2:w.state==='ready'):(torpHot(s,e)||P.some(w=>w.T.kind==='lance'));
+  return hot?Math.round(rangeAt(e,P,.65))+2:0}
+function aiDoomed(s){if(ships.filter(x=>!x.dead&&x.team===s.team).length<2)return false;let inc=0;
+  for(const e of enemiesOf(s)){const dd=hexDist(e,s);if(dd>18)continue;e.weapons.forEach((w,k)=>{if(!w.alive||w.T.kind==='missile')return;const dm=w.T.kind==='torp'?torpDmg(w):w.T.kind==='lance'?lanceDmg(w.T,dd):w.T.dmg||0;inc+=dm*hitP0(e,'w'+k,s)/(w.T.kind==='torp'?IMP*3:IMP)})}
+  for(const m of missiles)if(!m.dead&&!m.intercept&&m.target===s)inc+=(m.dmg||10)/IMP;
+  return (s.hull+s.shield+reinfAmt(s))/Math.max(.1,inc)<IMP}
+// the range where this ship's guns do best against the target's: maximise (my expected volley at r) − (its expected volley at r); ties go to the longer range
+function volleyAt(x,r,withPunch){let v=0;for(const w of x.weapons){if(!w.alive||w.T.kind==='missile'||!w.T.acc)continue;const P=punchW(w);if(P&&!withPunch)continue;
+    const dm=w.T.kind==='lance'?lanceDmg(w.T,r):P?punchDmg(w):(w.T.dmg||0);v+=dm*Math.max(0,accAt(accK(x,w.T.acc),r)-(w===null?0:0))}return v}
+function bestRange(s,t,lo,hi){const tp=hotPunch(s,t)>0;let best=hi,bv=-1e9;for(let r=lo;r<=hi;r++){const v=volleyAt(s,r,false)-volleyAt(t,r,tp)*(1-(t.d.evade||0));if(v>bv+.5){bv=v;best=r}else if(Math.abs(v-bv)<=.5)best=r}return best}
+function uniPlan(s,t,d,a,side,sepRate,torps){s.torpQuit=torps.length===1&&s.reactor0>0&&s.reactor/s.reactor0<=.6+1e-9;s._roleT=-1;const role=aiRole(s);s.role=role;let mode,want,face,prio,reserve=Math.min(6,s.reactor0/4);
+  let thr=0,thrE=null;for(const e of enemiesOf(s)){const dd=hexDist(e,s);if(dd>24)continue;const r=hotPunch(s,e);if(r&&r-dd>thr-(thrE?hexDist(thrE,s):0)){thr=r;thrE=e}}
+  s.hotNear=!!thrE;const bb=a-bestBattery(s,t)*D2R;
+  if(role==='close'){const P=s.weapons.filter(punchW),ready=P.length&&P.every(w=>w.T.kind==='torp'?w.stages>=3:w.state==='ready');
+    s.holdImp=ready&&d<=13?(s.holdImp||0)+1:0;
+    if(ready){mode='attack';const Rs=strikeRange(s);want=AIV.uniA?{range:1,radial:1.2}:{range:Math.max(1,Rs-3),radial:1.3,maxClose:12};face=d>Rs+1&&!turnIn(s,t,d)?a-side*Math.PI/3:a;prio=['torps','lances','coils','lasers'];reserve=4}   // oblique approach, nose-on at the end
+    else{mode='charge';const gR=AIV.uniCR?Math.max(4,Math.round(rangeAt(s,s.weapons.filter(w=>w.alive&&w.T.kind!=='missile'&&!punchW(w)),.8))||6):9;want={range:Math.max(AIV.uniBR?clamp(bestRange(s,t,4,12),6,12):gR,thr&&thrE===t?thr:0),radial:1,orbit:1,chase:!AIV.uniC,maxClose:AIV.uniC?6:10};face=bb;prio=['torps','lances','lasers','coils'];reserve=6}}
+  else{   // artillery only when its guns actually out-reach the target's (65% range 2+ hexes longer): then hold at that range; otherwise fight where its guns hit 80%+
+    const myG=s.weapons.filter(w=>w.alive&&w.T.kind!=='missile'&&!punchW(w)),tG=t.weapons.filter(w=>w.alive&&w.T.kind!=='missile');
+    const my65=gunRange(s),t65=tG.length?Math.round(rangeAt(t,tG,.65)):0;const Rg=AIV.uniBR?bestRange(s,t,3,(TCR_TL[s.d.tl||4]||18)-2):my65>=t65+2||AIV.uniArt?my65:Math.max(4,Math.round(rangeAt(s,myG,.8))||6);s.artillery=my65>=t65+2;
+    if(thrE){mode='standoff';want={range:Math.max(Rg,thr),radial:1,orbit:2,chase:true,maxClose:10};face=bb;
+      if(AIV.brace&&hexDist(thrE,s)<=thr+4&&(sepRate<-6||hexDist(thrE,s)<=thr-2)){mode='brace';want={range:thr+3,radial:.7,orbit:7,maxClose:10};face=a}}
+    else{mode='hunt';want={range:Rg,radial:1.2,orbit:1,chase:true,maxClose:12};face=bb}
+    prio=['aplances','coils','lasers','rails','lances','torps']}
+  return{mode,want,face,prio,reserve}}
+const MDOC=s=>U(s)?s.d.doctrine!=='flee'&&aiRole(s)==='close':s.d.faction==='Martian'||s.d.faction==='Earthling',DDOC=s=>U(s)?s.d.doctrine!=='flee'&&aiRole(s)==='gun':s.d.faction==='Dogahr'||s.d.faction==='Golthan';
 const drainNow=s=>s.weapons.reduce((a,w)=>a+(!w.alive||!w.charging?0:w.T.kind==='torp'?w.T.perTurn/IMP:w.T.kind==='ap'?w.T.cost/AP_IMP:drains(w)?w.T.cost/cycleImp(s,w):0),0);   // per-impulse weapon-charging drain
 /* Nov 26: which bearing (degrees off the nose, + starboard) to put the target on so the most working guns bear (loaded guns count more).
    Torpedoes count only once they hold a stage. Turning away from the current bearing costs a little, so it doesn't flip-flop. */
@@ -1536,7 +1591,8 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   const uL={x:Math.cos(a),y:Math.sin(a)},Vt0=hp(t.vq,t.vr),V0=hp(s.vq,s.vr);const sepRate=((Vt0.x-V0.x)*uL.x+(Vt0.y-V0.y)*uL.y)/HS; // + = range opening (hexes/turn)
   const ready=w=>w.alive&&(w.T.kind==='torp'?w.stages>=3:w.state==='ready');
   const guns=s.weapons.filter(w=>w.alive&&w.T.kind!=='missile');
-  if(s.d.doctrine==='flee'){   /* Nov 22: freighters run straight away from the nearest enemy, shooting what they can */
+  if(U(s)&&s.d.doctrine!=='flee'){const u_=uniPlan(s,t,d,a,side,sepRate,torps);s.mode=u_.mode;want=u_.want;face=u_.face;prio=u_.prio;reserve=u_.reserve}
+  else if(s.d.doctrine==='flee'){   /* Nov 22: freighters run straight away from the nearest enemy, shooting what they can */
     s.mode='flee';want={range:80,radial:1.5};face=a+Math.PI;prio=['lasers','rails','coils'];reserve=1}
   else if(s.d.doctrine==='alpha'){
     // Martian: stay out of the fight while charging; once every gun is loaded and torpedoes are full, close and fire everything at once
@@ -1595,7 +1651,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   // hang back (Nov 20, from David's record): a crippled Dogahr doesn't dive into an intact enemy — it holds at range and fights with what it has left (missiles, long shots)
   {const guns=x=>x.weapons.filter(w=>w.T.kind!=='missile'),frac=x=>{const g=guns(x);return g.length?g.filter(w=>w.alive).length/g.length:1};
    const cripS=s.reactor<=s.reactor0*.6||s.hull<=s.d.hull*.5||frac(s)<=.5,healthyT=t.hull>=t.d.hull*.7&&frac(t)>=.6&&t.reactor>=t.reactor0*.7;
-   s.hangBack=AIV.hangback&&s.d.faction==='Dogahr'&&cripS&&healthyT;
+   s.hangBack=AIV.hangback&&(U(s)?s.d.doctrine!=='flee'&&ships.some(x=>x!==s&&!x.dead&&x.team===s.team&&x.weapons.some(w=>w.alive&&w.T.kind!=='missile')):s.d.faction==='Dogahr')&&cripS&&healthyT;   // uni: hanging back only makes sense with allies still fighting
    if(s.hangBack){want={range:20,radial:1.1,orbit:.6,maxClose:8};if(s.mode==='hunt'||s.mode==='dive')s.mode='standoff'}}
   // kill shot (Nov 18): target's shields gone and hull low — close in and shoot everything with a real chance
   s.killing=AIV.kill&&t.shield+reinfAmt(t)<6&&(t.hull<=Math.max(30,t.d.hull*.3)||t.reactor<=t.reactor0*.3)&&s.mode!=='brace';
@@ -1618,9 +1674,9 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(!canQueue(s,{type:'start',i,cost:c})||s.E-qCost(s)-c-genReserve(s)<(g==='torps'||AIV.apfix&&g==='aplances'?0:AIV.pdBudget&&s.mode==='charge'?reserve:Math.min(reserve,3)))return;queue(s,{type:'start',i,cost:c})});
   // spinal weapons loaded and the target close: steer for the target on a hex line off the nose (spinal arc is only ±15°)
   const spReady=s.weapons.some(w=>w.alive&&w.arc==='S'&&((w.T.kind==='slug'||w.T.kind==='lance'||w.T.kind==='ap')&&w.state==='ready'||w.T.kind==='torp'&&w.stages>=(s.mode==='brawl'?1:3)));
-  const wantNose=AIV.align&&spReady&&(d<=(s.d.faction==='Dogahr'?15:13)||AIV.r9&&s.mode==='attack'&&d<=18&&turnIn(s,t,d))&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||s.mode==='attack'&&(d<=9||AIV.r9&&turnIn(s,t,d))||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=9&&torps.some(w=>w.stages>=3));
+  const wantNose=AIV.align&&spReady&&(d<=(s.d.faction==='Dogahr'?15:13)||AIV.r9&&s.mode==='attack'&&d<=18&&turnIn(s,t,d))&&(s.mode==='hunt'||s.mode==='standoff'||s.mode==='brawl'||U(s)&&!AIV.uniN&&s.mode==='charge'&&d<=9||s.mode==='attack'&&(d<=9||AIV.r9&&turnIn(s,t,d))||s.mode==='run'||s.mode==='brace'||s.mode==='dive'||s.mode==='snipe'||s.mode==='strike'||s.mode==='reload'||AIV.fireReady&&s.mode==='charge'&&d<=9&&torps.some(w=>w.stages>=3));
   // enemy torpedoes known to be full: stay out of that ship's nose arc inside 9 hexes
-  const noseFoes=(AIV.r5?!DDOC(s):s.d.faction==='Martian')||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=15&&torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
+  const noseFoes=(U(s)?(s.mode==='attack'||s.killing):AIV.r5?!DDOC(s):s.d.faction==='Martian')||!AIV.avoid?[]:enemiesOf(s).filter(e=>hexDist(e,s)<=15&&torpHot(s,e)&&e.weapons.some(w=>w.alive&&w.T.kind==='torp')&&(sensRange(s)>0&&hexDist(e,s)<=sensRange(s)?e.weapons.some(w=>w.alive&&w.T.kind==='torp'&&w.stages>=2):true));
   const look=2/IMP;
   const posPen=(Vn,fn)=>{const sp={x:s.px.x+Vn.x*look,y:s.px.y+Vn.y*look};let pen=0;
     if(wantNose){const Vt1=hp(t.vq,t.vr),tp={x:t.px.x+Vt1.x*look,y:t.px.y+Vt1.y*look};const an=Math.atan2(tp.y-sp.y,tp.x-sp.x);
@@ -1629,17 +1685,25 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
       const off=Math.abs(norm(Math.atan2(sp.y-ep.y,sp.x-ep.x)-fAng(e.f)));if(off<40*D2R)pen+=(40*D2R-off)/(40*D2R)*1.6*(1.3-dd/13)}
     return pen};
   // navigation: steer velocity toward a desired velocity relative to the target
-  const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;const radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
+  /* Nov 27 (David's record: TL3 Dogahr fleet charged a TL1 Martian/Earthling fleet and traded ship for ship): (1) outrange — when this ship's targeting computer
+     out-reaches every gun-armed enemy near it by 4+ hexes, hold the range just outside the enemy's computer (enemy range + 3, at most own range − 2) and back off if they close;
+     (2) brake — never close faster than the ship can stop by reverse thrust (reverse burns every other impulse ≈ 4 hexes/turn per turn) before reaching the range it wants. */
+  if(AIV.outrange&&!s.killing&&s.mode!=='brace'&&s.mode!=='flee'&&s.mode!=='run'&&!(s.order&&s.order.k!=='free')){const myR=TCR_TL[s.d.tl||4]||18;
+    const foes=enemiesOf(s).filter(e=>hexDist(e,s)<=myR+8&&e.weapons.some(w=>w.alive&&w.T.kind!=='missile'));
+    s.kite=false;if(foes.length){const eR=Math.max(...foes.map(e=>TCR_TL[e.d.tl||4]||18));if(myR-eR>=4){const keep=Math.min(myR-2,eR+3);if(want.range<keep){want={...want,range:keep,radial:Math.max(want.radial||1,1.2),maxClose:Math.min(want.maxClose||6,8),chase:true};s.mode='outrange'}
+      const nd=Math.min(...foes.map(e=>hexDist(e,s)));if(nd<keep+4){s.kite=true;face=a-side*Math.PI*5/6}}}}   // being closed on: kite — turn ~110° off the enemy (side guns still bear) and burn away; forward burns open the range far faster than reverse thrust
+  const u={x:Math.cos(a),y:Math.sin(a)},p={x:-u.y*side,y:u.x*side};const mc=want.maxClose||6;let radial=clamp((d-want.range)*want.radial,-mc,mc),orb=want.orbit||0;
+  if(AIV.brake&&radial>0&&!s.killing&&s.mode!=='attack'&&s.mode!=='brawl'&&s.mode!=='dive'&&s.mode!=='strike'&&s.mode!=='run')radial=Math.min(radial,Math.sqrt(2*4*Math.max(0,d-want.range)));
   // only partly match the target's velocity, so two AIs chasing each other don't escalate speed without limit
   const Vt=hp(t.vq,t.vr),V=hp(s.vq,s.vr);const mf=want.chase?1:.5;let Vd={x:Vt.x*mf+(u.x*radial+p.x*orb)*HS,y:Vt.y*mf+(u.y*radial+p.y*orb)*HS};let ordNav=false;if(isAI(s)){const ov=orderVd(s);if(ov){Vd=ov;ordNav=true}}{const vm=Math.hypot(Vd.x,Vd.y)/HS,cap=want.chase?18:14;if(vm>cap){Vd.x*=cap/vm;Vd.y*=cap/vm}}const e={x:Vd.x-V.x,y:Vd.y-V.y};const em=Math.hypot(e.x,e.y)/HS;
-  const urgent=s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:13)||s.mode==='hunt'&&d>(s.d.prefRange||6)*1.5+6||s.mode==='snipe'&&(d<12||d>22)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4||ordNav&&em>1;
+  const urgent=s.kite||s.mode==='flee'||AIV.r6&&s.mode==='brace'||s.mode==='run'||s.mode==='attack'||s.mode==='brawl'&&d>3||(s.mode==='hunt'||s.mode==='standoff')&&d<4||s.mode==='standoff'&&d<(AIV.dStand?5:13)||s.mode==='hunt'&&d>(s.d.prefRange||6)*1.5+6||s.mode==='snipe'&&(d<12||d>22)||s.mode==='dive'&&d>3||s.evadeUntil>T||s.killing&&d>4||ordNav&&em>1;
   const pen0=posPen(V,s.f);const navOK=!starved||d<3;
   if(navOK&&(em>=(urgent?.75:1.5)||pen0>.35)&&s.E-qCost(s)-genReserve(s)>burnCost(s,'F')+(urgent||pen0>.6?0:Math.min(8,s.reactor/4))){let best=null,bv=em+pen0;
     // Nov 20: agile ships can pivot first and then burn along the new facing (all within the ship's rotation limit per impulse)
     const PM=AIV.agile?maxPiv(s):0,av=s.E-qCost(s)-genReserve(s);let bestP=0;
     for(const k of Object.keys(BURNS)){if(!burnAllowed(s,k))continue;const tk=BURNS[k].turn||0;
      for(let pp=-PM;pp<=PM;pp++){if(Math.abs(pp+tk)>maxPiv(s))continue;const pc=pp?pivotCost(s,Math.sign(pp))*Math.abs(pp):0;if(!isFinite(pc)||av<burnCost(s,k)+pc)continue;
-      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>120*D2R&&!ordNav?.8:0)+(AIV.faceKeep&&!ordNav?Math.max(0,Math.abs(norm(fAng(b.f)-face))-Math.abs(norm(fAng(s.f)-face)))/(Math.PI/3)*.6:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
+      const fP=(s.f+pp+NF)%NF,b=burnResult(s,k,fP);const bp=hp(b.dq,b.dr);const tb=Math.abs(norm(a-fAng(b.f)));const ne=Math.hypot(e.x-bp.x,e.y-bp.y)/HS+(k==='R'?(AIV.apfix&&s.weapons.some(w=>w.alive&&w.T.kind==='ap')?.5:.15):0)+(b.f!==s.f?.05:0)+Math.abs(pp)*.06+(AIV.nowob&&b.f!==s.f&&s.lastTB&&T-s.lastTB.T<=4&&Math.sign(norm(fAng(b.f)-fAng(s.f)))===-s.lastTB.dir?.6:0)+(tb>(s.kite?165:120)*D2R&&!ordNav?.8:0)+(AIV.faceKeep&&!ordNav?Math.max(0,Math.abs(norm(fAng(b.f)-face))-Math.abs(norm(fAng(s.f)-face)))/(Math.PI/3)*.6:0)+posPen({x:V.x+bp.x,y:V.y+bp.y},b.f);if(ne<bv-.2){bv=ne;best=k;bestP=pp}}}   // never turn the stern to the enemy just to burn: back off with reverse thrust instead
     if(best){for(let i=0;i<Math.abs(bestP);i++)queue(s,{type:'pivot',dir:Math.sign(bestP),cost:pivotCost(s,Math.sign(bestP))});queue(s,{type:'burn',a:best,cost:burnCost(s,best)});const b1=burnResult(s,best,(s.f+bestP+NF)%NF),bf=b1.f;if(bf!==s.f)s.lastTB={T,dir:Math.sign(norm(fAng(bf)-fAng(s.f)))}
       /* Nov 21: double burn — when movement is urgent and energy allows, a second straight-ahead burn (never the 3rd, critical one) */
       if(AIV.dbl&&urgent&&best!=='R'){const p1=hp(b1.dq,b1.dr),e1={x:e.x-p1.x,y:e.y-p1.y},b2=burnResult(s,'F',bf),p2=hp(b2.dq,b2.dr);const n1=Math.hypot(e1.x,e1.y)/HS,n2=Math.hypot(e1.x-p2.x,e1.y-p2.y)/HS;
@@ -1654,13 +1718,16 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     if(k&&Math.abs(norm(an-fAng(f0)))>14*D2R){const dir=Math.sign(k),n=Math.min(maxPiv(s),Math.abs(k));const pv=preP?[]:s.queue.filter(x=>x.type==='pivot');if(!preP)s.queue=s.queue.filter(x=>x.type!=='pivot');
       let done=0;for(let i=0;i<n;i++)if(isFinite(pivotCost(s,dir))&&s.E-qCost(s)-genReserve(s)>=pivotCost(s,dir)&&queue(s,{type:'pivot',dir,cost:pivotCost(s,dir)}))done++;
       if(!done)for(const x of pv)s.queue.push(x)}}   // couldn't afford it: keep the navigation pivots
+  /* uni: point defense stays loaded before any gun is loaded — unless the ship is doomed in a fleet battle, then every point goes into its guns */
+  s.doomed=U(s)&&aiDoomed(s);
+  if(U(s)&&AIV.uniPD!==0&&!s.doomed)s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-pdC(s)>=0&&queue(s,{type:'pd',i,cost:1})){}});
   // weapons by priority, keeping a little energy back for manoeuvres
   const desperate=AIV.lastGasp&&d<=15&&!s.weapons.some(w=>w.alive&&w.T.kind!=='missile'&&(w.state==='ready'||w.state==='cycling'||w.charging||w.holding));
   for(const g of prio)s.weapons.forEach((w,i)=>{if(!w.alive||w.T.grp!==g)return;const c=w.T.kind==='torp'?w.T.perTurn:w.T.kind==='ap'?(AIV.apfix?w.T.cost/AP_IMP*3:w.T.cost/2):drains(w)?w.T.cost/cycleImp(s,w)*3:w.T.cost;
     if(s.E-qCost(s)-c-genReserve(s)<(g==='torps'||desperate||AIV.apfix&&g==='aplances'?0:reserve))return;queue(s,{type:'start',i,cost:c})});
   s.weapons.forEach((w,i)=>{if(w.T.kind==='missile'&&w.state==='idle')queue(s,{type:'start',i,cost:0})});
   {const msIn=AIV.pdFirst&&missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team!==s.team&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=20);
-   if(!(starved&&!msIn))s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-pdC(s)>=(msIn&&!AIV.pdBudget?0:AIV.pdBudget?Math.max(reserve,msIn?2:8):reserve)&&queue(s,{type:'pd',i,cost:1})){}})}
+   if(!(starved&&!msIn)&&!s.doomed)s.pd.forEach((pp,i)=>{while(s.E-qCost(s)-genReserve(s)-pdC(s)>=(msIn&&!AIV.pdBudget?0:AIV.pdBudget?Math.max(reserve,msIn?2:8):reserve)&&queue(s,{type:'pd',i,cost:1})){}})}
   // shield reinforcement for every AI ship (1 energy per point): when missiles are inbound or the enemy is within 10 hexes, keep a reinforcement layer up so opening fire stays off hull and systems
   {const inbound=missiles.some(m=>!m.dead&&!m.dorm&&!m.intercept&&m.target===s&&Math.hypot(m.px.x-s.px.x,m.px.y-s.px.y)/HS<=(AIV.r8?20:12));   /* r8: brace as soon as a wave is launched at it (David layered shields from the launch, not the last impulse) */
     const idleGuns=s.weapons.some((w,i)=>w.alive&&w.T.kind!=='missile'&&w.state==='idle'&&!s.queue.some(x=>x.type==='start'&&x.i===i));
@@ -1680,7 +1747,7 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
   if(!gunsWaiting&&s.shield<s.d.shield&&s.E-qCost(s)>16)queue(s,{type:'repair',n:2,cost:2*REPAIR_COST});   // repair only once every gun is loaded or loading
   // fire
   const fire=[];
-  if(s.d.doctrine==='alpha'){
+  if(!U(s)&&s.d.doctrine==='alpha'){
     // alpha strike trigger: torpedoes at 85%, or at 65% while the range is opening (lasers' chance if torpedoes are gone)
     const keys=s.weapons.map((w,i)=>'w'+i);const tk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='torp'&&canFireMount(s,k,t));
     let lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='beam'&&canFireMount(s,k,t));if(!s.weapons.some(w=>w.alive&&w.T.kind==='beam'))lk=keys.filter((k,i)=>s.weapons[i].alive&&s.weapons[i].T.kind==='slug'&&canFireMount(s,k,t));
@@ -1701,10 +1768,13 @@ function aiDecide0(s){if(!AINEW[s.team])return aiDecideOld(s);if(T>0&&impOf(T)==
     const q=s.queue;s.queue=[];return{queue:q,fire}}
   const msReady=[];
   s.weapons.forEach((w,i)=>{const key='w'+i;if(!canFireMount(s,key,t))return;const K=w.T.kind,pp=hitP(s,key,t);
-    if(K==='missile'){const tDef=AIV.msHold&&t.msMode==='def'&&t.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);if(d<=(tDef?6:(AIV.r5?MDOC(s):s.d.faction==='Martian')?16:24))msReady.push(key);return}
-    if(K==='torp'){if((s.killing?w.stages>=1:w.stages>=3)&&pp>=(s.killing?.15:AIV.r5?.65:.4))fire.push(key);return}
+    if(K==='missile'){const tDef=AIV.msHold&&t.msMode==='def'&&t.weapons.some(w=>w.alive&&w.T.kind==='missile'&&w.ammo>0);if(d<=(tDef?6:U(s)?(AIV.uniMs||24):(AIV.r5?MDOC(s):s.d.faction==='Martian')?16:24))msReady.push(key);return}
+    if(K==='torp'){if(U(s)&&!s.killing){if(AIV.uniP&&w.stages>=AIV.uniP&&w.stages<3&&pp>=.85-1e-6&&s.mode==='charge'){fire.push(key);return}if(w.stages>=3&&(pp>=(AIV.uniT||.85)-1e-6||pp>=.65-1e-6&&(sepRate>.25||(s.holdImp||0)>=6||s.mode==='brace')))fire.push(key);return}   // uni: charge in, fire at close range with a high chance (or a good one when the range is opening / it has waited)
+      if((s.killing?w.stages>=1:w.stages>=3)&&pp>=(s.killing?.15:AIV.r5?.65:.4))fire.push(key);return}
     if(AIV.r5&&K==='ap'&&!s.killing&&pp<.65&&!(s.hull<s.d.hull*.35))return;   // antiproton lances (2-turn recharge): only good shots
-    if(pp>=(s.killing?.1:.35))fire.push(key)});
+    if(U(s)&&K==='lance'&&!s.killing&&pp<.65-1e-6)return;
+    if(U(s)&&AIV.uniH&&s.mode==='attack'&&!s.killing&&pp<.85)return;   // closing for the strike: guns hold unless the shot is very good
+    if(pp>=(s.killing?.1:U(s)?(AIV.uniG||.4):.35))fire.push(key)});
   if(msReady.length){let n=msReady.length;
     if(AIV.r7&&AIV.dogHold&&DDOC(s))n=dogWave(s,t,n,d);   /* Nov 21 (David): off — the Dogahr fires every ready launcher, from the first impulse; held missiles are lost rate of fire */
     else if(s.d.faction==='Dogahr'&&AIV.salvo){const own=missiles.filter(m=>!m.dead&&!m.dorm&&!m.intercept&&m.owner.team===s.team&&m.target===t).length;
@@ -2184,8 +2254,11 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
   for(const s of ships){if(s.dead)continue;const c=hp(s.q,s.r);ctx.beginPath();for(let i=0;i<6;i++){const a=i*Math.PI/3;const x=sx(c.x)+R_*.98*Math.cos(a),y=sy(c.y)+R_*.98*Math.sin(a);i?ctx.lineTo(x,y):ctx.moveTo(x,y)}ctx.closePath();ctx.strokeStyle=REL[rel(s)]+(s===P?'':'99');ctx.lineWidth=(s===P?2.5:1.5)*dpr;ctx.stroke();ctx.lineWidth=1}
   // drift arrows: one turn of coasting
   for(const s of ships){if(s.dead)continue;const a=posOf(s);let vq=s.vq,vr=s.vr;
-    if(own(s)&&phase==='decide'){let f=s.f;for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn'){const b=burnResult(s,x.a,f);f=b.f;vq+=b.dq;vr+=b.dr}}}
-    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?REL.foe+'cc':own(s)?s.color+(s===P&&phase==='decide'?'cc':'66'):REL.ally+'99',!fr(s)?[6,4]:[3,5])}}
+    if((own(s)||fr(s)&&isAI(s))&&phase==='decide'){let f=s.f;for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn'){const b=burnResult(s,x.a,f);f=b.f;vq+=b.dq;vr+=b.dr}}}
+    if(vq||vr){const v=hp(vq,vr);arrow(a,{x:a.x+v.x,y:a.y+v.y},!fr(s)?REL.foe+'cc':own(s)?s.color+(s===P&&phase==='decide'?'cc':'66'):REL.ally+'99',!fr(s)?[6,4]:[3,5])}
+    /* Nov 27 (David): AI-run friendly ships show their planned moves too — the drift arrow above includes their queued burns; queued pivots show as a short tick at the new heading */
+    if(fr(s)&&isAI(s)&&phase==='decide'&&s.queue&&s.queue.some(x=>x.type==='pivot'||x.type==='burn')){let f=s.f;for(const x of s.queue){if(x.type==='pivot')f=(f+x.dir+NF)%NF;if(x.type==='burn')f=burnResult(s,x.a,f).f}
+      if(f!==s.f){const h=fAng(f),L=HS*.9;ctx.save();ctx.strokeStyle=(own(s)?s.color:REL.ally)+'aa';ctx.lineWidth=2*devicePixelRatio;ctx.setLineDash([2,3]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(a.x+Math.cos(h)*L),sy(a.y+Math.sin(h)*L));ctx.stroke();ctx.restore()}}}
   const PT=P&&!P.dead?tgt(P):null;const AL=ships.filter(x=>!x.dead),DU=PT?[P,PT]:AL.length===2&&AL[0].team!==AL[1].team?AL:null;   /* Nov 26 (David): duels always show the range, even with every ship on AI */
   if(DU){const [A1,B1]=DU,a=posOf(A1),b=posOf(B1);ctx.strokeStyle='rgba(150,190,220,.2)';ctx.setLineDash([4,6]);ctx.beginPath();ctx.moveTo(sx(a.x),sy(a.y));ctx.lineTo(sx(b.x),sy(b.y));ctx.stroke();ctx.setLineDash([]);
     ctx.fillStyle='rgba(180,210,235,.75)';ctx.font=`${11*dpr}px monospace`;ctx.textAlign='center';ctx.fillText(hexDist(A1,B1)+' hexes',sx((a.x+b.x)/2),sy((a.y+b.y)/2)-6*dpr)}
@@ -2704,7 +2777,7 @@ function clickMap(e){if(!ships.length)return;const mx=e.clientX*devicePixelRatio
     if(s===P&&!s.dead&&phase==='decide'&&pcrHexOK(s,i,h)&&pcrReady(s,i)){(s.pcrHex||(s.pcrHex={}))[i]={q:h.q,r:h.r};s.fireSel.add('pcrh'+i);pcrExcl(s,'pcrh'+i);pcrPick=null;arcSel=null;log(`${s.name}: plasma-charged round aimed at hex ${h.q},${h.r} (${hexDist(s,h)} hexes)`,'dim');buildHUD()}
     else toast('Not a valid hex: it must be inside the mount\'s arc and within '+(pcrTCR(s)+10)+' hexes');return}let best=null,bd=40*devicePixelRatio;
   for(const x of alive()){const p=posOf(x);const d=Math.hypot(sx(p.x)-mx,sy(p.y)-my);if(d<bd){bd=d;best=x}}
-  {const wa=typeof wingAtScreen==='function'?wingAtScreen(mx,my,30*devicePixelRatio):null;if(wa&&wa.w.team!==(P&&P.team)&&P&&!P.dead&&(!best||wa.d<bd)){P.pdWing=wa.w.id;P.pdWingN=0;log(`${P.name}: PD target ${wgLabel(wa.w)} (${wDist(P,wa.w).toFixed(0)} hexes) — arm shots in the ✈ PD vs craft row`,'dim');buildHUD();return}}   // Nov 27 (David): click an enemy craft group to make it your PD target
+  {const wa=typeof wingAtScreen==='function'?wingAtScreen(mx,my,30*devicePixelRatio):null;if(wa&&wa.w.team!==(P&&P.team)&&P&&!P.dead&&(!best||wa.d<bd||wa.d<=16*devicePixelRatio)){P.pdWing=wa.w.id;P.pdWingN=0;log(`${P.name}: PD target ${wgLabel(wa.w)} (${wDist(P,wa.w).toFixed(0)} hexes) — arm shots in the ✈ PD vs craft row`,'dim');buildHUD();return}}   // Nov 27 (David): click an enemy craft group to make it your PD target
   if(!best)return;if(own(best)&&!best.ai&&!e.shiftKey||best===P)selectShip(best);else if(P&&!P.dead){P.target=best;log(`${P.name} ${best.team===P.team?'inspecting':'targeting'} ${best.name}`,'dim');buildHUD()}}
 function cycleTarget(){if(!P||P.dead)return;const by=L=>L.sort((a,b)=>hexDist(P,a)-hexDist(P,b));const f=[...by(enemiesOf(P)),...by(ships.filter(x=>!x.dead&&x!==P&&x.team===P.team))];if(!f.length)return;const i=f.indexOf(P.target);P.target=f[(i+1)%f.length];log(`${P.name} ${P.target.team===P.team?'inspecting':'targeting'} ${P.target.name}`,'dim');buildHUD()}
 function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=$('c');ctx=canvas.getContext('2d');resize();addEventListener('resize',resize);
@@ -2738,6 +2811,11 @@ function init(){window.sfxRaw=sfx;if(typeof mpInit==='function')mpInit();canvas=
 function updStick(){const sd=$('side'),e=$('enrow'),k=$('stickstat');if(!sd||!k)return;const hide=!e||e.getBoundingClientRect().bottom>sd.getBoundingClientRect().top+6;k.classList.toggle('on',!hide)}
 {const _bh=buildHUD;buildHUD=function(){const r=_bh.apply(this,arguments);try{updStick()}catch(e){}return r}}
 {const sd=document.getElementById('side');if(sd)sd.addEventListener('scroll',updStick,{passive:true})}
+
+/* Nov 27 (David): wingmen following / covering the ship you fly re-plan as soon as you change your orders, so their planned moves on the map match what they will do */
+let _wmSig='';function refreshWingmen(){if(phase!=='decide'||!P||P.dead||isAI(P))return;const sig=T+'|'+P.name+'|'+(P.queue||[]).filter(q=>q.type==='burn'||q.type==='pivot').map(q=>q.type+(q.a||q.dir)).join(',');if(sig===_wmSig)return;_wmSig=sig;
+  for(const x of alive())if(isAI(x)&&own(x)&&x.order&&(x.order.k==='follow'||x.order.k==='cover')&&orderAnchor(x)===P){const r=aiDecide(x);x.queue=r.queue;x.fireChoice=r.fire}}
+{const _bh=buildHUD;buildHUD=function(){try{refreshWingmen()}catch(e){}return _bh.apply(this,arguments)}}
 
 // =====================================================================
 //  ONLINE PLAY, up to 8 players (PeerJS, browser-to-browser; Nov 21, David)
@@ -3296,7 +3374,11 @@ function tgtDead(t){return !t||(t.n!=null?!wingAlive(t):t.dead)}
 function wingAIOrders(){for(const w of wings){if(!wingFlying(w)||!w.car.wingAI&&!w.car.dead&&!isAI(w.car))continue;
     if(w.ms<=0&&w.type==='B'){setWingOrder(w,'return');continue}
     if(w.type==='F'){const foe=wings.some(e=>wingFlying(e)&&e.team!==w.team);setWingOrder(w,foe?'intercept':'escort',foe?null:w.car)}
-    else if(w.order!=='attack'||tgtDead(w.tgt))setWingOrder(w,'attack',null)}}
+    else{const best=catchable(w);if(w.order!=='attack'||tgtDead(w.tgt)||best&&w.tgt!==best&&catchT(w,w.tgt)>catchT(w,best)*1.5+1)setWingOrder(w,'attack',best)}}}
+/* Nov 27 (David's record: AI bombers chased a Condor flying away at 13 hexes/turn — faster than they can fly — and only struck at T6): AI wings attack the enemy ship
+   they can reach soonest (distance over closing speed, where the target running away at its own speed eats into the craft's), not just the carrier's target */
+function catchT(w,t){if(!t||t.dead)return 1e9;const dx=t.px.x-w.px.x,dy=t.px.y-w.px.y,L=Math.hypot(dx,dy)||1,V=hp(t.vq,t.vr),away=(V.x*dx+V.y*dy)/L/HS,cl=WING[w.type].spd-Math.max(0,away);return cl<=1?1e9:Math.max(0,L/HS-4)/cl}
+function catchable(w){let b=null,bt=1e9;for(const s of ships){if(s.dead||s.team===w.team)continue;const t=catchT(w,s)-(s===w.car.target?.15:0);if(t<bt){bt=t;b=s}}return b}
 
 /* ---- launch, movement, combat: once per impulse, after missiles move ---- */
 function moveWings(off){if(!wings.length)return 0;const dt=1/IMP;const base=Math.max(ANIM/1000+.12,off||0);let ev=0,last=0;const at=()=>{const v=reducedAnim?base+.2:base+(ev++)*.18;last=Math.max(last,v);return v};
@@ -3361,7 +3443,8 @@ function drawWings(){const dpr=devicePixelRatio,k=animK();for(const w of wings){
     const col=w.car.color||'#fff',rel=w.team===MYTEAM?(own(w.car)?'#7fd17f':'#6fb6ff'):'#ffa24d',s=Math.max(2.2,cam.s/dpr*3)*dpr;
     ctx.save();ctx.translate(X,Y);ctx.rotate(w.h);const pos=[[0,0],[-1.3,-1.1],[-1.3,1.1],[-2.6,-2.2],[-2.6,2.2],[-2.6,0]];
     for(let i=0;i<w.n;i++){const [px_,py_]=pos[i];ctx.save();ctx.translate(px_*s*1.4,py_*s*1.4);ctx.beginPath();if(w.type==='F'){ctx.moveTo(s*1.2,0);ctx.lineTo(-s*.8,-s*.7);ctx.lineTo(-s*.4,0);ctx.lineTo(-s*.8,s*.7)}else{ctx.moveTo(s,0);ctx.lineTo(0,-s*.75);ctx.lineTo(-s,0);ctx.lineTo(0,s*.75)}ctx.closePath();ctx.fillStyle=col;ctx.globalAlpha=.9;ctx.fill();ctx.restore()}
-    ctx.restore();ctx.font=`${10*dpr}px ui-monospace,monospace`;ctx.fillStyle=rel;ctx.textAlign='left';ctx.fillText(`${WING[w.type].ab}${w.id}·${w.n}`,X+6*s,Y-4*s+((w.id%3)-1)*9*dpr)}}
+    ctx.restore();if(P&&!P.dead&&P.pdWing===w.id){ctx.save();ctx.strokeStyle='#ff5a5a';ctx.lineWidth=1.5*dpr;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(X-s*1.6,Y,s*5,0,7);ctx.stroke();ctx.restore()}   // your PD target
+    ctx.font=`${10*dpr}px ui-monospace,monospace`;ctx.fillStyle=rel;ctx.textAlign='left';ctx.fillText(`${WING[w.type].ab}${w.id}·${w.n}`,X+6*s,Y-4*s+((w.id%3)-1)*9*dpr)}}
 
 /* ---- HUD: wing control for a selected carrier ---- */
 function carrierPanel(){const side=$('side');if(!side||!P||P.dead||!isCarrier(P)||!own(P))return;let el=$('wingpanel');if(el)el.remove();el=document.createElement('div');el.id='wingpanel';el.className='panel';
@@ -3404,7 +3487,7 @@ function pdWingRow(){const side=$('side');if(!side||!P||P.dead||!own(P)||isAI(P)
   el.querySelector('#pdwsel').onchange=e=>{P.pdWing=e.target.value?+e.target.value:null;P.pdWingN=0;buildHUD()};
   const b1=el.querySelector('#pdw1'),ba=el.querySelector('#pdwall'),bx=el.querySelector('#pdwx');if(b1)b1.onclick=()=>{P.pdWingN=armed+1;buildHUD()};if(ba)ba.onclick=()=>{P.pdWingN=inA;buildHUD()};if(bx)bx.onclick=()=>{P.pdWingN=0;buildHUD()}}
 {const _bh=buildHUD;buildHUD=function(){_bh.apply(this,arguments);try{pdWingRow()}catch(e){console.error(e)}}}
-function wingAtScreen(mx,my,maxd){let b=null,bd=maxd;for(const w of wings){if(!wingFlying(w))continue;const d=Math.hypot(sx(w.px.x)-mx,sy(w.px.y)-my);if(d<bd){bd=d;b=w}}return b?{w:b,d:bd}:null}
+function wingAtScreen(mx,my,maxd){let b=null,bd=maxd;const k=animK();for(const w of wings){if(!wingFlying(w))continue;const A0=w.ppx||w.px,x=A0.x+(w.px.x-A0.x)*k,y=A0.y+(w.px.y-A0.y)*k;const d=Math.hypot(sx(x)-mx,sy(y)-my);if(d<bd){bd=d;b=w}}return b?{w:b,d:bd}:null}
 
 function toggleMusic(){musicOn=!musicOn;const st=document.getElementById('start');if(!(st&&getComputedStyle(st).display!=='none'))startMusic();setMusicGain()}
 init();
