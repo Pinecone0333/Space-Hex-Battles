@@ -2731,8 +2731,8 @@ function renderBuilder(){for(let i=0;i<fleet.length&&i<8;i++)if(!formManual[i]&&
     for(const arr of [fleetFaction,fleetTL,fleetForm,startSpeed]){const t=arr[A];arr[A]=arr[B];arr[B]=t}
     renderBuilder();if(typeof lobbyChanged==='function')lobbyChanged()}}
   const ad=$('addai');if(ad)ad.onclick=()=>{const i=SLOTS.findIndex(x=>!x);if(i<0)return;const usedT=new Set(SLOTS.filter(Boolean).map(x=>x.team));let tm=0;while(usedT.has(tm)&&tm<7)tm++;SLOTS[i]={kind:'ai',owner:null,team:tm,name:''};fleet[i]=[];fleetFaction[i]='Dogahr';fleetTL[i]=4;tlManual[i]=false;fleetTL[i]=eraDefault(i);fleetForm[i]='line';startSpeed[i]=4;rightSel=i;renderBuilder();lobbyChanged()};
-  box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:false});renderBuilder();lobbyChanged()});
-  box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');fleet[+t].splice(+i,1);renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=()=>{const [t,k]=b.dataset.fadd.split(':');if(fleet[+t].length<MAXSHIPS)fleet[+t].push({key:k,ai:fleet[+t].some(x=>!x.ai)});   /* Nov 27 night (David): you fly one ship by default — every ship after the first is added under AI command; untick AI to command more */renderBuilder();lobbyChanged()});
+  box.querySelectorAll('[data-frm]').forEach(b=>b.onclick=()=>{const [t,i]=b.dataset.frm.split(':');const wasMine=fleet[+t][+i]&&!fleet[+t][+i].ai;fleet[+t].splice(+i,1);if(wasMine&&fleet[+t].length&&!fleet[+t].some(x=>!x.ai)){const L=fleet[+t].slice().sort((a,b)=>SHIPS[b.key].weight-SHIPS[a.key].weight);L[0].ai=false}renderBuilder();lobbyChanged()});   // Nov 27 night: removing the ship you fly hands you the biggest one left
   box.querySelectorAll('[data-fcmd]').forEach(b=>b.onchange=()=>{const [t,i]=b.dataset.fcmd.split(':');const x=fleet[+t][+i];const hum=SLOTS[+t].kind==='human';x.cmd=b.value===''||(hum&&+b.value===SLOTS[+t].owner)?undefined:+b.value;renderBuilder();lobbyChanged()});
   box.querySelectorAll('[data-fclr]').forEach(b=>b.onclick=()=>{fleet[+b.dataset.fclr]=[];renderBuilder();lobbyChanged()});
   box.querySelectorAll('[data-aiall]').forEach(b=>b.onclick=()=>{const t=+b.dataset.aiall;const on=!fleet[t].every(x=>x.ai);for(const x of fleet[t])x.ai=on;renderBuilder();lobbyChanged()});
@@ -3223,6 +3223,28 @@ const HL={
   target:()=>tq('#rside .panel',{first:true}),
   log:()=>tq('#rside .panel').slice(-1),
   map:()=>[{getBoundingClientRect:()=>{const L=document.getElementById('side').getBoundingClientRect(),Rr=document.getElementById('rside').getBoundingClientRect();return{left:L.right+20,top:60,right:Rr.left-20,bottom:innerHeight-150}}}],
+  topstat:()=>tq('#topstat'),
+  htabs:()=>tq('.row.htabs'),
+  tabShield:()=>tq('[data-act="dgtab:shield"]'),
+  tabDC:()=>tq('[data-act="dgtab:dc"]'),
+  tabFleet:()=>tq('[data-act="dgtab:fleet"]'),
+  tabWings:()=>tq('[data-act="dgtab:wings"]'),
+  reinf:()=>tq('[data-act="reinf:1"]',{up:'.row'}),
+  regen:()=>tq('#side .row.dim.sm',{text:'regen'}),
+  dcDiag:()=>tq('#side .panel',{text:'Damage control'}),
+  ordBar:()=>tq('[data-act="ordall:follow"]',{up:'.row'}),
+  ordAdv:()=>tq('[data-act="ordall:adv"],[data-act="ordall:back"],[data-act="ordall:rejoin"]'),
+  ordAtk:()=>tq('[data-act^="ordall:attack"]'),
+  allBtns:()=>tq('[data-allai]',{up:'.row'}),
+  cards:()=>tq('#side [data-sel]'),
+  aiBox:()=>tq('#side [data-ai]',{up:'label'}),
+  ordSel:()=>tq('#side .ordsel'),
+  wingBtns:()=>tq('[data-wall]',{up:'.row'}),
+  wingLaunch:()=>tq('[data-wall="launch"]'),
+  wingRows:()=>tq('#wingtab [data-word]',{up:'div'}),
+  bomb:()=>tq('[data-wall="B:attack!"]'),
+  intercept:()=>tq('[data-wall="F:intercept"]'),
+  foeCraft:()=>tq('#foecraft'),
   none:()=>[]};
 
 /* ---- the script ---- */
@@ -3305,6 +3327,110 @@ const TUTS={mw:{name:'Maneuvering and Weapons',blurb:'Fly a Martian Peregrine: h
  ],end:true},
  ]}};
 
+
+/* ===== Nov 27 night (David): three more tutorials — first drafts for David to review ===== */
+const tSelf=()=>tP();
+function tutHit(n,from){const s=tP();if(!s)return;let d=TUT.drones.find(x=>!x.dead);if(!d){tutDrone(0,6,0,from||'Gunnery Drone');d=TUT.drones[TUT.drones.length-1]}applyDamage(s,n,d,d.px);buildHUD()}
+const myWings=()=>typeof wings==='undefined'?[]:wings.filter(w=>w.car===tP()&&wingAlive(w));
+Object.assign(TUTS,{
+ sh:{name:'Shields and Damage Control',blurb:'Fly the Peregrine again: the status strip, the shield generator and its upkeep, reinforcing and repairing shields, regeneration, and sending damage-control teams when hits get through to the hull.',
+ steps:[
+ {id:'01',title:'Welcome',obj:'',pops:[
+  ['Shields up, Captain.','This run is about staying alive: your shields, what they cost, and what to do when damage gets through them.','none'],
+  ['Always in view','The strip at the top of the left panel never scrolls away: your energy, hull and shields, your upkeep (what you spend every impulse just to keep things running) and your net energy after upkeep. Forfeit and Rematch live here too.','topstat'],
+  ['The tabs','Everything else is in these tabs: Fire control, Damage control, Shielding, Fleet and Fighters. Tabs your ship can\'t use are greyed out.','htabs'],
+ ]},
+ {id:'02',title:'The Shielding tab',obj:'Open the 🛡 Shielding tab.',pops:[
+  ['Shielding','Click the Shielding tab.','tabShield'],
+ ],goal:()=>dgTab==='shield'},
+ {id:'03',title:'The generator',obj:'Set the generator to 50% and press Continue.',pops:[
+  ['The shield generator','Your shields are only as strong as your generator. At 100% you get full shields and full regeneration, and you can reinforce and repair. Every step down caps your shields at that share and slows regeneration — but saves energy every impulse. Off means no shields at all.','gen'],
+  ['Try it','Set the generator to 50% and press Continue. Watch your shield cap and your upkeep in the strip at the top.','gen'],
+ ],goal:()=>{const s=tP();return !!s&&T>TUT.T0&&Math.abs(genLvl(s)-.5)<.01}},
+ {id:'04',title:'Full power',obj:'Set the generator back to 100% and press Continue.',pops:[
+  ['Capped','See the cap: half your shields are gone while the generator runs at half. In a quiet moment that energy might be worth more in your guns. In a fight, you want 100%.\n\nPut it back to 100% and press Continue.','gen'],
+ ],goal:()=>{const s=tP();return !!s&&T>TUT.T0&&genLvl(s)>=1-1e-9}},
+ {id:'05',title:'Under fire',obj:'Reinforce your shields (+1 or +2), then press Continue.',setup(){tutDrone(0,6,0,'Gunnery Drone');tutHit(8)},pops:[
+  ['Hit!','A gunnery drone just hit you for 8. Shields soak damage first — your hull is untouched — but your shields are lower now.','topstat'],
+  ['Reinforcement','Reinforce adds temporary shield points on top of your shields: 2 energy per point, at most 2 points per impulse, and they last one turn (8 impulses). Use it when you know a big hit is coming — a torpedo, a missile wave.\n\nClick Reinforce +2, then press Continue.','reinf'],
+ ],goal:()=>{const s=tP();return !!s&&T>TUT.T0&&reinfAmt(s)>0}},
+ {id:'06',title:'Repair and regeneration',obj:'Repair your shields (+1 or +2) and press Continue until they are back above where they started.',setup(){tutHit(10);TUT.sh0=tP()?tP().shield:0},pops:[
+  ['Another hit','Your shields took another 10. Repair rebuilds base shields: 2 energy per point, at most 2 per impulse, and only with the generator at 100%. Unlike reinforcement, it lasts.','reinf'],
+  ['Regeneration','Shields also regenerate on their own. This line shows the rate: no regeneration if you were hit within the last 4 impulses (repair only), the base rate if hit within 12, and double rate if you have not been hit for 12 impulses or more.','regen'],
+  ['Try it','Click Repair +2 and press Continue a few times until your shields are higher than they are now.','reinf'],
+ ],goal:()=>{const s=tP();return !!s&&T>TUT.T0&&s.shield>TUT.sh0+1}},
+ {id:'07',title:'Running dark',obj:'',pops:[
+  ['Running dark','Some ships (the Golthan) can run dark from this tab: it costs extra energy and needs full shields, but cuts the hit chance of direct fire from ships ahead of you by 30%. Any fire of your own — guns, missiles, even point defense — breaks it for 4 impulses. Your Peregrine can\'t, so you won\'t see the button.','none'],
+ ]},
+ {id:'08',title:'Through the shields',obj:'Open the 🔧 Damage tab and send a damage-control team to a damaged system (click it on the diagram).',setup(){const s=tP();if(!s)return;tutHit(Math.ceil(s.shield+reinfAmt(s))+1);let k=0;while(s&&!(s.damaged||[]).length&&s.hull>30&&k++<20)tutHit(3)},pops:[
+  ['Shields down','A heavy volley took your shields down, and hits are reaching the hull. Every point of hull damage can also knock out a system: a weapon, a PD gun, thrusters, the reactor, sensors.','topstat'],
+  ['Damage control','The Damage tab shows your ship: green systems work, red ones are damaged. Click a damaged system to send a repair team. Each team works on one system at a time and takes a while; the number on the tab shows how many systems are down.\n\nOpen the Damage tab and send a team.','tabDC'],
+ ],goal:()=>{const s=tP();return !!s&&((s.dc||[]).length>0||s.queue.some(q=>q.type==='dc'))}},
+ {id:'09',title:'Training complete',obj:'',pops:[
+  ['Well done, Captain.','You know how to run your generator, reinforce before a big hit, repair after one, and patch up systems when the shields fail. Remember the 🔧 Repairs: AI button if you would rather let the computer run your teams.\n\nPress Next to return to the game modes.','none'],
+ ],end:true}]},
+
+ fc:{name:'Fleet Command',blurb:'Command a Condor with two AI wingmen: the Fleet tab, fleet orders (follow, cover, attack, advance, fall back, rejoin), formations, orders for one ship, and taking direct command of a wingman.',
+ fleet:[{key:'condor',ai:false},{key:'albatross',ai:true},{key:'peregrine',ai:true}],
+ steps:[
+ {id:'01',title:'Your squadron',obj:'',pops:[
+  ['Squadron command','You command the Condor. The Albatross and the Peregrine flying with you are your wingmen: the AI flies them, and you give them orders.\n\nIn a skirmish you always fly one ship yourself; the rest of your fleet is under AI command unless you choose to take a ship over.','map'],
+ ]},
+ {id:'02',title:'The Fleet tab',obj:'Open the ⚑ Fleet tab.',pops:[
+  ['The Fleet tab','All fleet command lives in the Fleet tab. Click it.','tabFleet'],
+ ],goal:()=>dgTab==='fleet'},
+ {id:'03',title:'Fleet orders',obj:'Order your wingmen to Follow me.',pops:[
+  ['Orders to every wingman','This row gives one order to every AI ship you own.\n\nFollow me: keep station on your ship, steering for where you will be after this impulse, and fight your target.\nCover me: stay close, between you and the nearest threat, with launchers on Defend.\nAttack: go after your current target and stay on it.\nFree: the AI uses its own judgment.','ordBar'],
+  ['Try it','Click ⇢ Follow me.','ordBar'],
+ ],goal:()=>ships.filter(x=>own(x)&&x.ai&&!x.dead).every(x=>x.order&&x.order.k==='follow')},
+ {id:'04',title:'Formation',obj:'Order your wingmen to Advance, then press Continue.',pops:[
+  ['Formation','Your ships start in a formation. The line above the buttons counts how many wingmen are still in formation — close to their slot, on your heading, at your speed. Ships that drift out have to rejoin.','ordBar'],
+  ['Advance, fall back, rejoin','Advance moves every slot ahead of your ship, Fall back moves them behind (both stack: click twice for twice as far). They only work for ships in formation. Rejoin formation sends everyone back to their starting slots.\n\nClick ▲ Advance, then press Continue.','ordAdv'],
+ ],goal:()=>T>TUT.T0&&ships.filter(x=>own(x)&&x.ai&&!x.dead).every(x=>x.order&&(x.order.adv||0)>0)},
+ {id:'05',title:'Attack',obj:'Target Drone 1 (click it), order ⚔ Attack Drone 1, and press Continue until both drones are destroyed.',setup(){tutDrone(-12,13,0,'Drone 1');tutDrone(12,13,0,'Drone 2');const s=tP();if(s)s.target=TUT.drones.find(d=>d.name==='Drone 1');buildHUD()},pops:[
+  ['Targets','Two drones have appeared ahead. Your target is Drone 1. With an enemy targeted, the Attack button appears: your wingmen go after that ship and stay on it even if you switch to another.','ordAtk'],
+  ['Divide the work','Order Attack on Drone 1, then switch your own target to Drone 2 (click it or press T) and kill it yourself.','map'],
+ ],goal:()=>TUT.drones.every(d=>d.dead)},
+ {id:'06',title:'One ship at a time',obj:'Take direct command of a wingman: untick AI on its card.',pops:[
+  ['Ship cards','Each card is one of your ships: hull, shields, energy, and its own order menu. A different order for one ship overrides the fleet order. Click a card to look at that ship.','cards'],
+  ['Taking command','Untick AI on a card and that ship is yours to fly directly; Tab switches between the ships you command. Command all / All → AI do it for the whole fleet. Most captains fly one ship and command the rest — that is the default.\n\nUntick AI on the Albatross or the Peregrine.','aiBox'],
+ ],goal:()=>ships.some(x=>own(x)&&!x.dead&&x!==flagship()&&!x.ai)},
+ {id:'07',title:'Training complete',obj:'',pops:[
+  ['Well done, Commodore.','You can open the Fleet tab, give orders to the whole squadron or one ship, keep a formation, split your fire, and take a wingman over when it matters.\n\nPress Next to return to the game modes.','none'],
+ ],end:true}]},
+
+ fi:{name:'Fighter Command',blurb:'Command a Martian Light Starfighter Carrier: craft groups, launching, bomber strikes, recovery and rearming, and fighters intercepting incoming bombers while your PD helps.',
+ fleet:[{key:'mcarrierl',ai:false,sq:['F','B']}],craft:true,
+ steps:[
+ {id:'01',title:'Carriers and hangars',obj:'',pops:[
+  ['Your carrier','The Light Starfighter Carrier carries two squadrons: one of fighters, one of bombers. Each squadron flies as two groups of six craft. Cruisers carry small hangars (2 to 4 craft), carriers carry whole squadrons.','map'],
+  ['Fighters and bombers','Fighters: two small missiles each, two PD guns, hard to hit — they hunt other craft and escort. Bombers: four small missiles each, fired all at once within 4 hexes of a ship, and they can\'t be intercepted. Every craft that dies is gone for the rest of the battle.','none'],
+ ]},
+ {id:'02',title:'The Fighters tab',obj:'Open the ✈ Fighters tab.',pops:[
+  ['Fighter command','Open the Fighters tab. It is greyed out on ships that carry no craft.','tabWings'],
+ ],goal:()=>dgTab==='wings'},
+ {id:'03',title:'Launch',obj:'Press Launch all, then press Continue until every group is flying.',pops:[
+  ['The groups','Each row is one group: its craft (dots), its missiles, where it is, and its order.','wingRows'],
+  ['Launch','Launch all puts two groups into space every impulse. Click it, then press Continue.','wingLaunch'],
+ ],goal:()=>myWings().length>0&&myWings().every(w=>w.state==='fly')},
+ {id:'04',title:'Bomber strike',obj:'Send your bombers at the drone (Bombers → my target) and press Continue until it is destroyed.',setup(){tutDrone(0,12,0,'Target Drone');const s=tP();if(s)s.target=TUT.drones[TUT.drones.length-1];buildHUD()},pops:[
+  ['Strike','A drone sits 12 hexes ahead and it is your target. Bombers → my target sends both bomber groups at it. They fly as fast as missiles, close to 4 hexes and fire everything.','bomb'],
+ ],goal:()=>TUT.drones.every(d=>d.dead)},
+ {id:'05',title:'Rearming',obj:'Press Continue until your bombers have landed to rearm.',pops:[
+  ['Home to rearm','Bombers fire once per sortie and then head home on their own. When a group reaches the carrier it lands and rearms for one turn, then it can launch again. Rearming restores missiles — never lost craft. You can call any group home with Recall all or its order menu.','wingBtns'],
+ ],goal:()=>myWings().filter(w=>w.type==='B').some(w=>w.state==='rearm'||w.state==='docked')},
+ {id:'06',title:'Incoming bombers',obj:'Destroy the enemy bombers before they reach you: order Fighters intercept, and click the bomber group to fire your PD at it.',setup(){const s=tP();if(!s)return;tutDrone(25,16,0,'Raider');const r=TUT.drones[TUT.drones.length-1];const w=newWing(r,'B',4);w.state='fly';w.px={...r.px};w.ppx=null;w.vx=0;w.vy=0;wings.push(w);setWingOrder(w,'attack',s);TUT.foe=w;buildHUD()},pops:[
+  ['Bombers inbound','An enemy bomber group has launched at you. Bomber missiles can\'t be shot down — the only defense is to kill the bombers before they get within 4 hexes.','map'],
+  ['Intercept','Fighters intercept sends your fighters after enemy craft.','intercept'],
+  ['Your own PD','You can also target a craft group directly: click it on the map or in the Enemy craft list. Only point defense can fire at craft — every other weapon greys out — and your PD fires at any range, though it hits far more often up close. PD also fires on its own at craft within 4 hexes.','foeCraft'],
+ ],goal:()=>TUT.foe&&!wingFlying(TUT.foe)},
+ {id:'07',title:'Escort and disable',obj:'',pops:[
+  ['Two more orders','Escort keeps fighters close around the carrier. Disable sends fighters in close to turn their PD guns on an enemy ship with systems targeting — knocking out weapons and engines rather than just hull.','wingRows'],
+ ]},
+ {id:'08',title:'Training complete',obj:'',pops:[
+  ['Well done, Captain.','You can launch, strike, recover and defend. In skirmishes craft are switched off by default — untick No fighters on the setup screen to fly them.\n\nPress Next to return to the game modes.','none'],
+ ],end:true}]}});
+
 /* ---- drones ---- */
 function tutDrone(brg,dist,vel,name){const s=tP();if(!s)return;const a=fAng(s.f)+brg*D2R,X=s.px.x+Math.cos(a)*dist*HX*SQ3,Y=s.px.y+Math.sin(a)*dist*HX*SQ3,h=pixToHex(X,Y);
   const n=TUT.drones.length,d=makeShip('drone',h.q,h.r,s.f,1,true,name||'Drone '+(n+1),null);d.slot=1;d.px=hp(d.pq,d.pr);d.ppx=null;
@@ -3315,11 +3441,13 @@ function tutDrone(brg,dist,vel,name){const s=tP();if(!s)return;const a=fAng(s.f)
 function startTutorial(id){const Tu=TUTS[id];if(!Tu)return;if(typeof setMobile==='function'&&typeof MOB!=='undefined'&&MOB)setMobile(false);
   if(typeof SCEN!=='undefined'&&SCEN)leaveScenario();COOP='';
   SLOTS=[{kind:'human',owner:ME,team:0,name:'You'},{kind:'ai',owner:null,team:1,name:'Drones'},null,null,null,null,null,null];
-  fleet[0]=[{key:'peregrine',ai:false}];fleet[1]=[{key:'drone',ai:true}];for(let i=2;i<MAXSLOTS;i++)fleet[i]=[];fleetFaction[0]='Martian';fleetFaction[1]='Nonaligned';fleetTL[0]=4;fleetTL[1]=4;startSpeed[0]=0;startSpeed[1]=0;startMode='stations';era='open';
+  fleet[0]=(Tu.fleet||[{key:'peregrine',ai:false}]).map(x=>({...x}));fleet[1]=[{key:'drone',ai:true}];for(let i=2;i<MAXSLOTS;i++)fleet[i]=[];fleetFaction[0]='Martian';fleetFaction[1]='Nonaligned';fleetTL[0]=4;fleetTL[1]=4;startSpeed[0]=0;startSpeed[1]=0;startMode='stations';era='open';
   for(const x of ['modepick','facpick']){const o=$(x);if(o)o.remove()}
-  TUT={id,step:-1,pop:0,drones:[],T0:0,v0:[0,0]};initAudio();startMusic();start();
+  TUT={id,step:-1,pop:0,drones:[],T0:0,v0:[0,0],noF:typeof noFighters!=='undefined'?noFighters:true};if(typeof noFighters!=='undefined')noFighters=!Tu.craft;initAudio();startMusic();start();
   // clear the placeholder drone; the Peregrine sits at the centre drifting north at 2 hexes/turn
-  ships=ships.filter(s=>!s.d.drone);const s=P;s.pq=s.q=0;s.pr=s.r=0;s.px=hp(0,0);s.f=0;const v=fdir(0);s.vq=v[0]*2;s.vr=v[1]*2;s.target=null;
+  ships=ships.filter(s=>!s.d.drone);const s=P;const o0={...s.px},v=fdir(0);
+  for(const x of ships){const X=x.px.x-o0.x,Y=x.px.y-o0.y,h=pixToHex(X,Y);x.pq=x.q=h.q;x.pr=x.r=h.r;x.px=hp(h.q,h.r);x.ppx=null;x.f=0;x.vq=v[0]*2;x.vr=v[1]*2;x.target=null}
+  if(typeof wings!=='undefined')for(const w of wings){w.px={...w.car.px};w.ppx=null}if(typeof initFormSlots==='function')initFormSlots();
   cam.x=s.px.x;cam.y=s.px.y;cam.snap=true;logLines=[];log('Training: '+Tu.name,'warn');buildHUD();tutNext()}
 function tutNext(){const Tu=TUTS[TUT.id];TUT.step++;const st=Tu.steps[TUT.step];if(!st){tutExit();return}
   TUT.T0=T;const s=tP();TUT.v0=s?[s.vq,s.vr]:[0,0];if(st.setup)st.setup();TUT.pop=0;tutObj();tutShowPop()}
@@ -3329,7 +3457,7 @@ function tutObj(){let el=$('tutobj');if(!el){el=document.createElement('div');el
 function tutRect(els){let L=1e9,Tt=1e9,Rr=-1e9,B=-1e9;for(const e of els){const r=e.getBoundingClientRect();if(!r||r.width===0&&r.height===0)continue;L=Math.min(L,r.left);Tt=Math.min(Tt,r.top);Rr=Math.max(Rr,r.right);B=Math.max(B,r.bottom)}return L<1e9?{left:L-4,top:Tt-4,right:Rr+4,bottom:B+4}:null}
 let tutVO=null;
 function tutShowPop(){const st=TUTS[TUT.id].steps[TUT.step];const p=st.pops[TUT.pop];if(!p){tutHidePop();if(st.end){tutDone(TUT.id);tutExit()}else if(!st.goal)tutNext();return}
-  const pid='mw.'+st.id+'.'+(TUT.pop+1);let blk=$('tutblock');if(!blk){blk=document.createElement('div');blk.id='tutblock';document.body.appendChild(blk)}blk.style.display='block';
+  const pid=TUT.id+'.'+st.id+'.'+(TUT.pop+1);let blk=$('tutblock');if(!blk){blk=document.createElement('div');blk.id='tutblock';document.body.appendChild(blk)}blk.style.display='block';
   let ring=$('tutring');if(!ring){ring=document.createElement('div');ring.id='tutring';document.body.appendChild(ring)}
   let card=$('tutpop');if(!card){card=document.createElement('div');card.id='tutpop';document.body.appendChild(card)}
   card.innerHTML=`<div class="tp-h">${p[0]}</div><div class="tp-t">${p[1].replace(/\n/g,'<br>')}</div><div class="tp-b"><span class="dim sm">${TUT.pop+1} / ${st.pops.length}</span><span style="flex:1"></span>${TUT.pop?'<button class="btn" id="tpback">◂ Back</button>':''}<button class="btn go" id="tpnext">${TUT.pop+1<st.pops.length?'Next ▸':st.end?'Finish ▸':st.goal?'Got it ▸':'Next ▸'}</button></div>`;
@@ -3350,7 +3478,7 @@ function tutHidePop(){for(const x of ['tutpop','tutring','tutblock']){const e=$(
 function tutDoneSet(){try{return new Set(JSON.parse(localStorage.getItem('shtTutDone')||'[]'))}catch(e){return new Set()}}
 function tutDone(id){const S=tutDoneSet();S.add(id);try{localStorage.setItem('shtTutDone',JSON.stringify([...S]))}catch(e){}}
 const tutPopOpen=()=>{const c=$('tutpop');return !!c&&c.style.display!=='none'};
-function tutExit(){tutHidePop();for(const x of ['tutobj']){const e=$(x);if(e)e.remove()}TUT=null;ships=[];missiles=[];fx=[];P=null;phase='select';buildHUD();
+function tutExit(){tutHidePop();for(const x of ['tutobj']){const e=$(x);if(e)e.remove()}if(TUT&&typeof noFighters!=='undefined')noFighters=TUT.noF;TUT=null;ships=[];missiles=[];fx=[];P=null;phase='select';buildHUD();
   $('end').style.display='none';$('start').style.display='flex';try{menuWant=true;if(AC){if(musicSrc)stopMusic();startMenuMusic()}}catch(e){}renderBuilder();openModePicker()}
 // goal checks and keeping highlights on target while the HUD redraws
 setInterval(()=>{if(!TUT)return;{const st=TUTS[TUT.id].steps[TUT.step],pe=$('tutprog');if(st&&st.prog&&pe)pe.textContent=st.prog()}if(tutPopOpen()){tutPlace();return}const st=TUTS[TUT.id].steps[TUT.step];if(st&&st.goal&&phase!=='over'&&st.goal())tutNext()},250);
@@ -3378,7 +3506,7 @@ addEventListener('keydown',e=>{if(!TUT||!tutPopOpen())return;e.preventDefault();
   const orig=openModePicker;openModePicker=function(){orig();const el=$('modepick');if(!el)return;const add=()=>{const g=el.querySelector('.fp-g');if(!g||g.querySelector('[data-tut]'))return;
       const b=document.createElement('button');b.className='faccard';b.dataset.tut='1';b.style.setProperty('--fc','#4da6ff');
       b.innerHTML=`<div class="fc-t"><b style="color:#4da6ff;font-size:16px">🎓 Tutorial</b><span class="dim">Learn to fly and fight, step by step. Desktop only.</span>${(()=>{const n=Object.keys(TUTS).filter(i=>tutDoneSet().has(i)).length;return n?`<span class="tutdone">✓ ${n}/${Object.keys(TUTS).length} completed</span>`:''})()}</div>`;g.prepend(b);
-      b.onclick=e=>{e.stopPropagation();const g2=el.querySelector('.fp-in');g2.innerHTML=`<div class="fp-h"><button class="btn" id="tutback" style="margin:0">◂</button><b style="font-size:17px">Tutorials</b></div>`+Object.entries(TUTS).map(([id,Tu],k)=>`<div class="faccard" style="--fc:#4da6ff;display:block;cursor:default;margin-bottom:8px"><b style="color:#4da6ff;font-size:16px">${k+1}. ${Tu.name}</b>${tutDoneSet().has(id)?' <span class="tutdone">✓ Completed</span>':''}<div style="margin:6px 0">${Tu.blurb}</div><button class="btn big" data-tutgo="${id}" style="min-width:200px;border-color:#4da6ff;color:#4da6ff">Start ▶</button>${MP.on?' <span class="dim sm">(offline only — you are hosting or joined)</span>':''}</div>`).join('')+'<div class="dim sm">More tutorials coming: shields and damage control, fleets.</div>';
+      b.onclick=e=>{e.stopPropagation();const g2=el.querySelector('.fp-in');g2.innerHTML=`<div class="fp-h"><button class="btn" id="tutback" style="margin:0">◂</button><b style="font-size:17px">Tutorials</b></div>`+Object.entries(TUTS).map(([id,Tu],k)=>`<div class="faccard" style="--fc:#4da6ff;display:block;cursor:default;margin-bottom:8px"><b style="color:#4da6ff;font-size:16px">${k+1}. ${Tu.name}</b>${tutDoneSet().has(id)?' <span class="tutdone">✓ Completed</span>':''}<div style="margin:6px 0">${Tu.blurb}</div><button class="btn big" data-tutgo="${id}" style="min-width:200px;border-color:#4da6ff;color:#4da6ff">Start ▶</button>${MP.on?' <span class="dim sm">(offline only — you are hosting or joined)</span>':''}</div>`).join('')+'<div class="dim sm">Nov 27 drafts: Shields and damage control, Fleet command, Fighter command — David will review them.</div>';
         $('tutback').onclick=ev=>{ev.stopPropagation();openModePicker()};g2.querySelectorAll('[data-tutgo]').forEach(x=>x.onclick=ev=>{ev.stopPropagation();if(MP.on)return;startTutorial(x.dataset.tutgo)})}};
     add();new MutationObserver(add).observe(el,{childList:true,subtree:true})}})();
 
@@ -3562,7 +3690,7 @@ function wingAtScreen(mx,my,maxd){let b=null,bd=maxd;const k=animK();for(const w
    gun ships open slower the less ground they want to give: their wanted range is their 65% range if they out-reach the enemy (artillery),
    otherwise their 80% range or the enemy's hot torpedo/lance danger range, whichever is longer; 12+ hexes to close → 4, 6+ → 2, less → 0 (holds range longest), punch (torpedo/lance) ships open at 4 with the nose 60° off (the oblique approach) and the vector straight in. */
 const OPEN_MAXV=4,OPEN_MAXOFF=2;   // 2 facings = 60°
-const openActive=()=>!SCEN&&T===0&&phase==='decide'&&ships.length>0;
+const openActive=()=>!SCEN&&!(typeof TUT!=='undefined'&&TUT)&&T===0&&phase==='decide'&&ships.length>0;
 function openSet(s,hd,vd,v){hd=clamp(Math.round(hd),-OPEN_MAXOFF,OPEN_MAXOFF);vd=clamp(Math.round(vd),-OPEN_MAXOFF,OPEN_MAXOFF);v=clamp(Math.round(v),0,OPEN_MAXV);
   if(s.f0==null)s.f0=s.f;s.open={hd,vd,v};s.f=((s.f0+hd)%NF+NF)%NF;const d=fdir(s.f0+vd);s.vq=d[0]*v;s.vr=d[1]*v;s.ppx=null}
 function openGet(s){return s.open||{hd:0,vd:0,v:Math.round(vlen(s.vq,s.vr))}}
