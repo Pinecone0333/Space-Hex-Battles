@@ -483,7 +483,7 @@ SHIPS.dcarrier={faction:'Dogahr',cls:'Carrier',ptsCls:'Heavy Cruiser',weight:101
   dots:[[-22,-25],[-22,25],[-22,-14],[-22,14],[26,-20],[26,20],[26,0],[6,-30],[6,30]],
   weapons:[['ML','FX'],['ML','FX'],['ML','LS'],['ML','RS'],...rep(4,['MS','ALL'])],pd:['FX','FX','FX','ALL','ALL']};
 /* Nov 23 (David): a TL4 ship automatically gets a TL3 version; any other tech level only when David says so. TL2 versions exist for these ships only: */
-const TL2_SHIPS=['albatross','peregrine','earthling','earthdd','mcarrier'];
+const TL2_SHIPS=['albatross','peregrine','earthling','earthdd','mcarrier','earthcl'];   // Nov 27 (David): + Earthling Light Cruiser
 for(const k of Object.keys(SHIPS)){const d=SHIPS[k];d.tl=4;const r4=d.reactor||R.reactor,gc=d.genCost||R.genCost;const r3=r4-gc;
   SHIPS[k+'3']={...d,tl:3,name:d.name+' (TL3)',short:d.short+' III',shield:0,noShield:true,reactor:r3,weight:d.weight-.1};
   if(TL2_SHIPS.includes(k))SHIPS[k+'2']=   /* Nov 21 (David): Earthlings get TL2 too */{...d,tl:2,name:d.name+' (TL2)',short:d.short+' II',shield:0,noShield:true,reactor:Math.round(r3*.85*2)/2,weight:d.weight-.2,accPen:0,
@@ -530,7 +530,7 @@ SHIPS.corvette2i={...SHIPS.corvette,cls:'Corvette',weight:32,name:'Martian Impro
 SHIPS.ecorv1={faction:'Earthling',cls:'Corvette',weight:31,name:'Earthling Corvette',short:'Earthling Corvette',color:'#5a9cff',laser:'#ff3b3b',torp:'#ff4d4d',hull:30,shield:0,noShield:true,big:false,tl:1,accPen:0,reactor:8.5,genCost:0,doctrine:'alpha',frigate:true,pdKind:'chain',
   shape:SHIPS.earlyeff.shape.map(p=>p&&p.map(v=>Math.round(v*.75*10)/10)),lines:(SHIPS.earlyeff.lines||[]).map(p=>p.map(v=>Math.round(v*.75*10)/10)),dots:(SHIPS.earlyeff.dots||[]).map(p=>p.map(v=>Math.round(v*.75*10)/10)),
   weapons:[['RG','LX'],['RG','RX'],['MS','ALL'],['MS','ALL']],pd:['FX','FX','FX']};
-SHIPS.ecorv2={...SHIPS.ecorv1,name:'Earthling Corvette (TL2)',short:'Earthling Corvette II',tl:2,weight:31.5,pdKind:undefined};   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
+SHIPS.ecorv2={...SHIPS.ecorv1,name:'Earthling Corvette (TL2)',short:'Earthling Corvette II',tl:2,weight:31.5,pdKind:undefined,weapons:[['SL2','LX'],['SL2','RX'],['MS','ALL'],['MS','ALL']]};   // Nov 27 (David): TL2 — laser PD and Small Laser Cannons instead of railguns   // Nov 22 (David): 6.5 after −2 = corvette class on the TL1 ladder
 // ---- Blokai (Nov 18, David): tech level 5. Placeholder outline until David's sprite: oval aft hull, smaller cup-shaped bow ----
 FACTIONS.Blokai={color:'#a9b2bf',full:'Blokai Commonwealth',lore:'Technologically advanced arboreal aliens governed by direct democracy. Xenophobic and isolationist. Those who upset the social order are exiled.',blurb:'Heavy shields, plasma lances, long-range targeting'};
 // Nov 24 (David): original egg; the fork (25% smaller) sits straight on it, no neck — two side prongs and a thin centre prong, equal length: side prongs curved on the outside edge to a point and straight on the inside, a straight-sided centre prong with a flat end, straight parallel-sided slots between them
@@ -3348,9 +3348,10 @@ addEventListener('keydown',e=>{if(!TUT||!tutPopOpen())return;e.preventDefault();
    Fighters: 2 small missiles each (mostly vs other craft), 2 spinal PD, reload every other impulse. Small missiles: 2 damage.
    Wings fly themselves on orders: attack (a ship or enemy wing), escort (a friendly ship), intercept (hunt enemy craft), return (dock and rearm, 1 turn). */
 var wings=[];let WID=0;
-const WING={F:{name:'Fighters',ab:'F',spd:16,acc:6,ms:2,pd:[[0,'S'],[0,'S']],pdEvery:2,evade:.05,msHit:.75},
-            B:{name:'Bombers',ab:'B',spd:12,acc:4,ms:4,pd:[[-.10,'S'],[0,'ALL']],pdEvery:4,evade:0,msHit:.75}};
-const WREARM=8,WRANGE=6,SMS_DMG=2,WDOG=3,PDAUTO=4;   // WDOG: craft PD dogfight range; PDAUTO: ships' automatic PD vs craft
+/* Nov 27 (David): acc = hexes/turn gained per impulse — same as missiles (R.msAcc 16 per turn = 2 per impulse); spd is no longer a cap */
+const WING={F:{name:'Fighters',ab:'F',spd:16,acc:2,ms:2,pd:[[0,'S'],[0,'S']],pdEvery:2,evade:.05,msHit:.75},
+            B:{name:'Bombers',ab:'B',spd:12,acc:2,ms:4,pd:[[-.10,'S'],[0,'ALL']],pdEvery:4,evade:0,msHit:.75}};
+const WMAXV=30,WREARM=8,WRANGE=6,SMS_DMG=2,WDOG=3,PDAUTO=4;   // WDOG: craft PD dogfight range; PDAUTO: ships' automatic PD vs craft
 const isCarrier=s=>!!(s&&s.d&&s.d.bays);
 const wingAlive=w=>w&&w.n>0&&w.state!=='dead';
 const wingFlying=w=>wingAlive(w)&&w.state==='fly';
@@ -3377,7 +3378,7 @@ function wingAIOrders(){for(const w of wings){if(!wingFlying(w)||!w.car.wingAI&&
     else{const best=catchable(w);if(w.order!=='attack'||tgtDead(w.tgt)||best&&w.tgt!==best&&catchT(w,w.tgt)>catchT(w,best)*1.5+1)setWingOrder(w,'attack',best)}}}
 /* Nov 27 (David's record: AI bombers chased a Condor flying away at 13 hexes/turn — faster than they can fly — and only struck at T6): AI wings attack the enemy ship
    they can reach soonest (distance over closing speed, where the target running away at its own speed eats into the craft's), not just the carrier's target */
-function catchT(w,t){if(!t||t.dead)return 1e9;const dx=t.px.x-w.px.x,dy=t.px.y-w.px.y,L=Math.hypot(dx,dy)||1,V=hp(t.vq,t.vr),away=(V.x*dx+V.y*dy)/L/HS,cl=WING[w.type].spd-Math.max(0,away);return cl<=1?1e9:Math.max(0,L/HS-4)/cl}
+function catchT(w,t){if(!t||t.dead)return 1e9;const dx=t.px.x-w.px.x,dy=t.px.y-w.px.y,L=Math.hypot(dx,dy)||1,V=hp(t.vq,t.vr),away=(V.x*dx+V.y*dy)/L/HS,cl=Math.min(WMAXV,Math.sqrt(2*R.msAcc*L/HS))-Math.max(0,away);return cl<=1?1e9:Math.max(0,L/HS-4)/cl}
 function catchable(w){let b=null,bt=1e9;for(const s of ships){if(s.dead||s.team===w.team)continue;const t=catchT(w,s)-(s===w.car.target?.15:0);if(t<bt){bt=t;b=s}}return b}
 
 /* ---- launch, movement, combat: once per impulse, after missiles move ---- */
@@ -3397,11 +3398,18 @@ function moveWings(off){if(!wings.length)return 0;const dt=1/IMP;const base=Math
     const tp=T_.px,tv=T_.n!=null?{x:T_.vx,y:T_.vy}:tgtVel(T_);
     let stand=0;if(w.order==='disable')stand=1.5;else if(w.order==='escort')stand=1.5;else if(w.order==='return')stand=0;else if(T_.n!=null)stand=1;else stand=w.type==='B'?3:2;
     let gx=tp.x-w.px.x,gy=tp.y-w.px.y;const gd=Math.hypot(gx,gy)||1;if(w.order==='escort'){const a=(w.id%4)*Math.PI/2;gx+=Math.cos(a)*stand*HS;gy+=Math.sin(a)*stand*HS}else{gx-=gx/gd*stand*HS;gy-=gy/gd*stand*HS}
-    const gl=Math.hypot(gx,gy),want=Math.min(W.spd*HS,gl*IMP/3);const dvx=tv.x+(gl?gx/gl*want:0)-w.vx,dvy=tv.y+(gl?gy/gl*want:0)-w.vy,dl=Math.hypot(dvx,dvy),cap=W.acc*HS;
+    const gl=Math.hypot(gx,gy),want=Math.min(WMAXV*HS,Math.sqrt(2*R.msAcc*gl/HS)*HS);   /* Nov 27 (David): craft accelerate like missiles (16 hexes/turn per turn, no fixed top speed) and close as fast as they can still brake to match the target */const dvx=tv.x+(gl?gx/gl*want:0)-w.vx,dvy=tv.y+(gl?gy/gl*want:0)-w.vy,dl=Math.hypot(dvx,dvy),cap=W.acc*HS;
     const k=dl>cap?cap/dl:1;w.vx+=dvx*k;w.vy+=dvy*k;w.px={x:w.px.x+w.vx*dt,y:w.px.y+w.vy*dt};w.h=Math.atan2(tp.y-w.px.y,tp.x-w.px.x);
     if(w.order==='return'&&!w.car.dead&&wDist(w,w.car)<=1){w.state='rearm';w.ready=T+WREARM;w.ppx=null;log(`${wgLabel(w)} landed — rearming (ready ${turnOf(T+WREARM)}·${impOf(T+WREARM)})`,'dim')}}
   // small missiles (can't be intercepted): bombers once per sortie within 4 hexes of a ship; fighters one per craft per impulse at enemy craft (or a ship they attack)
-  for(const w of wings){if(!wingFlying(w)||w.ms<=0)continue;const W=WING[w.type],t=w.cur;if(!t||tgtDead(t)||t.team===w.team)continue;const d=wDist(w,t);if(d>4)continue;
+  for(const w of wings){if(!wingFlying(w)||w.ms<=0)continue;const W=WING[w.type];let t=w.cur;
+    /* Nov 27 (David): take a good shot when one appears — if the current target isn't within 4 hexes, a bomber (or a fighter on Attack) fires at the nearest enemy ship that is,
+       and a fighter at the nearest enemy craft group; the group then switches to that target */
+    if((!t||tgtDead(t)||t.team===w.team||wDist(w,t)>4)&&w.order!=='return'&&w.order!=='disable'){let b=null,bd=4.01;
+      if(w.type==='B'||w.order==='attack')for(const s of ships){if(s.dead||s.team===w.team)continue;const dd=wDist(w,s);if(dd<bd){bd=dd;b=s}}
+      if(w.type==='F'&&w.order!=='attack'||!b&&w.type==='F')for(const e of wings){if(!wingFlying(e)||e.team===w.team)continue;const dd=wDist(w,e);if(dd<bd){bd=dd;b=e}}
+      if(b){t=b;w.cur=b;if(w.order==='attack'||w.type==='B')w.tgt=b}}
+    if(!t||tgtDead(t)||t.team===w.team)continue;const d=wDist(w,t);if(d>4)continue;
     const isW=t.n!=null;if(w.type==='B'&&isW)continue;if(!isW&&w.order==='disable')continue;   // disabling: PD only, missiles kept for craft
     const shots=w.type==='B'?w.n*w.ms:(isW?w.n:w.n*w.ms);if(!shots)continue;const D=at();
     for(let i=0;i<Math.min(shots,8);i++)fx.push({type:'beam',x1:w.px.x+rnd(-6,6),y1:w.px.y+rnd(-6,6),x2:wTp(t).x+rnd(-8,8),y2:wTp(t).y+rnd(-8,8),t:.4,max:.4,color:'#ffe9a8',w:1,d:D});sfxAt('missile',.35);
