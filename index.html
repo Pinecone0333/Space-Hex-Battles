@@ -2022,7 +2022,7 @@ function buildHUD(){if(!ships.length){for(const id of ['side','rside'])if($(id))
      <div class="row dim sm">v <b class="txt">${vlen(s.vq,s.vr)}</b> hex/turn · facing ${fName(s.f)}${t?` · range to ${t.name} <b class="txt">${d}</b>`:''}</div></div>`;
     h+=`<div class="panel" style="padding-top:4px">${own(s)&&!s.ai?`<div class="row aiw" style="gap:4px"><button class="btn ${s.aiE?'aion':''}" data-act="aie" title="Simplified command: the AI runs this ship's generator, weapon loading, torpedo charging/holding, PD reloads and shield reinforcement. You still maneuver, pick targets and fire.">⚡ Energy: ${s.aiE?'<b>AI</b>':'Manual'}</button><button class="btn ${s.aiDC?'aion':''}" data-act="aidc" title="Simplified command: the AI assigns this ship's damage-control teams.">🔧 Repairs: ${s.aiDC?'<b>AI</b>':'Manual'}</button>${s.pd.length?`<button class="btn ${s.aiPD||s.aiE?'aion':''}" data-act="aipd" ${s.aiE?'disabled':''} title="Reload every PD mount automatically whenever there's energy for it (the generator's upkeep is protected). Included when Energy is on AI.">🛡 PD: ${s.aiPD||s.aiE?'<b>Auto</b>':'Manual'}</button>`:''}</div>`:''}</div>`;
     if(s.ai)h+=`<div class="panel dim">${s.name} is under AI command. Untick "AI" on its tab in the Fleet tab to take control.</div>`;
-    const noSh=!!s.d.noShield,hasCr=typeof isCarrier==='function'&&isCarrier(s)&&!(typeof noFighters!=='undefined'&&noFighters)&&typeof wings!=='undefined'&&wings.some(w=>w.car===s&&wingAlive(w));
+    const noSh=!!s.d.noShield,hasCr=typeof isCarrier==='function'&&(isCarrier(s)||typeof wings!=='undefined'&&wings.some(w=>w.car===s&&w.free))&&!(typeof noFighters!=='undefined'&&noFighters)&&typeof wings!=='undefined'&&wings.some(w=>w.car===s&&wingAlive(w));
     if(dgTab==='shield'&&noSh||dgTab==='wings'&&!hasCr)dgTab='fire';
     {const nDmg=(s.damaged||[]).filter(b=>b.k!=='rea').length+((s.damaged||[]).some(b=>b.k==='rea')?1:0);
      h+=`<div class="row wtabs htabs"><button class="btn ${dgTab==='fire'?'mfire':''}" data-act="dgtab:fire" title="Fire control (F toggles): load, fire and manage weapons">🎯 Fire</button><button class="btn ${dgTab==='dc'?'mrep':''}" data-act="dgtab:dc" title="Damage control (F toggles): click damaged systems on the ship diagram to send repair teams">🔧 Damage${nDmg?` <b class="warn">${nDmg}</b>`:''}</button><button class="btn ${dgTab==='shield'?'mfire':''}" data-act="dgtab:shield" ${noSh?'disabled title="No shield generator"':'title="Shield generator, reinforcement, repair'+(s.d.runDark?', running dark':'')+'"'}>🛡 Shielding</button><button class="btn ${dgTab==='fleet'?'mfire':''}" data-act="dgtab:fleet" title="Fleet command: hand ships to the AI, fleet orders, switch between your ships">⚑ Fleet</button><button class="btn ${dgTab==='wings'?'mfire':''}" data-act="dgtab:wings" ${hasCr?'title="Launch and order your fighters and bombers"':'disabled title="This ship carries no craft"'}>✈ Fighters</button></div>`}
@@ -2545,11 +2545,11 @@ function cmdLostPrompt(nm){if(!SCEN||phase==='over'&&!SCEN.camp)return;let el=$(
   el.querySelectorAll('[data-cmdtake]').forEach(b=>b.onclick=()=>{const x=ships[+b.dataset.cmdtake];close();if(x&&!x.dead){x.ai=false;x.queue=[];P=x;log(`You take command of ${x.name}`,'good');buildHUD()}});
   $('cmdai').onclick=()=>{close();buildHUD()}}
 function startScenario(id,side,camp,ctl){const S=SCENARIOS[id];if(!S)return;if(!ctl)ctl='manual';
-  if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode});
+  if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode,fleetWings});
   SCEN={id,side,camp:!!camp,ctl};era=S.era;startMode='stations';
   SLOTS=[null,null,null,null,null,null,null,null];
   S.fleets.forEach((F,i)=>{const human=F.fac===side;SLOTS[i]=human?{kind:'human',owner:ME,team:F.team,name:'You'}:{kind:'ai',owner:null,team:F.team,name:F.name||''};
-    const ci=human&&ctl==='command'&&S.command?F.ships.indexOf(S.command[side]):-1;fleet[i]=F.ships.map((k,j)=>({key:k,ai:!human||ci>=0&&j!==ci}));fleetFaction[i]=F.fac;fleetTL[i]=F.tl;fleetForm[i]='line';startSpeed[i]=0});
+    const ci=human&&ctl==='command'&&S.command?F.ships.indexOf(S.command[side]):-1;fleetWings[i]={F:0,B:0};fleet[i]=F.ships.map((k,j)=>({key:k,ai:!human||ci>=0&&j!==ci}));fleetFaction[i]=F.fac;fleetTL[i]=F.tl;fleetForm[i]='line';startSpeed[i]=0});
   for(let i=S.fleets.length;i<MAXSLOTS;i++)fleet[i]=[];
   const mp=$('modepick');if(mp)mp.remove();const fp=$('facpick');if(fp)fp.remove();
   initAudio();startMusic();start();
@@ -2561,7 +2561,7 @@ function startScenario(id,side,camp,ctl){const S=SCENARIOS[id];if(!S)return;if(!
 const pName=id=>{if(id===ME)return 'You';const s=SLOTS.find(x=>x&&x.kind==='human'&&x.owner===id);return s&&s.name&&s.name!=='You'?s.name:id===0?'Host':'Player '+(id+1)};
 function scenCmdIdx(S,side){const fi=S.fleets.findIndex(F=>F.fac===side&&!F.ai),ck=S.command&&S.command[side];if(fi<0)return null;const j=ck?S.fleets[fi].ships.indexOf(ck):0;return{fi,j:j<0?0:j}}
 function scenLobby(id,side,camp){const S=SCENARIOS[id];if(!S)return;
-  if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode});
+  if(!SCEN)skirmBak=JSON.stringify({SLOTS,fleet,fleetFaction,fleetTL,fleetForm,startSpeed,era,startMode,fleetWings});
   const hum=SLOTS.filter(x=>x&&x.kind==='human').map(x=>({...x}));COOP='';
   SCEN={id,side,camp:!!camp,ctl:'coop',coop:true,lobby:true};era=S.era;startMode='stations';
   SLOTS=[null,null,null,null,null,null,null,null];
@@ -2603,7 +2603,7 @@ function renderScenLobby(){const S=SCENARIOS[SCEN.id],box=$('builder');box.inner
   {const x=$('scenx');if(x)x.onclick=()=>{leaveScenario();renderBuilder();lobbyChanged()}}
   const ok=scenLobbyOK();$('go').disabled=!ok||MP.role==='guest';$('go').textContent=MP.role==='guest'?'Waiting for host to launch…':ok?'Launch '+S.name+' ▶':'Someone must fly the ⭐ command ship'}
 function scenLobbyOK(){if(!SCEN||!SCEN.lobby)return true;const S=SCENARIOS[SCEN.id],c=scenCmdIdx(S,SCEN.side),hs=humans();if(!SCEN.camp)return true;const x=c&&fleet[c.fi][c.j];return !!(x&&x.cmd!=null&&hs.includes(x.cmd))}
-function leaveScenario(){const wasLobby=SCEN&&SCEN.coop,hum=SLOTS.filter(x=>x&&x.kind==='human').map(x=>({...x}));SCEN=null;if(skirmBak){const b=JSON.parse(skirmBak);SLOTS=b.SLOTS;if(wasLobby)for(const h of hum)if(!SLOTS.some(x=>x&&x.kind==='human'&&x.owner===h.owner)){const k=SLOTS.findIndex(x=>!x);if(k>=0){SLOTS[k]=h;b.fleet[k]=[]}}for(let i=0;i<MAXSLOTS;i++){fleet[i]=b.fleet[i]||[];fleetFaction[i]=b.fleetFaction[i];fleetTL[i]=b.fleetTL[i];fleetForm[i]=b.fleetForm[i];startSpeed[i]=b.startSpeed[i]}era=b.era;startMode=b.startMode;skirmBak=null}}
+function leaveScenario(){const wasLobby=SCEN&&SCEN.coop,hum=SLOTS.filter(x=>x&&x.kind==='human').map(x=>({...x}));SCEN=null;if(skirmBak){const b=JSON.parse(skirmBak);SLOTS=b.SLOTS;if(wasLobby)for(const h of hum)if(!SLOTS.some(x=>x&&x.kind==='human'&&x.owner===h.owner)){const k=SLOTS.findIndex(x=>!x);if(k>=0){SLOTS[k]=h;b.fleet[k]=[]}}for(let i=0;i<MAXSLOTS;i++){fleet[i]=b.fleet[i]||[];fleetFaction[i]=b.fleetFaction[i];fleetTL[i]=b.fleetTL[i];fleetForm[i]=b.fleetForm[i];startSpeed[i]=b.startSpeed[i]}if(b.fleetWings)fleetWings=b.fleetWings;era=b.era;startMode=b.startMode;skirmBak=null}}
 function openModePicker(){for(const id of ['modepick','facpick']){const o=$(id);if(o)o.remove()}const el=document.createElement('div');el.id='modepick';el.className='facpick first';
   const online=MP.on;let view='modes',side='Martian',scen='bloodynose';
   const draw=()=>{let h='';const P0=campProg();
@@ -2643,6 +2643,7 @@ const ERAS={
   dog2:{name:'Second Dogahr Invasion',allow:{Martian:[2],Earthling:[2],Dogahr:[3]},extra:['condor3']},
   dbw:{name:'Dogahr/Blokai War',allow:{Martian:[3,4],Earthling:[3,4],Dogahr:[3],Hunibler:[3],Blokai:[5]}},
   hun:{name:'Hunifer Invasion',allow:{Hunifer:[4],Blokai:[5],Dogahr:[3,4],Hunibler:[3,4],Martian:[3,4],Earthling:[3,4]}}};
+let fleetWings=Array.from({length:8},()=>({F:0,B:0}));   // Nov 28 (David): craft groups flying with a fleet, no carrier
 let era='open',globalTL=0,noFighters=true;   /* Nov 27 (David): No fighters (on by default — David, Nov 27 night) — cruisers and the Dreadnought launch nothing, carriers can't be picked */
    /* Nov 26 (David): skirmish Tech level setter at the top — only works in the Open era; picking an era clears it */
 const facListed=f=>!!(ERAS[era]&&ERAS[era].allow&&ERAS[era].allow[f]);
@@ -2675,7 +2676,7 @@ function ptsClass(k){const d=SHIPS[k],c=d.cls,b=k.replace(/[0-9]+$/,'');if(d.pts
   if(/Light Corvette/.test(c))return 'Light Corvette';if(/Corvette/.test(c))return 'Corvette';if(/Freighter/.test(c))return 'Freighter';if(c==='Drone')return 'Drone';return 'Destroyer'}
 const shipPts=k=>Math.round(PTS3[ptsClass(k)]*(PTS_TL[SHIPS[k].tl||4]||1)/5)*5;
 const shipValue=shipPts;
-const fleetValue=t=>Math.round(fleet[t].reduce((a,x)=>a+shipValue(x.key),0));
+const fleetValue=t=>Math.round(fleet[t].reduce((a,x)=>a+shipValue(x.key),0)+(typeof wingPts==='function'?wingPts(t):0));
 function randomEquivalent(t,ref){const V=fleetValue(ref);if(!V)return false;let best=null;
   const facs=Object.keys(FACTIONS).filter(f=>facOK(f)&&f!=='Nonaligned');
   for(let tries=0;tries<400;tries++){const f=facs[Math.floor(Math.random()*facs.length)],tls=facTLs(f),tl=tls[Math.floor(Math.random()*tls.length)];
@@ -2693,7 +2694,7 @@ function renderBuilder(){for(let i=0;i<fleet.length&&i<8;i++)if(!formManual[i]&&
      <div class="row" style="margin:2px 0 4px;flex-wrap:wrap"><button class="btn facbtn" data-facpick="${t}" style="border-color:${FACTIONS[fac].color};color:${FACTIONS[fac].color}" title="Choose a faction">⚑ ${fac} ▾</button><span class="dim">Tech</span><select data-tl="${t}">${fleetTL[t]?'':'<option value="0" selected>— pick —</option>'}${allTLs(fac).map(l=>`<option value="${l}" ${l===fleetTL[t]?'selected':''}>TL${l}</option>`).join('')}</select><span class="dim" style="font-size:10.5px">${FACTIONS[fac].blurb}${fleetTL[t]?` · TL${fleetTL[t]}: ${TLNOTE[fleetTL[t]]}`:''}</span>${tlBreaks(fac,fleetTL[t])?`<div class="sm" style="flex-basis:100%;color:var(--warn)">⚠ ${fac} TL${fleetTL[t]} breaks the rules of the ${ERAS[era].name} (era: ${fac} TL${ERAS[era].allow[fac].join('/')}${(ERAS[era].extra||[]).filter(k=>SHIPS[k].faction===fac).map(k=>' + '+SHIPS[k].cls+' TL'+SHIPS[k].tl).join('')})</div>`:''}</div>
      <div class="row" style="gap:6px;margin:2px 0 4px">${hum&&t===selSlot?`<button class="btn ${allAI?'aion':''}" data-aiall="${t}" title="Put every ship in this fleet under AI control, to just watch the fight. Click again to take them all back.">🤖 AI controls all${allAI?' ✓':''}</button>`:''}${fleet[t].length?`<button class="btn" data-fclr="${t}" title="Remove every ship from this fleet">✕ Clear all</button>`:''}${t!==selSlot?`<button class="btn" data-rndeq="${t}" title="Fill this fleet with a random faction and ships of about the same strength as your fleet (points by class and tech level — a TL3 heavy cruiser is 150)">🎲 Random equivalent enemy</button>`:''}</div>
      <div class="fl-list">${sorted.map(({x,i})=>{const d=SHIPS[x.key];return `<div class="fl" data-tipship="${x.key}" style="border-left:3px solid ${FACTIONS[d.faction].color}">${shipLabel(x.key)}<span class="dim" style="flex:1;text-align:right">${d.shield}/${d.hull} · R${d.reactor||R.reactor} · <b style="color:#ffd27a">${shipPts(x.key)}</b></span>${humans().length>1?`<select data-fcmd="${t}:${i}" title="Who commands this ship in battle">${(hum?[]:[['','AI']]).concat(humans().map(pid=>[String(pid),pid===ME?'Me':'Player '+(pid+1)])).map(([v,l])=>`<option value="${v}" ${String(x.cmd!=null?x.cmd:(hum?SLOTS[t].owner:''))===v?'selected':''}>${l}</option>`).join('')}</select>`:''}${hum||x.cmd!=null?`<label class="dim"><input type="checkbox" data-fai="${t}:${i}" ${x.ai?'checked':''}> AI</label>`:''}<button class="btn" data-frm="${t}:${i}">✕</button></div>`}).join('')||'<div class="dim">(no ships yet)</div>'}</div>
-     <div class="row" style="gap:10px">${fleet[t].length>1?`<label class="dim">Formation <select data-form="${t}" title="${FORM_DESC[FORM_ALIAS[fleetForm[t]]||fleetForm[t]]||''}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" title="${FORM_DESC[k]}" ${(FORM_ALIAS[fleetForm[t]]||fleetForm[t])===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>
+     <div class="row" style="gap:10px">${fleet[t].length>1?`<label class="dim">Formation <select data-form="${t}" title="${FORM_DESC[FORM_ALIAS[fleetForm[t]]||fleetForm[t]]||''}">${Object.entries(FORMS).map(([k,l])=>`<option value="${k}" title="${FORM_DESC[k]}" ${(FORM_ALIAS[fleetForm[t]]||fleetForm[t])===k?'selected':''}>${l}</option>`).join('')}</select></label>`:''}</div>${typeof wingRowHTML==='function'?wingRowHTML(t):''}
      <div class="addlist">${avail.length?'':`<span class="dim">${!fleetTL[t]?`<b style="color:var(--warn)">${fac} isn't part of this era — pick a tech level to add ships.</b>`:era==='open'?'No ships at this tech level for this faction yet.':'None in this era at this tech level.'}</span>`}${avail.map(k=>{const d=SHIPS[k];return `<button class="btn addship" data-fadd="${t}:${k}" data-tipship="${k}" style="border-color:${FACTIONS[d.faction].color}"><b style="color:${FACTIONS[d.faction].color}">+ ${d.cls}${d.tl<4?' (TL'+d.tl+')':''}${shipOK(k)?'':' <span style="color:var(--warn)" title="breaks the rules of this era">⚠</span>'}</b><span class="dim">${d.noShield?'no shields':d.shield}/${d.hull} · reactor ${d.reactor||R.reactor} · <b style="color:#ffd27a">${shipPts(k)} pts</b></span></button>`}).join('')}</div></div>`};
   const card=i=>{const s=SLOTS[i];const fac=fleetFaction[i];
     return `<div class="slotc ${i===rightSel?'sel':''}" ${i!==selSlot?`data-slotsel="${i}"`:''} style="border-left:5px solid ${TCOL8[s.team]};display:inline-flex;gap:6px;align-items:center;margin:3px">
@@ -2918,17 +2919,17 @@ function mpSend(m){if(MP.role==='guest'){if(MP.conn&&MP.conn.open)MP.conn.send(m
 
 // ---- lobby ----
 const mpFleetOut=i=>(fleet[i]||[]).map(x=>({key:x.key,ai:!!x.ai,cmd:x.cmd,sq:x.sq}));   // Nov 27: squadron choices travel too
-function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,speed:startSpeed,startMode,chargeMode,era,noFighters,coop:COOP,scen:SCEN&&SCEN.coop?{id:SCEN.id,side:SCEN.side,camp:SCEN.camp,lobby:SCEN.lobby}:null})}
+function mpBroadcastLobby(){if(MP.role!=='host')return;mpSend({t:'lobby',slots:SLOTS,fleets:fleet.map((f,i)=>mpFleetOut(i)),fac:fleetFaction,tl:fleetTL,form:fleetForm,fw:fleetWings,speed:startSpeed,startMode,chargeMode,era,noFighters,coop:COOP,scen:SCEN&&SCEN.coop?{id:SCEN.id,side:SCEN.side,camp:SCEN.camp,lobby:SCEN.lobby}:null})}
 function mpApplyLobby(m){const mi=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===ME);const keep=mi>=0?{f:fleet[mi],fac:fleetFaction[mi],tl:fleetTL[mi],form:fleetForm[mi],sp:startSpeed[mi]}:null;
   SLOTS=m.slots;startMode=m.startMode;chargeMode=m.chargeMode;COOP=m.coop||'';SCEN=m.scen?{...m.scen,coop:true,ctl:'coop'}:(SCEN&&SCEN.coop?null:SCEN);const prevEra=era;era=ERAS[m.era]?m.era:'open';noFighters=!!m.noFighters;
-  for(let i=0;i<MAXSLOTS;i++){fleet[i]=(m.fleets[i]||[]).map(x=>({...x}));fleetFaction[i]=m.fac[i];fleetTL[i]=m.tl[i];fleetForm[i]=m.form[i];if(typeof formManual!=='undefined')formManual[i]=true;startSpeed[i]=m.speed[i];if(typeof formManual!=='undefined'&&i!==mi)formManual[i]=true}
+  if(Array.isArray(m.fw))fleetWings=m.fw.map(o=>({F:+(o&&o.F)||0,B:+(o&&o.B)||0}));for(let i=0;i<MAXSLOTS;i++){fleet[i]=(m.fleets[i]||[]).map(x=>({...x}));fleetFaction[i]=m.fac[i];fleetTL[i]=m.tl[i];fleetForm[i]=m.form[i];if(typeof formManual!=='undefined')formManual[i]=true;startSpeed[i]=m.speed[i];if(typeof formManual!=='undefined'&&i!==mi)formManual[i]=true}
   const ni=mySlotIdx();if(keep&&ni===mi&&mpLastSlot){if(prevEra!==era){keep.tl=(fleetFaction[ni]=keep.fac,eraDefault(ni));tlManual[ni]=false;setTimeout(mpSendMySlot,0)}fleet[ni]=keep.f;fleetFaction[ni]=keep.fac;fleetTL[ni]=keep.tl;fleetForm[ni]=keep.form;startSpeed[ni]=keep.sp}   // my own slot: keep my local edits (the host echoes them back)
   if(MP.pre&&SLOTS[ni]&&SLOTS[ni].owner===ME){const q=MP.pre;MP.pre=null;fleetFaction[ni]=q.fac;fleetTL[ni]=q.tl;fleet[ni]=q.fleet;fleetForm[ni]=q.form;startSpeed[ni]=q.sp;setTimeout(mpSendMySlot,0)}   // keep the faction (and ships) picked before joining
   const myT=SLOTS[ni]?SLOTS[ni].team:0;mpStatus(`<span class="good">Connected</span> as Player ${ME+1} · Team ${TLET[myT]}. Build your fleet; the host sets teams and launches.`);
   if($('start').style.display!=='none')renderBuilder()}
-function mpSendMySlot(){const i=mySlotIdx();const m={t:'myslot',fleet:mpFleetOut(i),fac:fleetFaction[i],tl:fleetTL[i],form:fleetForm[i],speed:startSpeed[i]};const j=JSON.stringify(m);if(j===mpLastSlot)return;mpLastSlot=j;mpSend(m)}
+function mpSendMySlot(){const i=mySlotIdx();const m={t:'myslot',fleet:mpFleetOut(i),fac:fleetFaction[i],tl:fleetTL[i],form:fleetForm[i],speed:startSpeed[i],fw:fleetWings[i]};const j=JSON.stringify(m);if(j===mpLastSlot)return;mpLastSlot=j;mpSend(m)}
 function mpApplySlot(pid,m){const i=SLOTS.findIndex(x=>x&&x.kind==='human'&&x.owner===pid);if(i<0)return;
-  fleet[i]=(m.fleet||[]).slice(0,MAXSHIPS).filter(x=>SHIPS[x.key]).map(x=>({key:x.key,ai:!!x.ai,cmd:Number.isInteger(x.cmd)?x.cmd:undefined}));if(FACTIONS[m.fac])fleetFaction[i]=m.fac;fleetTL[i]=m.tl;fleetForm[i]=m.form;startSpeed[i]=m.speed;
+  fleet[i]=(m.fleet||[]).slice(0,MAXSHIPS).filter(x=>SHIPS[x.key]).map(x=>({key:x.key,ai:!!x.ai,cmd:Number.isInteger(x.cmd)?x.cmd:undefined,sq:Array.isArray(x.sq)?x.sq.filter(v=>v==='F'||v==='B').slice(0,8):undefined}));if(FACTIONS[m.fac])fleetFaction[i]=m.fac;if(m.fw)fleetWings[i]={F:Math.max(0,Math.min(8,+m.fw.F||0)),B:Math.max(0,Math.min(8,+m.fw.B||0))};fleetTL[i]=m.tl;fleetForm[i]=m.form;startSpeed[i]=m.speed;
   if($('start').style.display!=='none')renderBuilder();mpBroadcastLobby()}
 
 // ---- host → guest snapshots (each guest gets its own view) ----
@@ -3550,7 +3551,17 @@ function wingScan(s,w){const d=wDist(s,w),W=WING[w.type];const ac=Math.round(Mat
   return `<div class="panel"><h2>Target: <span style="color:${w.car.color}">${wgLabel(w)}</span></h2><div class="row">${W.name} · <b>${w.n}</b>/${w.max||6} craft · ${d.toFixed(1)} hexes</div>
    <div class="row dim sm">Order: ${w.order}${w.cur&&w.cur.name?' → '+w.cur.name:''} · small missiles ${w.ms} each</div><div class="row dim sm">Your PD: ${ac}% per shot · only PD can fire at craft (other weapons are greyed out)</div></div>`}
 let wStrikes=[];
-function wingsInit(){wings=[];WID=0;wStrikes=[];if(typeof noFighters!=='undefined'&&noFighters)return;for(const s of ships)if(isCarrier(s)){const sq=(s.sq&&s.sq.length===sqN(s.d)?s.sq:defSq(s.d)).slice();s.sq=sq;if(s.d.hangar)wings.push(newWing(s,sq[0],s.d.hangar));else for(const t of sq){wings.push(newWing(s,t));wings.push(newWing(s,t))}s.launchAll=isAI(s);s.wingAI=isAI(s)}}
+function wingsInit(){wings=[];WID=0;wStrikes=[];if(typeof noFighters!=='undefined'&&noFighters)return;for(const s of ships)if(isCarrier(s)){const sq=(s.sq&&s.sq.length===sqN(s.d)?s.sq:defSq(s.d)).slice();s.sq=sq;if(s.d.hangar)wings.push(newWing(s,sq[0],s.d.hangar));else for(const t of sq){wings.push(newWing(s,t));wings.push(newWing(s,t))}s.launchAll=isAI(s);s.wingAI=isAI(s)}
+  /* Nov 28 (David): independent craft groups — bought on the skirmish screen, they start in space with their fleet's flagship (their "home"), can't land or rearm,
+     and pass to the biggest surviving ship of the fleet if the flagship dies */
+  if(typeof fleetWings!=='undefined'&&!SCEN)for(let i=0;i<MAXSLOTS;i++){const fw=fleetWings[i];if(!fw||!(fw.F||fw.B))continue;const h=freeHome(i);if(!h)continue;let k=0;
+    for(const [ty,n] of [['F',fw.F],['B',fw.B]])for(let j=0;j<n;j++){const w=newWing(h,ty);w.free=true;w.state='fly';const a=fAng(h.f),side=(k%2?1:-1)*(1+Math.floor(k/2))*.9;
+      w.px={x:h.px.x+Math.cos(a)*HS*1.6-Math.sin(a)*HS*side,y:h.px.y+Math.sin(a)*HS*1.6+Math.cos(a)*HS*side};w.ppx=null;const v=hp(h.vq,h.vr);w.vx=v.x;w.vy=v.y;w.h=a;w.order='escort';w.tgt=h;wings.push(w);k++}}}
+function freeHome(slot,team){const L=ships.filter(x=>!x.dead&&(slot!=null?x.slot===slot:x.team===team));if(!L.length)return null;return L.find(x=>!isAI(x))||L.slice().sort((a,b)=>b.d.weight-a.d.weight)[0]}
+const WPTS={F:20,B:25};const wingPts=t=>{const f=typeof fleetWings!=='undefined'&&fleetWings[t];return f&&!(typeof noFighters!=='undefined'&&noFighters)?(f.F||0)*WPTS.F+(f.B||0)*WPTS.B:0};
+function wingRowHTML(t){if(typeof fleetWings==='undefined')return '';const f=fleetWings[t]||(fleetWings[t]={F:0,B:0});const off=typeof noFighters!=='undefined'&&noFighters;
+  const st=(ty,lab)=>`<span class="dim">${lab}</span> <button class="btn" data-fw="${t}:${ty}:-1" ${off||!f[ty]?'disabled':''} style="padding:0 7px">−</button> <b>${f[ty]}</b> <button class="btn" data-fw="${t}:${ty}:1" ${off||f[ty]>=8?'disabled':''} style="padding:0 7px">+</button>`;
+  return `<div class="row" style="gap:8px;flex-wrap:wrap;${off?'opacity:.4':''}" title="${off?'Untick No fighters to add craft':'Groups of six craft that fly with this fleet without a carrier: they start in space beside the flagship and can\'t rearm. Fighters '+WPTS.F+' pts, bombers '+WPTS.B+' pts a group.'}"><span class="dim">✈ Craft, no carrier:</span>${st('F','Fighters')}${st('B','Bombers')}</div>`}
 function wingHit(w,d,by){if(!wingAlive(w))return;const n0=w.n;w.dmg+=d;while(w.dmg>=2&&w.n>0){w.n--;w.dmg-=2}if(w.n<=0){w.n=0;w.state='dead';log(`${wgLabel(w)} destroyed${by?' by '+by:''}`,fr(w.car)?'bad':'good')}return n0-w.n}
 
 /* ---- orders ---- */
@@ -3562,10 +3573,33 @@ function setWingOrder(w,order,tgt){if(typeof MP!=='undefined'&&MP.role==='guest'
 function tgtDead(t){return !t||(t.n!=null?!wingAlive(t):t.dead)}
 
 /* AI for wings (all wings fly themselves; AI carriers also choose the orders) */
-function wingAIOrders(){for(const w of wings){if(!wingFlying(w)||!w.car.wingAI&&!w.car.dead&&!isAI(w.car))continue;
-    if(w.ms<=0&&w.type==='B'){setWingOrder(w,'return');continue}
-    if(w.type==='F'){const foe=wings.some(e=>wingFlying(e)&&e.team!==w.team);setWingOrder(w,foe?'intercept':'escort',foe?null:w.car)}
-    else{const best=catchable(w);if(w.order!=='attack'||tgtDead(w.tgt)||best&&w.tgt!==best&&catchT(w,w.tgt)>catchT(w,best)*1.5+1)setWingOrder(w,'attack',best)}}}
+/* Nov 28 (David): air doctrine by fighter balance (craft counted, carriers' docked groups included).
+   Way ahead (1.5× or the enemy has none): fighters go on the offensive — escort our bombers, or attack enemy ships themselves (missiles, then Disable with PD); they rarely idle by the carrier.
+   About even: fighters intercept enemy craft wherever they are, otherwise escort our bombers or the carrier.
+   Behind: fighters defend — intercept enemy craft that come within 8 hexes of our ships, otherwise stay with the carrier — and bombers stay home (or come home) until the odds are closer to even (80%+).
+   Enemy bombers closing on our ships are always intercepted first. */
+function airBal(team){let my=0,foe=0;for(const w of wings){if(!wingAlive(w)||w.type!=='F')continue;if(w.team===team)my+=w.n;else foe+=w.n}return{my,foe,r:foe?my/foe:99}}
+function airGo(team){return airBal(team).r>=.8}
+function wingAIOrders(){const BAL={};const bal=t=>BAL[t]||(BAL[t]=airBal(t));
+  for(const w of wings){if(!wingFlying(w)||!w.car.wingAI&&!w.car.dead&&!isAI(w.car))continue;const B=bal(w.team),home=w.car.dead?null:w.car;
+    if(w.type==='B'){
+      if(w.ms<=0){if(w.free)setWingOrder(w,'escort',home);else setWingOrder(w,'return');continue}
+      const committed=w.order==='attack'&&w.tgt&&!tgtDead(w.tgt)&&wDist(w,w.tgt)<9;
+      if(B.r<.8&&!committed){if(w.free)setWingOrder(w,'escort',home);else if(w.order!=='return')setWingOrder(w,'return');continue}
+      const best=catchable(w);if(w.order!=='attack'||tgtDead(w.tgt)||best&&w.tgt!==best&&catchT(w,w.tgt)>catchT(w,best)*1.5+1)setWingOrder(w,'attack',best);continue}
+    // fighters
+    let threat=null,td=1e9;for(const e of wings){if(!wingFlying(e)||e.team===w.team||e.type!=='B'||e.ms<=0)continue;for(const s of ships){if(s.dead||s.team!==w.team)continue;const d=Math.hypot(e.px.x-s.px.x,e.px.y-s.px.y)/HS;if(d<14&&d<td){td=d;threat=e}}}
+    if(threat){setWingOrder(w,'intercept');continue}
+    const foeCraft=wings.filter(e=>wingFlying(e)&&e.team!==w.team);
+    const myB=wings.filter(b=>wingFlying(b)&&b.team===w.team&&b.type==='B'&&b.order==='attack');
+    const escortB=()=>{let b=null,bd=1e9;for(const x of myB){const d=wDist(w,x);if(d<bd){bd=d;b=x}}return b};
+    const nearFoe=r=>foeCraft.some(e=>ships.some(s=>!s.dead&&s.team===w.team&&Math.hypot(e.px.x-s.px.x,e.px.y-s.px.y)/HS<r));
+    if(B.r>=1.5){const b=escortB();
+      if(b){const hot=foeCraft.some(e=>wDist(e,b)<6);setWingOrder(w,hot?'intercept':'escort',hot?null:b)}
+      else if(foeCraft.length&&nearFoe(10))setWingOrder(w,'intercept');
+      else{const t=catchable(w);if(t)setWingOrder(w,w.ms>0?'attack':'disable',t);else setWingOrder(w,'escort',home)}}
+    else if(B.r>=.67){if(foeCraft.length)setWingOrder(w,'intercept');else{const b=escortB();setWingOrder(w,'escort',b||home)}}
+    else{if(nearFoe(8))setWingOrder(w,'intercept');else setWingOrder(w,'escort',home)}}}
 /* Nov 27 (David's record: AI bombers chased a Condor flying away at 13 hexes/turn — faster than they can fly — and only struck at T6): AI wings attack the enemy ship
    they can reach soonest (distance over closing speed, where the target running away at its own speed eats into the craft's), not just the carrier's target */
 function catchT(w,t){if(!t||t.dead)return 1e9;const dx=t.px.x-w.px.x,dy=t.px.y-w.px.y,L=Math.hypot(dx,dy)||1,V=hp(t.vq,t.vr),away=(V.x*dx+V.y*dy)/L/HS,cl=Math.min(WMAXV,Math.sqrt(2*R.msAcc*L/HS))-Math.max(0,away);return cl<=1?1e9:Math.max(0,L/HS-4)/cl}
@@ -3573,6 +3607,7 @@ function catchable(w){let b=null,bt=1e9;for(const s of ships){if(s.dead||s.team=
 
 /* ---- launch, movement, combat: once per impulse, after missiles move ---- */
 function moveWings(off){if(!wings.length&&!wStrikes.length)return 0;const dt=1/IMP;const base=Math.max(ANIM/1000+.12,off||0);let ev=0,last=0;const at=()=>{const v=reducedAnim?base+.2:base+(ev++)*.18;last=Math.max(last,v);return v};
+  for(const w of wings)if(w.free&&wingFlying(w)&&w.car.dead){const h=freeHome(w.car.slot)||freeHome(null,w.team);if(h){w.car=h;if(w.order==='escort'||w.order==='return')w.tgt=h}}
   // small-missile salvos fired last impulse arrive now
   wStrikes=wStrikes.filter(k=>!k.done);
   for(const k of wStrikes){if(T<k.due)continue;k.done=true;const t=k.tgt;if(!t||tgtDead(t)){continue}const D=at();
@@ -3584,10 +3619,11 @@ function moveWings(off){if(!wings.length&&!wStrikes.length)return 0;const dt=1/I
     if(s.dead){for(const w of mine_)if(w.state==='docked'||w.state==='rearm'){w.state='dead';w.n=0}continue}
     for(const w of mine_)if(w.state==='rearm'&&T>=w.ready){w.state='docked';w.ms=WING[w.type].ms;w.fired=false;w.pdT=-99}
     if(isAI(s))s.launchAll=true;   /* Nov 27 night (David's record: ships handed to the AI mid-battle never launched their craft) — any ship under AI command launches */
-    if(s.launchAll){let k=0;for(const w of mine_){if(k>=2)break;if(w.state!=='docked')continue;w.state='fly';const a=fAng(s.f)+(k?.6:-.6);w.px={x:s.px.x+Math.cos(a)*HS*.6,y:s.px.y+Math.sin(a)*HS*.6};w.ppx={...s.px};const v=hp(s.vq,s.vr);w.vx=v.x;w.vy=v.y;w.h=fAng(s.f);k++;
+    if(s.launchAll){let k=0;const hold=isAI(s)&&!airGo(s.team);for(const w of mine_){if(k>=2)break;if(w.state!=='docked')continue;if(hold&&w.type==='B')continue;w.state='fly';const a=fAng(s.f)+(k?.6:-.6);w.px={x:s.px.x+Math.cos(a)*HS*.6,y:s.px.y+Math.sin(a)*HS*.6};w.ppx={...s.px};const v=hp(s.vq,s.vr);w.vx=v.x;w.vy=v.y;w.h=fAng(s.f);k++;
       if(w.car.wingAI||isAI(s)){if(w.type==='B')setWingOrder(w,'attack',null);else setWingOrder(w,wings.some(e=>wingFlying(e)&&e.team!==w.team)?'intercept':'escort',s)}
       else if(w.order==='attack'&&!w.tgt)w.tgt=s.target&&s.target.team!==s.team?s.target:null}
       if(isAI(s)&&!mine_.some(w=>w.state==='docked'))s.launchAll=!!isAI(s)}}
+  for(const w of wings)if(w.free&&w.state==='fly'&&w.order==='escort'&&(!w.tgt||tgtDead(w.tgt))&&!w.car.dead)w.tgt=w.car;
   wingAIOrders();
   // move
   for(const w of wings){if(!wingFlying(w))continue;const W=WING[w.type];if(tgtDead(w.tgt))w.tgt=null;const T_=w.tgt||wingDefaultTarget(w);w.cur=T_;
@@ -3597,7 +3633,8 @@ function moveWings(off){if(!wings.length&&!wStrikes.length)return 0;const dt=1/I
     let gx=tp.x-w.px.x,gy=tp.y-w.px.y;const gd=Math.hypot(gx,gy)||1;if(w.order==='escort'){const a=(w.id%4)*Math.PI/2;gx+=Math.cos(a)*stand*HS;gy+=Math.sin(a)*stand*HS}else{gx-=gx/gd*stand*HS;gy-=gy/gd*stand*HS}
     const gl=Math.hypot(gx,gy),want=Math.min(WMAXV*HS,Math.sqrt(2*R.msAcc*gl/HS)*HS);   /* Nov 27 (David): craft accelerate like missiles (16 hexes/turn per turn, no fixed top speed) and close as fast as they can still brake to match the target */const dvx=tv.x+(gl?gx/gl*want:0)-w.vx,dvy=tv.y+(gl?gy/gl*want:0)-w.vy,dl=Math.hypot(dvx,dvy),cap=W.acc*HS;
     const k=dl>cap?cap/dl:1;w.vx+=dvx*k;w.vy+=dvy*k;w.px={x:w.px.x+w.vx*dt,y:w.px.y+w.vy*dt};w.h=Math.atan2(tp.y-w.px.y,tp.x-w.px.x);
-    if(w.order==='return'&&!w.car.dead&&wDist(w,w.car)<=1){w.state='rearm';w.ready=T+WREARM;w.ppx=null;log(`${wgLabel(w)} landed — rearming (ready ${turnOf(T+WREARM)}·${impOf(T+WREARM)})`,'dim')}}
+    if(w.order==='return'&&w.free){setWingOrder(w,'escort',w.car)}
+    else if(w.order==='return'&&!w.car.dead&&wDist(w,w.car)<=1){w.state='rearm';w.ready=T+WREARM;w.ppx=null;log(`${wgLabel(w)} landed — rearming (ready ${turnOf(T+WREARM)}·${impOf(T+WREARM)})`,'dim')}}
   // small missiles (can't be intercepted): bombers once per sortie within 4 hexes of a ship; fighters one per craft per impulse at enemy craft (or a ship they attack)
   for(const w of wings){if(!wingFlying(w)||w.ms<=0)continue;const W=WING[w.type];let t=w.cur;
     /* Nov 27 (David): take a good shot when one appears — if the current target isn't within 4 hexes, a bomber (or a fighter on Attack) fires at the nearest enemy ship that is,
@@ -3646,6 +3683,18 @@ const wTp=t=>t.px;
 function wingsBurstHex(h){let k=0;for(const w of wings){if(!wingFlying(w))continue;const x=wHex(w);if(x.q===h.q&&x.r===h.r){k+=w.n;w.n=0;w.state='dead';burst(w.px,18,'#ffd23a')}}return k}
 
 /* ---- drawing ---- */
+/* Nov 28 (David's sketches): craft sprites, nose along +x. Martian fighter: a long body between two square pods, a gun forward of each pod.
+   Martian bomber: a body with a gun turret (circle) and twin forward guns between long straight wings that carry the missiles.
+   Dogahr fighter: a body set forward between two long pods, a gun forward of each pod. Dogahr bomber: a broad body with a turret and twin forward guns,
+   two legs aft that carry the missiles. Other factions use the Martian shapes for now. Missiles show on the wings while the craft still has them. */
+const CRAFT={
+ MF:{k:1.25,p:[['r',-.98,.97,-.4,.4],['r',-.98,-.2,-.95,-.4],['r',-.98,-.2,.4,.95],['l',-.2,-.68,.42,-.68],['l',-.2,.68,.42,.68]],m:[]},
+ MB:{k:.8,p:[['r',-1.05,.7,-.525,.525],['r',-1.05,.05,-2.325,-.525],['r',-1.05,.05,.525,2.325],['l',.7,-.175,1.05,-.175],['l',.7,.175,1.05,.175],['c',-.55,0,.2,.2]],m:[[-.8,-.2,-1.15],[-.8,-.2,-1.75],[-.8,-.2,1.15],[-.8,-.2,1.75]]},
+ DF:{k:.9,p:[['r',-.6,1.4,-.51,.51],['r',-1.4,.25,-1.41,-.51],['r',-1.4,.25,.51,1.41],['l',.25,-.96,1.15,-.96],['l',.25,.96,1.15,.96]],m:[]},
+ DB:{k:.72,p:[['r',-.68,1.47,-2.15,2.15],['r',-2.33,-.68,-2.15,-1.25],['r',-2.33,-.68,1.25,2.15],['l',1.47,-.32,2.32,-.32],['l',1.47,.32,2.32,.32],['c',-.06,0,.4,.52]],m:[[-2.1,-.95,-1.55],[-2.1,-.95,-1.85],[-2.1,-.95,1.55],[-2.1,-.95,1.85]]}};
+function drawCraft(S,s,col,armed){const k=S.k*s;ctx.lineWidth=Math.max(.8,s*.22);ctx.strokeStyle=col;ctx.fillStyle='rgba(8,14,22,.85)';ctx.lineJoin='miter';
+  for(const q of S.p){ctx.beginPath();if(q[0]==='r'){ctx.rect(q[1]*k,q[3]*k,(q[2]-q[1])*k,(q[4]-q[3])*k);ctx.fill();ctx.stroke()}else if(q[0]==='l'){ctx.moveTo(q[1]*k,q[2]*k);ctx.lineTo(q[3]*k,q[4]*k);ctx.stroke()}else{ctx.ellipse(q[1]*k,q[2]*k,q[3]*k,q[4]*k,0,0,7);ctx.stroke()}}
+  if(armed&&S.m.length){ctx.strokeStyle='#ffe9a8';ctx.lineWidth=Math.max(.6,s*.16);for(const [a,b,y] of S.m){ctx.beginPath();ctx.moveTo(a*k,y*k);ctx.lineTo(b*k,y*k);ctx.stroke()}}}
 /* Nov 28 (David): in-flight small missiles — many tiny darts with short trails, straight-ish lines from launch point to the (moving) target */
 // online: guests get the salvos in flight so they can draw them (damage is the host's)
 function serStrikes(){return wStrikes.map(k=>({p0:k.p0,tw:k.isW,t:k.isW?k.tgt.id:ships.indexOf(k.tgt),born:k.born,due:k.due,done:!!k.done,col:k.col,J:k.J,last:k.last}))}
@@ -3661,12 +3710,12 @@ function drawStrikes(){if(!wStrikes.length)return;const dpr=devicePixelRatio,k=a
 function drawWings(){drawStrikes();const dpr=devicePixelRatio,k=animK();for(const w of wings){if(!wingFlying(w))continue;const a=w.ppx||w.px,b=w.px,x=a.x+(b.x-a.x)*k,y=a.y+(b.y-a.y)*k,X=sx(x),Y=sy(y);
     const col=w.car.color||'#fff',rel=w.team===MYTEAM?(own(w.car)?'#7fd17f':'#6fb6ff'):'#ffa24d',s=Math.max(2.2,cam.s/dpr*3)*dpr;
     ctx.save();ctx.translate(X,Y);ctx.rotate(w.h);const pos=[[0,0],[-1.3,-1.1],[-1.3,1.1],[-2.6,-2.2],[-2.6,2.2],[-2.6,0]];
-    for(let i=0;i<w.n;i++){const [px_,py_]=pos[i];ctx.save();ctx.translate(px_*s*1.4,py_*s*1.4);ctx.beginPath();if(w.type==='F'){ctx.moveTo(s*1.2,0);ctx.lineTo(-s*.8,-s*.7);ctx.lineTo(-s*.4,0);ctx.lineTo(-s*.8,s*.7)}else{ctx.moveTo(s,0);ctx.lineTo(0,-s*.75);ctx.lineTo(-s,0);ctx.lineTo(0,s*.75)}ctx.closePath();ctx.fillStyle=col;ctx.globalAlpha=.9;ctx.fill();ctx.restore()}
+    const shp=CRAFT[(w.car.d.faction==='Dogahr'?'D':'M')+w.type],sp=w.type==='B'?2.7:2;for(let i=0;i<w.n;i++){const [px_,py_]=pos[i];ctx.save();ctx.translate(px_*s*sp,py_*s*sp);drawCraft(shp,s,col,w.ms>0);ctx.restore()}
     ctx.restore();if(CINE)continue;if(P&&!P.dead&&P.target===w){ctx.save();ctx.strokeStyle='#ff5a5a';ctx.lineWidth=1.5*dpr;ctx.setLineDash([3,3]);ctx.beginPath();ctx.arc(X-s*1.6,Y,s*5,0,7);ctx.stroke();ctx.restore()}   // your target
     ctx.font=`${10*dpr}px ui-monospace,monospace`;ctx.fillStyle=rel;ctx.textAlign='left';ctx.fillText(`${WING[w.type].ab}${w.id}·${w.n}`,X+6*s,Y-4*s+((w.id%3)-1)*9*dpr)}}
 
 /* ---- HUD: wing control for a selected carrier ---- */
-function carrierPanel(){const el=$('wingtab');if(!el||!P||P.dead||!isCarrier(P)||!own(P))return;   // Nov 27 night: lives in the ✈ Fighters tab
+function carrierPanel(){const el=$('wingtab');if(!el||!P||P.dead||!(isCarrier(P)||wings.some(w=>w.car===P))||!own(P))return;   // Nov 27 night: lives in the ✈ Fighters tab
   const L=wings.filter(w=>w.car===P&&wingAlive(w));const st=w=>w.state==='fly'?(w.order==='return'?'returning':'flying'):w.state==='rearm'?`rearming → ${turnOf(w.ready)}·${impOf(w.ready)}`:'docked';
   const oSel=w=>`<select data-word="${w.id}" style="width:128px;font-size:11px"><option value="attack" ${w.order==='attack'?'selected':''}>Attack ${w.order==='attack'&&w.tgt?(w.tgt.n!=null?WING[w.tgt.type].ab+w.tgt.id:w.tgt.name):'carrier tgt'}</option><option value="attack!">→ my current target</option><option value="disable" ${w.order==='disable'?'selected':''}>Disable ${w.order==='disable'&&w.tgt?w.tgt.name:'carrier tgt'} (PD on systems)</option><option value="disable!">Disable my current target</option><option value="escort" ${w.order==='escort'?'selected':''}>Escort carrier</option><option value="intercept" ${w.order==='intercept'?'selected':''}>Intercept craft</option><option value="return" ${w.order==='return'?'selected':''}>Return &amp; rearm</option></select>`;
   el.innerHTML=`<h2 style="margin:0 0 4px">✈ Wings <span class="dim sm">${L.filter(w=>w.state==='fly').length} flying · ${L.filter(w=>w.state!=='fly').length} aboard</span></h2>
@@ -3684,6 +3733,7 @@ function sqPopup(t,i){const x=fleet[t]&&fleet[t][i];const d=x&&SHIPS[x.key];if(!
     <div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn go" id="sqok">Done</button></div></div>`;
     el.querySelectorAll('[data-sqk]').forEach(b=>b.onclick=()=>{const [k,v]=b.dataset.sqk.split(':');x.sq[+k]=v;draw()});el.querySelector('#sqok').onclick=()=>{el.remove();renderBuilder();if(typeof lobbyChanged==='function')lobbyChanged()}};
   draw();document.body.appendChild(el)}
+{const _rb0=renderBuilder;renderBuilder=function(){_rb0.apply(this,arguments);try{document.querySelectorAll('[data-fw]').forEach(b=>b.onclick=e=>{e.stopPropagation();const [t,ty,d]=b.dataset.fw.split(':');const f=fleetWings[+t]||(fleetWings[+t]={F:0,B:0});f[ty]=Math.max(0,Math.min(8,(f[ty]||0)+ +d));renderBuilder();if(typeof lobbyChanged==='function')lobbyChanged()})}catch(e){console.error(e)}}}
 {const _rb=renderBuilder;renderBuilder=function(){_rb.apply(this,arguments);try{
   document.querySelectorAll('#builder [data-frm]').forEach(b=>{const [t,i]=b.dataset.frm.split(':');const x=fleet[+t]&&fleet[+t][+i];const d=x&&SHIPS[x.key];if(noFighters||!hasCraft(d)||b.parentNode.querySelector('[data-sqed]'))return;
     if(!x.sq||x.sq.length!==sqN(d))x.sq=defSq(d);const nb=document.createElement('button');nb.className='btn';nb.dataset.sqed=t+':'+i;nb.title=d.hangar?`Hangar: ${d.hangar} craft — fighters or bombers`:'Choose fighter and bomber squadrons';nb.textContent='✈ '+craftLabel(d,x.sq);nb.onclick=e=>{e.stopPropagation();sqPopup(+t,+i)};b.before(nb)});
