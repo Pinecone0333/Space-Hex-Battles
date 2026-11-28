@@ -2319,6 +2319,13 @@ function render(){const dpr=devicePixelRatio;ctx.fillStyle='#04070c';ctx.fillRec
       ctx.restore()}
     if(f.type==='beam'){ctx.globalAlpha=a;ctx.strokeStyle=f.color;ctx.lineWidth=f.w*dpr;ctx.shadowColor=f.color;ctx.shadowBlur=8*dpr;const X1=sx(f.x1),Y1=sy(f.y1),X2=sx(f.x2),Y2=sy(f.y2),L=Math.hypot(X2-X1,Y2-Y1)||1,nx=-(Y2-Y1)/L,ny=(X2-X1)/L,n=f.n||1,g=3.2*dpr*Math.max(1,cam.s*.6);
       ctx.beginPath();for(let i=0;i<n;i++){const o=(i-(n-1)/2)*g;ctx.moveTo(X1+nx*o,Y1+ny*o);ctx.lineTo(X2+nx*o,Y2+ny*o)}ctx.stroke();ctx.shadowBlur=0}   // one thin beam per barrel, side by side
+    else if(f.type==='smis'){const k=1-f.t/f.max,fl=Math.min(1,k/.8),e=fl*fl*(3-2*fl);   // small missile (craft): accelerating dart on a slight curve, trail, spark on arrival
+      const P=u=>{const x=f.x1+(f.x2-f.x1)*u,y=f.y1+(f.y2-f.y1)*u,dx=f.x2-f.x1,dy=f.y2-f.y1,b=Math.sin(u*Math.PI)*f.bend*.18;return{x:x-dy*b,y:y+dx*b}};
+      ctx.save();if(fl<1){const h=P(e),tl=P(Math.max(0,e-.22));const X=sx(h.x),Y=sy(h.y),TX=sx(tl.x),TY=sy(tl.y);
+        const g=ctx.createLinearGradient(TX,TY,X,Y);g.addColorStop(0,f.color+'00');g.addColorStop(1,f.color+'cc');ctx.strokeStyle=g;ctx.lineWidth=2.2*dpr;ctx.beginPath();ctx.moveTo(TX,TY);ctx.lineTo(X,Y);ctx.stroke();
+        ctx.shadowColor=f.color;ctx.shadowBlur=6*dpr;ctx.fillStyle='#ffffff';ctx.beginPath();ctx.arc(X,Y,2.3*dpr,0,7);ctx.fill()}
+      else{const q=(k-.8)/.2;ctx.globalAlpha=Math.max(0,1-q);ctx.fillStyle=f.color;ctx.shadowColor=f.color;ctx.shadowBlur=10*dpr;ctx.beginPath();ctx.arc(sx(f.x2),sy(f.y2),(2+6*q)*dpr,0,7);ctx.fill()}
+      ctx.restore()}
     else if(f.type==='bolt'){const k=1-a;const x=f.x1+(f.x2-f.x1)*k,y=f.y1+(f.y2-f.y1)*k;ctx.globalAlpha=1;ctx.fillStyle=f.col+'66';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*2.2*dpr,0,7);ctx.fill();ctx.fillStyle='#fffbe8';ctx.beginPath();ctx.arc(sx(x),sy(y),f.r*dpr,0,7);ctx.fill()}
     else if(f.type==='p'){ctx.globalAlpha=Math.min(1,f.t*2);ctx.fillStyle=f.color;ctx.fillRect(sx(f.x),sy(f.y),2*dpr,2*dpr)}
     else if(f.type==='deb'){ctx.save();ctx.globalAlpha=Math.min(1,f.t*1.2);ctx.translate(sx(f.x),sy(f.y));ctx.rotate(f.rot);const z=f.sz*dpr*Math.max(.7,Math.min(1.6,cam.s/dpr));ctx.fillStyle=f.color;if(f.ember){ctx.shadowColor='#ff8a2a';ctx.shadowBlur=5*dpr}ctx.fillRect(-z,-z*.6,z*2,z*1.2);ctx.restore()}
@@ -3424,7 +3431,8 @@ function moveWings(off){if(!wings.length)return 0;const dt=1/IMP;const base=Math
     if(!t||tgtDead(t)||t.team===w.team)continue;const d=wDist(w,t);if(d>4)continue;
     const isW=t.n!=null;if(w.type==='B'&&isW)continue;if(!isW&&w.order==='disable')continue;   // disabling: PD only, missiles kept for craft
     const shots=w.type==='B'?w.n*w.ms:(isW?w.n:w.n*w.ms);if(!shots)continue;const D=at();
-    for(let i=0;i<Math.min(shots,8);i++)fx.push({type:'beam',x1:w.px.x+rnd(-6,6),y1:w.px.y+rnd(-6,6),x2:wTp(t).x+rnd(-8,8),y2:wTp(t).y+rnd(-8,8),t:.4,max:.4,color:'#ffe9a8',w:1,d:D});sfxAt('missile',.35);
+    /* Nov 27 (David): small missiles streak out from the craft to the target — one dart with a fading trail per missile (up to 24 drawn), launched in a ripple, a spark where each lands */
+    const col=w.car.d.torp||'#ffe9a8';for(let i=0;i<Math.min(shots,24);i++){const lag=i*.035;fx.push({type:'smis',x1:w.px.x+rnd(-10,10),y1:w.px.y+rnd(-10,10),x2:wTp(t).x+rnd(-9,9),y2:wTp(t).y+rnd(-9,9),bend:rnd(-.5,.5),t:.75,max:.75,color:col,d:D+lag})}sfxAt('missile',.35);
     if(isW){let k=0;for(let i=0;i<shots&&wingAlive(t);i++)if(Math.random()<WING[t.type].msHit-WING[t.type].evade){FXD=D;k+=wingHit(t,SMS_DMG,wgLabel(w))||0}FXD=0;w.ms=Math.max(0,w.ms-1);if(fr(w.car)||fr(t.car))log(`${wgLabel(w)} → ${wgLabel(t)}: ${shots} small missiles, ${k} down`,'dim')}
     else{FXD=D;for(let i=0;i<shots&&!t.dead;i++)applyDamage(t,SMS_DMG,w.car,w.px);FXD=0;w.ms=0;w.fired=true;burst(t.px,16,'#ffe9a8');if(fr(w.car)||fr(t))log(`${wgLabel(w)} → ${t.name}: ${shots} small missiles, ${shots*SMS_DMG} dmg`,fr(w.car)?'good':'bad');
       if(w.type==='B')setWingOrder(w,'return')}}
